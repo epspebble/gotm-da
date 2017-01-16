@@ -1,0 +1,71 @@
+!$Id: airsea.inp,v 1.4 2004/02/24 16:07:25 spi Exp spi $
+!-------------------------------------------------------------------------------
+! Air-sea interaction (heat and momentum fluxes)
+!
+! calc_fluxes=.true., use meteo_file
+       !SP flux_method =2 - flux obs from file
+                       =0 - gotm calculates fluxes
+       !SP swr_method  =2 - swr down obs from file  (1st column)
+!		       =0 - swr calculated by GOTM
+	!SP lwr_method =2 - lwr down obs from file (3rd column)
+!		       =0 - lwr calculated from met
+!SP     longwave_method       = 1 - Clark
+!			      = 2 - Hastenrath
+!			      = 3 - Zillman
+!			      = 4 - Brunt
+!			      = 5 - Bignami
+!			      = 6 - Josey
+!SP     clark_lamda = latitude depend variable needed for longwave_method 1
+!	wind_h  = height of wind observations used to calculate fluxes 
+!	rh_h = height of relative humidity obs used to calculate fluxes
+!	airt_h = height of air temp obs used to calculate fluxes
+!       
+	!HK solar used in calculation of swr from lat,long,time etc
+	!HK net_ir - not used
+!SP     swr_error   %I_0=swr_error*I_0%
+!HK const_qin, qout if heat_method=1 these are the values for I_O and heat resp.
+! heatflux_file='heatflux.dat',
+! momentum_method=2,CONSTVAL=1,FROMFILE=2
+! 
+! const_tx=0.0017, approx 1ms-1 wind
+! const_ty=0.0,
+! momentumflux_file='momentumflux.dat',
+! p_e_method=0, HK relates to precipitation and evaporation
+! p_e_flux_file='p_e.dat',
+! sst_method=2,
+! sst_file='sst.dat',
+! sss_method=0,
+! sss_file='sss.dat',
+! airt_method=0, =1 set to sst !HK airt is taken from file if calc_fluxes=true
+! airt_file='airt.dat',
+!-------------------------------------------------------------------------------
+ &airsea
+  calc_fluxes=         .true.,
+  meteo_file =       'OBS/ARABIAN/arabian_met.dat',      
+  	flux_method=         2,    
+  	swr_method=              2,
+  	lwr_method=              2,
+	longwave_method=	1,
+	clark_lamda=       .51,
+	wind_h=            3.63,     !**CHANGE THESE**!
+	rh_h=              2.69,
+	airt_h=            2.68,
+  	solar=               1370.,   !Willson,1984
+  	net_ir=              1370.,
+	swr_error=         1.0,
+  const_qin=           1000.0,
+  const_qout=          -310.429,
+  heatflux_file=       'OBS/ARABIAN/arabian_heat.dat',         
+  momentum_method=     0,
+  const_tx=            0.0017,
+  const_ty=            0.0,
+  momentumflux_file=   'momentumflux.dat',
+  p_e_method=          0,
+  p_e_flux_file=       'p_e.dat',
+  sst_method=          0,
+  sst_file=            'sst.dat',
+  sss_method=          0,
+  sss_file=            'sss.dat',
+  airt_method=         0,
+  airt_file=           'airt.dat',
+ /

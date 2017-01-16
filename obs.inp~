@@ -1,0 +1,99 @@
+ &sprofile
+  s_prof_method=0,
+  z_s1=         30.,
+  s_1=          20.,
+  z_s2=         40.,
+  s_2=          15.,
+  s_prof_file=  "ECMWF/sea_salt_-025N_330E.dat",
+  init_s_prof=  "OBS/COARE/mean_sprof_week.dat",
+  SRelaxTauM=   1.e15,
+  SRelaxTauB=   1.e15,
+  SRelaxTauS=   1.e15,
+  SRelaxBott=   0.,
+  SRelaxSurf=   0.,
+ /
+ &tprofile
+  t_prof_method=2,
+  z_t1=         30.,
+  t_1=          20.,
+  z_t2=         40.,
+  t_2=          15.,
+  t_prof_file=  "../OBS/ARABIAN/arabian_t.dat",
+  init_t_prof=  "OBS/ARABIAN/mean_tprof_week.dat",
+  TRelaxTauM=    1.e15,
+  TRelaxTauB=   1.e15,
+  TRelaxTauS=   1.e15,
+  TRelaxBott=   0.,
+  TRelaxSurf=   0.,
+ /
+ &ext_pressure
+  ext_press_method=0,
+  PressMethod=  0,
+  ext_press_file="pressure.dat",
+  PressConstU=  0.0,
+  PressConstV=  0.0,
+  PressHeight=  0.0,
+  PeriodM=      44714.0,
+  AmpMu=        0.0,
+  AmpMv=        0.0,
+  PhaseMu=      0.0,
+  PhaseMv=      0.0,
+  PeriodS=      43200.0,
+  AmpSu=        0.0,
+  AmpSv=        0.0,
+  PhaseSu=      0.0,
+  PhaseSv=      0.0,
+ /
+ &int_pressure
+  int_press_method=0,
+  int_press_file="intern_press.dat",
+  const_dsdx=   0.0,
+  const_dsdy=   0.0,
+  const_dtdx=   0.0,
+  const_dtdy=   0.0,
+  const_idpdx=  0.0,
+  const_idpdy=  0.0,
+  s_adv=        .false.,
+  t_adv=        .false.,
+ /
+ &extinct
+  extinct_method=9
+  extinct_file= "CHLO/SeaWiFS_9km/Jan_98-05_-60N-60N_270E-359E.dat",
+  start_lat=-60,
+  end_lat=60,
+  start_lon=270,
+  end_lon=359,
+ /
+ &w_advspec
+  w_adv_method= 0,
+  w_adv0=       0.,
+  w_adv_file=   "w_adv.dat",
+  w_adv_discr=  4,
+ /
+ &zetaspec
+  zeta_method=  0,
+  zeta_file=    "zeta.dat",
+  zeta_0=        0.00000,
+  period_1=      44714.0,
+  amp_1=         1.00000,
+  phase_1=       0.00000,
+  period_2=      43200.0,
+  amp_2=         0.50000,
+  phase_2=       0.00000,
+ /
+ &velprofile
+  vel_prof_method=0,
+  vel_prof_file="velprof.dat",
+  vel_relax_tau = 1.e15,
+  vel_relax_ramp = 86400,
+ /
+ &eprofile
+  e_prof_method=0,
+  e_obs_const=  1.e-12,
+  e_prof_file=  "eps_fly.dat",
+ /
+ &bprofile
+  b_obs_surf=   0.0,
+  b_obs_NN=     1.e-4,
+  b_obs_sbf=    0.0,
+ /

@@ -4,8 +4,6 @@
 !09/04 added skin sst to output variables
 !11/04 added cloud to output variables
 !03/05 added inovation to output variables
-!WT 2016-09-24
-! Commented out seviri*, amsri*, tmi*, ostia*, cloud and *error, 
 !-----------------------------------------------------------------------
 !BOP
 !
@@ -1375,12 +1373,12 @@
 !  variable ids
    integer, private          :: lon_id,lat_id,z_id,z1_id,time_id,zeta_id
    integer, private          :: border_id,swr_error_id,wind_error_id
-   ! integer, private          :: seviri_diff_id,seviri_sq_diff_id,seviri_obs_id
-   ! integer, private          :: amsre_diff_id,amsre_sq_diff_id,amsre_obs_id
-   ! integer, private          :: tmi_diff_id,tmi_sq_diff_id,tmi_obs_id
-   ! integer, private          :: ostia_diff_id,ostia_sq_diff_id
-   ! integer, private          :: ostia_seviri_diff_id,ostia_amsre_diff_id,ostia_tmi_diff_id
-   ! integer, private          :: ostia_seviri_sq_diff_id,ostia_amsre_sq_diff_id,ostia_tmi_sq_diff_id
+   integer, private          :: seviri_diff_id,seviri_sq_diff_id,seviri_obs_id
+   integer, private          :: amsre_diff_id,amsre_sq_diff_id,amsre_obs_id
+   integer, private          :: tmi_diff_id,tmi_sq_diff_id,tmi_obs_id
+   integer, private          :: ostia_diff_id,ostia_sq_diff_id
+   integer, private          :: ostia_seviri_diff_id,ostia_amsre_diff_id,ostia_tmi_diff_id
+   integer, private          :: ostia_seviri_sq_diff_id,ostia_amsre_sq_diff_id,ostia_tmi_sq_diff_id
    integer, private          :: sst_id,sss_id,skint_id,cloud_id
    integer, private          :: x_taus_id,y_taus_id
    integer, private          :: swr_id,heat_id,total_id,lwr_id,sens_id,latent_id
@@ -1495,8 +1493,8 @@
    call check_err(iret)
    iret = nf_def_var(ncid,'skint',NF_REAL,3,dims, skint_id)
    call check_err(iret)
-!   iret = nf_def_var(ncid,'cloud',NF_REAL,3,dims, cloud_id)
-!   call check_err(iret)
+   iret = nf_def_var(ncid,'cloud',NF_REAL,3,dims, cloud_id)
+   call check_err(iret)
 !   iret = nf_def_var(ncid,'swr_error',NF_REAL,3,dims, swr_error_id)
 !   call check_err(iret)
 !   iret = nf_def_var(ncid,'wind_error',NF_REAL,3,dims, wind_error_id)
@@ -1681,7 +1679,7 @@
 !   iret = set_attributes(ncid,ostia_amsre_sq_diff_id,units='celsius',long_name='sum of ostia-amsre squared differences')
 !   iret = set_attributes(ncid,ostia_tmi_diff_id,units='celsius',long_name='sum of ostia-tmi differences')
 !   iret = set_attributes(ncid,ostia_tmi_sq_diff_id,units='celsius',long_name='sum of ostia-tmi squared differences')
-!   iret = set_attributes(ncid,cloud_id,units='tenths',long_name='total fractional cloud cover')
+   iret = set_attributes(ncid,cloud_id,units='tenths',long_name='total fractional cloud cover')
    iret = set_attributes(ncid,sss_id,units='psu',long_name='sea surface salinity')
    iret = set_attributes(ncid,x_taus_id,units='N/m2',long_name='x-wind stress')
    iret = set_attributes(ncid,y_taus_id,units='N/m2',long_name='y-wind stress')
@@ -1768,13 +1766,13 @@
    use airsea,       only: tx,ty,I_0,heat,sst,sss,int_sw,int_hf,int_total,int_cs,qb,qh,qe,skint,cloud,swr_error,wind_error,border
    use meanflow,     only: depth0,u_taub,u_taus,rho_0,gravity
    use meanflow,     only: h,u,v,z,S,T,buoy,SS,NN,P,B
-   ! use airsea, only                : seviri_diff,seviri_sq_diff,seviri_obs
-   ! use airsea, only                : amsre_diff,amsre_sq_diff,amsre_obs
-   ! use airsea, only                : tmi_diff,tmi_sq_diff,tmi_obs
-   ! use airsea, only                : ostia_diff,ostia_sq_diff
-   ! use airsea, only                : ostia_seviri_diff,ostia_amsre_diff
-   ! use airsea, only                : ostia_tmi_diff,ostia_seviri_sq_diff
-   ! use airsea, only                : ostia_amsre_sq_diff,ostia_tmi_sq_diff
+   use airsea, only                : seviri_diff,seviri_sq_diff,seviri_obs
+   use airsea, only                : amsre_diff,amsre_sq_diff,amsre_obs
+   use airsea, only                : tmi_diff,tmi_sq_diff,tmi_obs
+   use airsea, only                : ostia_diff,ostia_sq_diff
+   use airsea, only                : ostia_seviri_diff,ostia_amsre_diff
+   use airsea, only                : ostia_tmi_diff,ostia_seviri_sq_diff
+   use airsea, only                : ostia_amsre_sq_diff,ostia_tmi_sq_diff
    use turbulence,   only: num,nuh,tke,eps,L,uu,vv,ww,tt,chi
    use observations, only: zeta,uprof,vprof,tprof,sprof,epsprof
    use eqstate,      only: eqstate1
@@ -1852,7 +1850,7 @@
    !iret = store_data(ncid,ostia_amsre_sq_diff_id,4,1,scalar=ostia_amsre_sq_diff)
    !iret = store_data(ncid,ostia_seviri_diff_id,4,1,scalar=ostia_seviri_diff)
    !iret = store_data(ncid,ostia_seviri_sq_diff_id,4,1,scalar=ostia_seviri_sq_diff)
-   !iret = store_data(ncid,cloud_id,4,1,scalar=cloud)
+   iret = store_data(ncid,cloud_id,4,1,scalar=cloud)
    iret = store_data(ncid,sss_id,4,1,scalar=sss)
    iret = store_data(ncid,x_taus_id,4,1,scalar=tx)
    iret = store_data(ncid,y_taus_id,4,1,scalar=ty)

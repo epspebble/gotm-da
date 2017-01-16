@@ -717,34 +717,13 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
       qa=.62197*(ea/(airp-0.378*ea))   !convert vapour pressure to mixing ratio (saturated at air temp.)
 
 !The below 2 formula are used in relative humidity is observed (rh)
-!      e=ea*rh*0.01                     !relative humidity = vapour pressure/satuated vapour pressure
-!      q=.62197*(e/(airp-0.378*e))     !mixing ratio   (kg/kg)
+      e=ea*rh*0.01                     !relative humidity = vapour pressure/satuated vapour pressure
+       q=.62197*(e/(airp-0.378*e))     !mixing ratio   (kg/kg)
 
-!W-H. Tse 160910 debug.      
-!      print *, "e,ea,rh,airp,q"
-!      print *,e,ea,rh,airp,q    
-   
-
-      !W-H. Tse 160910 The information in the link is good, but the following formula was wrongly input by the previous guy,
-      !where q and spec_hum is reversed in relationship.
-
-      ! PREVIOUS 
-      !The below formula is used if specific humidity is observed (spec_hum)
+!The below formula is used if specific humidity is observed (spec_hum)
       !from http://amsglossary.allenpress.com/glossary/search?id=specific-humidity1 using specific humidity (spec_hum) in Kg/Kg
-      !      q=spec_hum/(1+spec_hum)           !mixing ratio  (kg/kg)
-      ! END PREVIOUS
-
-      ! NEW
-      ! The formula by solving for q in spec_hum = q/(1+q), which gives q = spec_hum/(1-spec_hum).
-
-      q = spec_hum/(1-spec_hum)
-
-      ! END NEW      
-      rh=q*100/qa                       !relative humidity
-
-!W-H. Tse 160910 debug.            
-!      print *, "spec_hum,q,qa,rh"
-!      print *, spec_hum,q,qa,rh
+!      q=spec_hum/(1+spec_hum)           !mixing ratio  (kg/kg)
+!      rh=q*100/qa                       !relative humidity
 
 !The below is used if dew point temperature is observed (dew_pt)
       !from http://www.srh.noaa.gov/elp/wxcalc/formulas/vaporPressure.html using dew point temperature (dew_pt) in Celsius
@@ -874,6 +853,7 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
       rns=I_0
       rnl=qb   
 !   Cool skin
+
            hsb=-rho_air*cpa*usr*tsr
            hlb=-rho_air*xlv*usr*qsr
            qout=rnl+hsb+hlb
@@ -1152,7 +1132,7 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
 ! !DESCRIPTION:
 !  This subroutine calculates the short--wave net radiation based on 
 !  latitude, longitude, time, fractional cloud cover and albedo.
-!  The albedo monthly values from \cite{Payne72} are given here
+!  The albedo monthly values from \cite{Payne72} are given  here
 !  as means of the values between 
 !  at 30$^{\circ}$ N and 40$^{\circ}$ N for the Atlantic Ocean 
 !  (hence the same latitudinal band of the Mediterranean Sea).
@@ -1181,7 +1161,7 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
 !
 !   double precision                  :: solar=1350.
    double precision                  :: eclips=23.439*deg2rad
-   double precision                  :: tau=0.66  !Arab=0.74,COARE=0.63,Sub=0.7
+   double precision                  :: tau=0.7  !Arab=0.74,COARE=0.63,Sub=0.7
    double precision                  :: aozone=0.09
 
 
@@ -1429,9 +1409,9 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
       wy_obs=obs(2)
       airp  = obs(3)*100. !kbk mbar/hPa --> Pa
       airt  = obs(4)
-      spec_hum = obs(5)
+!      spec_hum = obs(5)
 !      dew_pt = obs(5)
-!      rh    = obs(5)
+      rh    = obs(5)
       cloud = obs(6)
 
       call exchange_coefficients()

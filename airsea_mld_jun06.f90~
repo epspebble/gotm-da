@@ -2,8 +2,7 @@
 !This module has the exchange_coefficients subroutine changed to calculate
 !fluxes according to the COARE Bulk Flux Algorithm version 3.0a modified 
 !slightly by Simon Josey and then adapted by Sam Pimentel in order to fit into
-!GOTM. 
-! 
+!GOTM.  
 !In addition to airsea_solar1.f90 this has the full albedo table from Payne, 
 !and I feel this is slightly neater.  Also if the Arabian sea observations for
 !incoming solar radiation are used, then the albedo factor needs to be included
@@ -57,6 +56,7 @@
    public                              :: integrated_fluxes
    public                              :: do_calc_fluxes
 
+!
 ! !PUBLIC DATA MEMBERS:
    logical,  public                    :: calc_fluxes=.false.
 !  tx and ty are the surface stress components:
@@ -77,16 +77,8 @@
    double precision, public	:: I_cool = 0.,albedo,qtot,sunbet
 !   double precision, public	:: qb,qe,qh
    double precision, public	:: dlr,w_10
+ 
 
-   double precision, public       :: seviri_diff=0.,amsre_diff=0.,tmi_diff=0.
-   double precision, public       :: ostia_diff=0.,ostia_seviri_diff=0.
-   double precision, public       :: ostia_amsre_diff=0.,ostia_tmi_diff=0.
-   double precision, public       :: seviri_sq_diff=0.,amsre_sq_diff=0.
-   double precision, public       :: tmi_sq_diff=0.,ostia_sq_diff=0.
-   double precision, public       :: ostia_seviri_sq_diff=0.
-   double precision, public       :: ostia_amsre_sq_diff=0.
-   double precision, public       :: ostia_tmi_sq_diff=0.,seviri_obs=0.
-   double precision, public       :: amsre_obs=0.,tmi_obs=0.
 !
 ! !DEFINED PARAMETERS:
    integer, parameter                  :: meteo_unit=20
@@ -186,7 +178,7 @@
    double precision, public                  :: const_qin,const_qout
    double precision, public                  :: swr_error,wind_error  !SP
    double precision, public                  :: wind_h,rh_h,airt_h   !SP
-   double precision, public                  :: border,ostia
+   double precision, public                  :: border
 
    double precision                  :: es,ea,e,qs,q,mr,xlv,rnl
    double precision                  :: cdd,chd,ced,Du,zt,dqer
@@ -439,7 +431,6 @@
 
    !Net shortwave radiation
    I_0=I_0_calc
-
 !     The heat fluxes
 
       select case (flux_method)
@@ -458,27 +449,10 @@
                PRINT*,'ERROR'
                READ*
             else
-!               I_0=I_0_calc*adjustment
+               I_0=I_0_calc*adjustment
 !               cloud=1-adjustment  !cloud index
-               I_0=adjustment*(1.-albedo)
+!               I_0=adjustment*(1.-albedo)
 !               cloud=1-I_0/I_0_calc
-
-! SP June 2016 - determine cloud fraction
-		if(I_0_calc .ne. 0) then 
-			cloud = ((1 - (I_0/I_0_calc) + 0.0019*sunbet)/0.62)
-			if(cloud .LT. 0.0) then
-				cloud = 0.0
-			end if
-			if(cloud .GT. 1.0) then
-				cloud = 1.0
-			end if
-		else
-			cloud = 0.0;
-		end if
-! SP June 2016 - recalculate swr (now with cloud values)
-                call short_wave_radiation(jul,secs,alon,alat) 
-                I_0=I_0_calc
-
             end if 
          case default
       end select
@@ -495,6 +469,7 @@
             end if
          case default
       end select
+
 
 !     The momentum fluxes
       select case (momentum_method)
@@ -527,13 +502,14 @@
          call skin_temp(sst,skint)
       end if
 
+
    return
    end subroutine air_sea_interaction
 !EOC
 !-----------------------------------------------------------------------
    subroutine skin_temp(sst,skint)
 
-! USES:
+! !USES:
 
 use meanflow,     only:  gravity,rho_0,cp
 
@@ -662,7 +638,7 @@ use meanflow,     only:  gravity,rho_0,cp
    double precision                  ::Ct,CC,Ribcu,Ribu,zetu,L10,qsr,tsr
    double precision                  ::rr,zoq,zot,zL,L,psu,pst
    double precision                  ::usrold,tsrold,qsrold,conusr,contsr,conqsr
-   double precision                  ::hsb,hlb,qout,dels,qcol,alq,xlamx
+   double precision                  ::hsb,hlb,qout,dels,qcol,alq,xlamx,tkt
    integer                           ::iter
 
    integer                           ::i,ios,count=1,count2=1,count3=0
@@ -677,23 +653,23 @@ use meanflow,     only:  gravity,rho_0,cp
       wx=(1+wind_error)*wx
       wy=(1+wind_error)*wy
    ELSE
-      if((wind_error.NE.0.0).AND.(ABS(wind_error-0.25).GT.0.0001).AND.(ABS(wind_error+0.25).GT.0.0001)) then
-         if(ABS(wind_error-9.0).LT.0.0001) then
-            wind_error=0.0
-            border=2
-!         else if(wind_error.LT.-0.999) then
-!            wind_error=-0.999
-!            border=3
-!         else if(wind_error.LT.-0.95) then
-!            wind_error=-0.95
-!            border=3
-!         else if(wind_error.GE.3) then
-!            wind_error=3.0
-!            border=3
-         else
-            border=1
-         end if
+   if((wind_error.NE.0.0).AND.(ABS(wind_error-0.25).GT.0.0001).AND.(ABS(wind_error+0.25).GT.0.0001)) then
+      if((sqrt(wx_obs*wx_obs+wy_obs*wy_obs).GE.6).AND.(wind_error.GT.0)) then
+         wind_error=0.0
+         border=2
+      else if((wind_error.GT.-1+6/sqrt(wx_obs*wx_obs+wy_obs*wy_obs)).AND.(sqrt(wx_obs*wx_obs+wy_obs*wy_obs).LT.6)) then
+         wind_error=-1+6/sqrt(wx_obs*wx_obs+wy_obs*wy_obs)
+         border=3
+      else if(wind_error.LE.-1) then
+         wind_error=-1
+         border=4
+      else if(wind_error.GE.3) then
+         wind_error=3
+         border=5
+      else
+         border=1
       end if
+   end if
             wx=(1+wind_error)*wx
             wy=(1+wind_error)*wy
    END IF
@@ -718,39 +694,18 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
 
 !The below 2 formula are used in relative humidity is observed (rh)
 !      e=ea*rh*0.01                     !relative humidity = vapour pressure/satuated vapour pressure
-!      q=.62197*(e/(airp-0.378*e))     !mixing ratio   (kg/kg)
+!       q=.62197*(e/(airp-0.378*e))     !mixing ratio   (kg/kg)
 
-!W-H. Tse 160910 debug.      
-!      print *, "e,ea,rh,airp,q"
-!      print *,e,ea,rh,airp,q    
-   
-
-      !W-H. Tse 160910 The information in the link is good, but the following formula was wrongly input by the previous guy,
-      !where q and spec_hum is reversed in relationship.
-
-      ! PREVIOUS 
-      !The below formula is used if specific humidity is observed (spec_hum)
+!The below formula is used if specific humidity is observed (spec_hum)
       !from http://amsglossary.allenpress.com/glossary/search?id=specific-humidity1 using specific humidity (spec_hum) in Kg/Kg
-      !      q=spec_hum/(1+spec_hum)           !mixing ratio  (kg/kg)
-      ! END PREVIOUS
-
-      ! NEW
-      ! The formula by solving for q in spec_hum = q/(1+q), which gives q = spec_hum/(1-spec_hum).
-
-      q = spec_hum/(1-spec_hum)
-
-      ! END NEW      
-      rh=q*100/qa                       !relative humidity
-
-!W-H. Tse 160910 debug.            
-!      print *, "spec_hum,q,qa,rh"
-!      print *, spec_hum,q,qa,rh
+!      q=spec_hum/(1+spec_hum)           !mixing ratio  (kg/kg)
+!      rh=q*100/qa                       !relative humidity
 
 !The below is used if dew point temperature is observed (dew_pt)
       !from http://www.srh.noaa.gov/elp/wxcalc/formulas/vaporPressure.html using dew point temperature (dew_pt) in Celsius
-!      e=6.11*10**(7.5*dew_pt/(237.7+dew_pt))
-!      q=.62197*(e/(airp-0.378*e))     !mixing ratio   (kg/kg)
-!      rh=e*100/ea
+      e=6.11*10**(7.5*dew_pt/(237.7+dew_pt))
+      q=.62197*(e/(airp-0.378*e))     !mixing ratio   (kg/kg)
+      rh=e*100/ea
     
 !OPEN(UNIT=77,FILE="OBS/q_with_rh_new2.asc")
 !WRITE(UNIT=77,FMT='(F9.8)') q
@@ -816,7 +771,7 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
           zetu=CC*Ribu/(1.+Ribu/Ribcu)   ! Unstable G and F
       else
           zetu=CC*Ribu*(1.+27./9.*Ribu/CC) ! Stable
-      end if
+      endif
       L10=zu/zetu                       ! MO length
 
 ! First guess M-O stability dependent scaling params.(u*,t*,q*) to estimate zo and z/L
@@ -867,13 +822,14 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
           Wg=Beta*(Bf*zi)**.333
        else
           Wg=0.2
-       end if
+       endif
          Du=sqrt(w**2.+Wg**2.)        !include gustiness in wind spd.
 !      
 !use net swr and net lwr calculated from previous step
       rns=I_0
       rnl=qb   
 !   Cool skin
+
            hsb=-rho_air*cpa*usr*tsr
            hlb=-rho_air*xlv*usr*qsr
            qout=rnl+hsb+hlb
@@ -886,7 +842,7 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
          else
            xlamx=6.                                      !prevent excessive warm skins
            tkt=min(.01,xlamx*visw/(sqrt(rho_air/rhow)*usr)) !Limit tkt
-         end if
+         endif
        dter=qcol*tkt/tcw                                 ! Eq.12 Cool skin
        dqer=wetc*dter
 
@@ -896,7 +852,7 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
          END IF
        if (max(abs(conusr),abs(contsr),abs(conqsr)).lt.0.001) then
           goto 912
-       end if
+       endif
    10 continue                                           ! end iterations
 
 !(sxj) jump out point
@@ -945,7 +901,7 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
       else
        c=min(50.,0.35*zL)                       !Stable
        psiu=-((1.+1.*zL)**1.+.6667*(zL-14.28)/dexp(c)+8.525)
-      end if
+      endif
       return
       end function psiu
 
@@ -963,7 +919,7 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
       else
        c=min(50.,0.35*zL)                        !Stable
        psit=-((1.+2.*zL/3.)**1.5+.6667*(zL-14.28)/dexp(c)+8.525)
-      end if
+      endif
       return
       end function psit
 !-----------------------------------------------------------------------
@@ -1152,7 +1108,7 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
 ! !DESCRIPTION:
 !  This subroutine calculates the short--wave net radiation based on 
 !  latitude, longitude, time, fractional cloud cover and albedo.
-!  The albedo monthly values from \cite{Payne72} are given here
+!  The albedo monthly values from \cite{Payne72} are given  here
 !  as means of the values between 
 !  at 30$^{\circ}$ N and 40$^{\circ}$ N for the Atlantic Ocean 
 !  (hence the same latitudinal band of the Mediterranean Sea).
@@ -1181,7 +1137,7 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
 !
 !   double precision                  :: solar=1350.
    double precision                  :: eclips=23.439*deg2rad
-   double precision                  :: tau=0.66  !Arab=0.74,COARE=0.63,Sub=0.7
+   double precision                  :: tau=0.7
    double precision                  :: aozone=0.09
 
 
@@ -1293,48 +1249,32 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
 !  clouds from COADS perpetual data set
 
 !SP-this represents the possible errors in the derived cloud value
-!   if((cloud.LT.0.1).AND.(ABS(swr_error+0.1).LT.0.0001)) then
-!       swr_error=0.0
-!   else if((cloud.LT.0.1).AND.(ABS(swr_error-0.1).LT.0.0001)) then
-!       swr_error=0.2
-!   else if ((cloud.GT.0.9).AND.(ABS(swr_error-0.1).LT.0.0001)) then
-!       swr_error=0.0
-!   else if((cloud.GT.0.9).AND.(ABS(swr_error+0.1).LT.0.0001)) then
-!       swr_error=-0.2
-!   end if
-
-         if(swr_error.ne.0.0) then
-            if(ABS(cloud-0.001).LT.0.0001) then  !SP IR obs therefore no cloud
-               cloud=0.0
-               border=1
-            else if(ABS(swr_error-9.0).LT.0.0001) then
-               swr_error=0.0
-               if(ABS(border).LT.0.0001) then
-                  border=2
-               end if
-            else 
-               cloud=cloud+swr_error
-               if (cloud.GT.1.0) then
-                  cloud=1.0
-                  border=3
-               else if (cloud.LT.0.0) then
-                  cloud=0.0
-                  border=3
-               else
-                  if((ABS(border).LT.0.0001).OR.(ABS(border-2.0).LT.0.0001)) then
-                     border=1
-                  end if
-               end if
-            end if
-         end if
+   if((cloud.LT.0.1).AND.(ABS(swr_error-0.1).LT.0.0001)) then
+       swr_error=0.2
+   else if((cloud.LT.0.1).AND.(ABS(swr_error+0.1).LT.0.0001)) then
+       swr_error=0.0
+   else if ((cloud.GT.0.9).AND.(ABS(swr_error-0.1).LT.0.0001)) then
+       swr_error=0.0
+   else if((cloud.GT.0.9).AND.(ABS(swr_error+0.1).LT.0.0001)) then
+       swr_error=-0.2
+   end if
+              cloud=cloud+swr_error
+              if (cloud.GT.1.0) then
+                 cloud=1.0
+                 border=6
+              end if
+              if (cloud.LT.0.0) then
+                 cloud=0.0
+                 border=7
+              end if
 !SP end swr_error section
 
+
    if(cloud .lt.0.3) then
-!   if(cloud.eq.0.0) then
       qshort  = qtot*(1.-albedo)        !SP albedo factor needed here
    else
       qshort  = qtot*(1.-.62*cloud + .0019*sunbet)*(1.-albedo) 
-   end if
+   endif
 
    if (present(swr)) then
       swr = qshort
@@ -1429,8 +1369,8 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
       wy_obs=obs(2)
       airp  = obs(3)*100. !kbk mbar/hPa --> Pa
       airt  = obs(4)
-      spec_hum = obs(5)
-!      dew_pt = obs(5)
+!      spec_hum = obs(5)
+      dew_pt = obs(5)
 !      rh    = obs(5)
       cloud = obs(6)
 
@@ -1601,6 +1541,7 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
    alpha = (obs2(3)-obs1(3))/dt
    qb = obs1(3) !+ t*alpha
 
+   return
    end subroutine read_heat_flux
 !EOC
 
@@ -1682,7 +1623,7 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
 !  and interpolates in time.
 !
 ! !USES:
-   use meanflow, only                : T,S,h
+   use meanflow, only                : T,S,h,cost_fctn,sign
 
    IMPLICIT NONE
 
@@ -1708,7 +1649,7 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
    integer, save             :: sst_jul2=0,sst_secs2=0
    integer, save             :: sst2_jul1,sst2_secs1
    integer, save             :: sst2_jul2=0,sst2_secs2=0
-   double precision, save            :: obs1(1),obs2(1)=0.,obs3(4),obs4(4)=0.
+   double precision, save            :: obs1(1),obs2(1)=0.,obs3(1),obs4(1)=0.
    logical, save             :: first=.true.,first2=.true.
    integer                   :: rc
    !SP
@@ -1729,20 +1670,13 @@ if(sst_method==2) then
          if(time_diff(sst_jul2,sst_secs2,jul,secs) .gt. 0) EXIT
       end do
       dt = time_diff(sst_jul2,sst_secs2,sst_jul1,sst_secs1)
-
-      if(first) then
-         first=.false.
-         !SP 21/03/06
-         !Assimilate SST observations at observation time
+      
+      !SP 21/03/06
+      !Assimilate SST observations at observation time
            sst=obs1(1)     !sets observation to sst value
-           ostia=obs1(1)
            PRINT*,obs1(1),'OSTIA'
-           ostia_diff=ostia_diff+(T(150)-obs1(1))
-           ostia_sq_diff=ostia_sq_diff+(T(150)-obs1(1))**2
-           call assimilate_satellite_obs(sst,T(1:150),S(1:150),h(1:150))
-         !END SP
-      else
-      end if
+           call assimilate_satellite_obs(sst,T(1:150),S(1:150),h(1:150),g,rho_0)
+      !END SP
 
    end if
 end if
@@ -1753,7 +1687,7 @@ if(sst_method2==2) then
          sst2_jul1 = sst2_jul2
          sst2_secs1 = sst2_secs2
          obs3 = obs4
-         call read_obs(sst_unit2,yy2,mm2,dd2,hh2,min2,ss2,4,obs4,rc)
+         call read_obs(sst_unit2,yy2,mm2,dd2,hh2,min2,ss2,1,obs4,rc)
          call julian_day(yy2,mm2,dd2,sst2_jul2)
          sst2_secs2 = hh2*3600 + min2*60 + ss2
          if(time_diff(sst2_jul2,sst2_secs2,jul,secs) .gt. 0) EXIT
@@ -1763,45 +1697,13 @@ if(sst_method2==2) then
       !SP 28/03/06
       !use obs to calculate cost function
       if(first2) then
-         seviri_diff=0.
-         amsre_diff=0.
-         tmi_diff=0.
-         ostia_seviri_diff=0.
-         ostia_amsre_diff=0.
-         ostia_tmi_diff=0.
-         seviri_sq_diff=0.
-         amsre_sq_diff=0.
-         tmi_sq_diff=0.
-         ostia_seviri_sq_diff=0.
-         ostia_amsre_sq_diff=0.
-         ostia_tmi_sq_diff=0.
-         seviri_obs=0.
-         amsre_obs=0.
-         tmi_obs=0.
+         sign=0.
+         cost_fctn=0.
          first2=.false.
       else
-         if(ABS(obs3(4)-2.0).LT.0.0001) then
-            PRINT*,obs3(1),'SEVIRI OBS'
-            seviri_diff=seviri_diff+(skint-obs3(1))
-            ostia_seviri_diff=ostia_seviri_diff+(ostia-obs3(1))
-            seviri_sq_diff=seviri_sq_diff+(skint-obs3(1))**2
-            ostia_seviri_sq_diff=ostia_seviri_sq_diff+(ostia-obs3(1))**2
-            seviri_obs=seviri_obs+1
-         else if(ABS(obs3(4)-1.0).LT.0.001) then
-            PRINT*,obs3(1),'AMSRE OBS'
-            amsre_diff=amsre_diff+(T(150)-obs3(1))
-            ostia_amsre_diff=ostia_amsre_diff+(ostia-obs3(1))
-            amsre_sq_diff=amsre_sq_diff+(T(150)-obs3(1))**2
-            ostia_amsre_sq_diff=ostia_amsre_sq_diff+(ostia-obs3(1))**2
-            amsre_obs=amsre_obs+1
-         else
-            PRINT*,obs3(1),'TMI OBS'
-            tmi_diff=tmi_diff+(T(150)-obs3(1))
-            ostia_tmi_diff=ostia_tmi_diff+(ostia-obs3(1))
-            tmi_sq_diff=tmi_sq_diff+(T(150)-obs3(1))**2
-            ostia_tmi_sq_diff=ostia_tmi_sq_diff+(ostia-obs3(1))**2
-            tmi_obs=tmi_obs+1
-         end if
+         PRINT*,obs3(1),'SEVIRI'
+         sign=sign+(T(150)-obs3(1))
+         cost_fctn=cost_fctn+(T(150)-obs3(1))**2
       end if
 
    end if
@@ -1816,16 +1718,16 @@ end if
    end subroutine read_sst
 !EOC
 !-----------------------------------------------------------------------
-     subroutine assimilate_satellite_obs(sst,T,S,h)
+     subroutine assimilate_satellite_obs(sst,T,S,h,g,rho_0)
 
-       use eqstate, only: unesco
+       use eqstate, only: eqstate1
 
        IMPLICIT NONE
 
-       double precision, intent(in)    :: sst,S(1:150),h(1:150)
+       double precision, intent(in)    :: sst,S(1:150),h(1:150),g,rho_0
        double precision, intent(inout) :: T(1:150)
 
-       double precision  :: delta,assim_depth,z,density,change
+       double precision  :: delta,assim_depth,z,density
        integer           :: i,count,tendepth,ml_level
      
 !-----------------------------------------------------------------------
@@ -1836,30 +1738,33 @@ z=0.0
 do i=1,tendepth
    z=z+h(i)
 end do
-density=unesco(S(tendepth),T(tendepth),z/10.,.true.)
-change=unesco(S(tendepth),T(tendepth)+0.8,z/10.,.true.)-density
-
+density=eqstate1(S(tendepth),T(tendepth)-0.8,z/10.,g,rho_0)
 do i=tendepth-1,1,-1
    z=z-h(i)
-   if(unesco(S(i),T(i),z/10.,.true.).LE.(density+change)) then
-      ml_level=i
-      exit
-   end if
-   if(unesco(S(i),T(i),z/10.,.true.).GE.(density-change)) then
+   if(eqstate1(S(i),T(i),z/10.,g,rho_0).GE.density) then
       ml_level=i
       exit
    end if
    if(i==1) then
       ml_level=i
-   end if
+   end
 end do
 !ajust mixed layer
-PRINT*,'ASSIMILATE'
-
-delta=sst-T(150)
+delta=sst-T(tendepth)
 do i=ml_level,150
    T(i)=T(i)+delta
 end do
+!correction below mixed layer if necessary
+if(sst.LT.T(tendepth)) then
+   do i=ml_level-1,1,-1
+      if(T(i).GT.T(ml_level)) then
+         T(i)=T(ml_level)
+      else
+         exit
+      end if
+   end do
+end if
+
 
 
 !old method 
