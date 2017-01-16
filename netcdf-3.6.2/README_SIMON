@@ -1,0 +1,9 @@
+Need to change the include line
+
+include <string>
+
+to
+
+include <string.h>
+
+for the file `cxx/ncvalues.cpp` for make to suceed.
