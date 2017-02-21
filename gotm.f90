@@ -51,6 +51,8 @@ module gotm
   use time
   use mtridiagonal
   use eqstate
+  !WT Uncomment this after moving the subroutines over, checking what used to be USE-ed, and what subroutines to export.
+!  use assimilation
 
   use sediment
   use seagrass
@@ -582,6 +584,8 @@ contains
   end subroutine time_loop
   !EOC
   !-----------------------------------------------------------------------
+
+  ! BEGIN Prospective assimilation module section.
   subroutine assimilation(T,S,tprof,sprof,cloud,advect,int_cs)
 
     IMPLICIT NONE
@@ -851,6 +855,8 @@ contains
     !end find the grid level of the mixed layer depth
 
   end function mld
+! END Prospective assimilation module portion.
+  
   !-----------------------------------------------------------------------
   !BOP
   !
