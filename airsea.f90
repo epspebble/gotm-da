@@ -1234,7 +1234,8 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
 
 !  sun declination :
 !SP from http://solardat.uoregon.edu/SolarRadiationBasics.html
-!   sundec = 1.00011 + 0.034221 * cos(th0) + 0.001280 * sin(th0)   &           !                + 0.000719 * cos(th02) + 0.000077 * sin(th02)
+!   sundec = 1.00011 + 0.034221 * cos(th0) + 0.001280 * sin(th0)   &           
+!                + 0.000719 * cos(th02) + 0.000077 * sin(th02)
 
 !  sun hour angle :
    thsun = (hour-12.)*15.*deg2rad + alon
