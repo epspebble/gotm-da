@@ -608,8 +608,8 @@ contains
        call assimilate_profile(tprof(1:nlev),T(1:nlev),sprof(1:nlev),S(1:nlev))
 
     case(3)
-       call assimilate_sst(tprof(1:nlev),T(1:nlev),delta,assim_depth)
        call assimilate_profile(tprof(1:nlev),T(1:nlev),sprof(1:nlev),S(1:nlev))
+       call assimilate_sst(tprof(1:nlev),T(1:nlev),delta,assim_depth)       
 
     case(4)
        !for cloud adjustment
@@ -762,13 +762,13 @@ contains
     !Assimilate SST into mixed layer
     if(count==sst_obs) then
        delta=tprof(obs_level)-T(obs_level)
-       delta=22.5750-T(obs_level)
+       !delta=22.5750-T(obs_level)
        if(mld(T(1:nlev)).lt.obs_level) then
           assim_depth=mld(T(1:nlev))
        else
           assim_depth=obs_level
        end if
-       PRINT*,'assimilate'
+       print *,'Assimilate SST into mixed layer from grid level ', assim_depth, ' till ', nlev
        DO i=assim_depth,nlev
           T(i)=T(i)+delta
        END DO

@@ -42,7 +42,7 @@
 !  bulk formulae, using observed or modelled meteorological parameters.
 !
 ! !USES:
-   use time, only: julian_day, time_diff, calendar_date
+   use time, only: julian_day, time_diff, calendar_date, write_time_string
    use observations, only: read_obs
 !
    IMPLICIT NONE
@@ -198,7 +198,9 @@
    double precision, public	:: solar
    double precision, public	:: net_ir=1353 !1350.
 
-!
+   !WT 2016-09-24 Debug
+   character(len=19) :: assim_timestr
+   
 !-----------------------------------------------------------------------
 
    contains
@@ -1736,7 +1738,7 @@ if(sst_method==2) then
          !Assimilate SST observations at observation time
            sst=obs1(1)     !sets observation to sst value
            ostia=obs1(1)
-           PRINT*,obs1(1),'OSTIA'
+           !PRINT *,obs1(1),'OSTIA'
            ostia_diff=ostia_diff+(T(150)-obs1(1))
            ostia_sq_diff=ostia_sq_diff+(T(150)-obs1(1))**2
            call assimilate_satellite_obs(sst,T(1:150),S(1:150),h(1:150))
@@ -1744,6 +1746,9 @@ if(sst_method==2) then
       else
       end if
 
+      call write_time_string(jul,secs,assim_timestr)
+      print *,'SST values assimilated at ', assim_timestr
+      print *,'Value:',sst
    end if
 end if
 if(sst_method2==2) then 
@@ -1853,8 +1858,8 @@ do i=tendepth-1,1,-1
       ml_level=i
    end if
 end do
-!ajust mixed layer
-PRINT*,'ASSIMILATE'
+!adjust mixed layer
+PRINT*,'ASSIMILATE SST'
 
 delta=sst-T(150)
 do i=ml_level,150
