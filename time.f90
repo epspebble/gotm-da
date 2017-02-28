@@ -24,6 +24,7 @@
    public                              :: init_time, calendar_date
    public                              :: julian_day, update_time
    public                              :: write_time_string
+   public                              :: UTC_to_local !WT 
    public                              :: time_diff
 !
 ! !PUBLIC DATA MEMBERS:
@@ -419,7 +420,49 @@
 
 !-----------------------------------------------------------------------
 
-   end module time
+    subroutine UTC_to_local(jul,secs,lon,ljul,lsecs)
+    IMPLICIT NONE
+   
+    double precision, intent(in)            :: lon
+    integer, intent(in)                     :: jul,secs
+    integer, intent(out)                    :: ljul,lsecs
+    
+    ! Local variables
+    integer                                 :: offset
+    character(len=19)                       :: timestr
+    
+    ! Using the theoretical hourly difference by 15 degrees in longitude
+    if (lon > 0) then
+        offset = int((lon+7.5)/15)
+    else 
+        offset = int((lon-7.5)/15)
+    end if
+    
+    lsecs = secs + offset*3600
+    
+    ! Set the local julian day and adjust forward or backward if necessary.
+    if (lsecs > 86400) then
+        lsecs = lsecs - 86400
+        ljul = jul + 1
+    else if (lsecs < 0) then
+        lsecs = lsecs + 86400
+        ljul = jul - 1
+    else
+        ljul = jul
+    end if
+    
+    ! Print out the input.
+    call write_time_string(jul,secs,timestr)
+    print *, "Longitude: ", lon
+    print *, "UTC: ", timestr
+    
+    ! Print out the output.
+    call write_time_string(ljul,lsecs,timestr)
+    print *, "Local time: ", timestr
+    
+    end subroutine UTC_to_local
+
+    end module time
 
 !-----------------------------------------------------------------------
 ! Copyright by the GOTM-team under the GNU Public License - www.gnu.org

@@ -42,7 +42,8 @@
 !  bulk formulae, using observed or modelled meteorological parameters.
 !
 ! !USES:
-   use time, only: julian_day, time_diff, calendar_date, write_time_string
+   use time, only: julian_day, time_diff, calendar_date, write_time_string 
+   use time, only: UTC_to_local !WT new function
    use observations, only: read_obs
 !
    IMPLICIT NONE
@@ -191,7 +192,7 @@
    double precision                  :: es,ea,e,qs,q,mr,xlv,rnl
    double precision                  :: cdd,chd,ced,Du,zt,dqer
 
-   double precision                  :: alon,alat
+   double precision                  :: alat,alon
 
 !!!!! SH 14/08/2003
    double precision, public	:: airt
@@ -437,7 +438,7 @@
         call flux_from_meteo(jul,secs)     
   end if
 
-   call short_wave_radiation(jul,secs,alon,alat)  !SP placed comment here
+   call short_wave_radiation(jul,secs,alat,alon)  !SP placed comment here
 
    !Net shortwave radiation
    I_0=I_0_calc
@@ -478,7 +479,7 @@
 			cloud = 0.0;
 		end if
 ! SP June 2016 - recalculate swr (now with cloud values)
-                call short_wave_radiation(jul,secs,alon,alat) 
+                call short_wave_radiation(jul,secs,alat,alon) 
                 I_0=I_0_calc
 
             end if 
@@ -1149,7 +1150,7 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
 ! !IROUTINE: Calculate the short--wave radiation \label{sec:swr}
 !
 ! !INTERFACE:
-   subroutine short_wave_radiation(jul,secs,lon,lat,swr)
+   subroutine short_wave_radiation(jul,secs,alat,alon,swr)
 !
 ! !DESCRIPTION:
 !  This subroutine calculates the short--wave net radiation based on 
@@ -1164,11 +1165,11 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
 !
 ! !INPUT PARAMETERS:
    integer, intent(in)                 :: jul,secs
-   double precision, intent(in)                :: lon,lat
+   double precision, intent(in)                :: alat,alon !WT assume radian
 !
 ! !OUTPUT PARAMETERS:
    double precision, optional, intent(out)     :: swr
-!
+!   
 ! !REVISION HISTORY:
 !  Original author(s): Karsten Bolding
 !
@@ -1182,6 +1183,11 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
 ! !LOCAL VARIABLES:
 !
 !   double precision                  :: solar=1350.
+
+   ! WT local version of jul and secs, also lon in degrees.   
+   integer                  :: ljul,lsecs
+   double precision                  :: lon 
+
    double precision                  :: eclips=23.439*deg2rad
    double precision                  :: tau=0.66  !Arab=0.74,COARE=0.63,Sub=0.7
    double precision                  :: aozone=0.09
@@ -1220,9 +1226,11 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
 !BOC
 
 !  number of days in a year :
-   call calendar_date(jul,yy,mm,dd)
+   lon = alon / deg2rad
+   call UTC_to_local(jul,secs,lon,ljul,lsecs)
+   call calendar_date(ljul,yy,mm,dd)
    days=float(yday(mm))+float(dd)
-   hour=1.0*secs/3600.
+   hour=1.0*lsecs/3600.
 !kbk   if (mod(yy,4) .eq. 0 ! leap year I forgot
    yrdays=365.
 
@@ -1467,7 +1475,7 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
       if (first) then
 !         call do_calc_fluxes(heatf=h1,taux=tx1,tauy=ty1)
          call do_calc_fluxes(qb1,qh1,qe1,taux=tx1,tauy=ty1)
-!         call short_wave_radiation(jul,secs,alon,alat,swr=I1)
+!         call short_wave_radiation(jul,secs,alat,alon,swr=I1)
 !         I2  = I1                
 !         h2  = h1
          tx2 = tx1
@@ -1494,7 +1502,7 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
 !         call do_calc_fluxes(heatf=h2,taux=tx2,tauy=ty2)
          call do_calc_fluxes(qb2,qh2,qe2,taux=tx2,tauy=ty2)
 	 
-!         call short_wave_radiation(jul,secs,alon,alat,swr=I2) 
+!         call short_wave_radiation(jul,secs,alat,alon,swr=I2) 
 !HK added:
        wx1=wx2
        wy1=wy2

@@ -1,6 +1,9 @@
 /* config.h.  Generated from config.h.in by configure.  */
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
+/* Define if building universal (internal helper macro) */
+/* #undef AC_APPLE_UNIVERSAL_BUILD */
+
 /* Define to one of `_getb67', `GETB67', `getb67' for Cray-2 and Cray-YMP
    systems. This function is required for `alloca.c' support on those systems.
    */
@@ -52,7 +55,7 @@
 /* Define to 1 if you have the `strlcat' function. */
 /* #undef HAVE_STRLCAT */
 
-/* Define to 1 if `st_blksize' is member of `struct stat'. */
+/* Define to 1 if `st_blksize' is a member of `struct stat'. */
 #define HAVE_STRUCT_STAT_ST_BLKSIZE 1
 
 /* Define to 1 if your `struct stat' has `st_blksize'. Deprecated, use
@@ -132,6 +135,9 @@
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "netcdf"
 
+/* Define to the home page for this package. */
+#define PACKAGE_URL ""
+
 /* Define to the version of this package. */
 #define PACKAGE_VERSION "3.6.2"
 
@@ -176,9 +182,22 @@
 /* Version number of package */
 #define VERSION "3.6.2"
 
-/* Define to 1 if your processor stores words with the most significant byte
-   first (like Motorola and SPARC, unlike Intel and VAX). */
-/* #undef WORDS_BIGENDIAN */
+/* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
+   significant byte first (like Motorola and SPARC, unlike Intel). */
+#if defined AC_APPLE_UNIVERSAL_BUILD
+# if defined __BIG_ENDIAN__
+#  define WORDS_BIGENDIAN 1
+# endif
+#else
+# ifndef WORDS_BIGENDIAN
+/* #  undef WORDS_BIGENDIAN */
+# endif
+#endif
+
+/* Enable large inode numbers on Mac OS X 10.5.  */
+#ifndef _DARWIN_USE_64_BIT_INODE
+# define _DARWIN_USE_64_BIT_INODE 1
+#endif
 
 /* Number of bits in a file offset, on hosts where this is settable. */
 /* #undef _FILE_OFFSET_BITS */
@@ -201,13 +220,13 @@
 /* #undef f2cFortran */
 
 /* Turned on by netCDF configure. */
-#define gFortran 1
+/* #undef gFortran */
 
 /* Define to `long int' if <sys/types.h> does not define. */
 /* #undef off_t */
 
 /* Turned on by netCDF configure. */
-/* #undef pgiFortran */
+#define pgiFortran 1
 
 /* Define to `unsigned int' if <sys/types.h> does not define. */
 /* #undef size_t */
