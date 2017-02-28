@@ -450,19 +450,20 @@
     else
         ljul = jul
     end if
-    
+
+    ! WT 170227 Debug
     ! Print out the input.
-    call write_time_string(jul,secs,timestr)
-    print *, "Longitude: ", lon
-    print *, "UTC: ", timestr
+!    call write_time_string(jul,secs,timestr)
+!    print *, "Longitude: ", lon
+!    print *, "UTC: ", timestr
     
     ! Print out the output.
-    call write_time_string(ljul,lsecs,timestr)
-    print *, "Local time: ", timestr
+!    call write_time_string(ljul,lsecs,timestr)
+!    print *, "Local time: ", timestr
     
-    end subroutine UTC_to_local
+!    end subroutine UTC_to_local
 
-    end module time
+!    end module time
 
 !-----------------------------------------------------------------------
 ! Copyright by the GOTM-team under the GNU Public License - www.gnu.org
