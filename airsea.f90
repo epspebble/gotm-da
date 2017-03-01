@@ -462,12 +462,14 @@
                READ*
             else
 !               I_0=I_0_calc*adjustment
-!               cloud=1-adjustment  !cloud index
-               I_0=adjustment*(1.-albedo)
+!               cloud=1-adjustment  !cloud index 
+               I_0=adjustment*(1.-albedo) ! adjustment comes from heat.dat 3rd column
 !               cloud=1-I_0/I_0_calc
 
 ! SP June 2016 - determine cloud fraction
 		if(I_0_calc .ne. 0) then 
+                        !170301 If we revise this and compute directly use the fraction
+                        ! I_0/I_0_calc, then there is no need of this?
 			cloud = ((1 - (I_0/I_0_calc) + 0.0019*sunbet)/0.62)
 			if(cloud .LT. 0.0) then
 				cloud = 0.0
@@ -479,6 +481,8 @@
 			cloud = 0.0;
 		end if
 ! SP June 2016 - recalculate swr (now with cloud values)
+
+                !170301 No need to call the subroutine again here?
                 call short_wave_radiation(jul,secs,alat,alon) 
                 I_0=I_0_calc
 
@@ -1340,10 +1344,11 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
          end if
 !SP end swr_error section
 
+!170301 Reed formula used here.
    if(cloud .lt.0.3) then
 !   if(cloud.eq.0.0) then
       qshort  = qtot*(1.-albedo)        !SP albedo factor needed here
-   else
+   else !170301 consider removing this case... over the top?
       qshort  = qtot*(1.-.62*cloud + .0019*sunbet)*(1.-albedo) 
    end if
 
