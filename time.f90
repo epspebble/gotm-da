@@ -461,10 +461,10 @@
 !    call write_time_string(ljul,lsecs,timestr)
 !    print *, "Local time: ", timestr
     
-!    end subroutine UTC_to_local
+    end subroutine UTC_to_local
 
-!    end module time
+    end module time
 
 !-----------------------------------------------------------------------
 ! Copyright by the GOTM-team under the GNU Public License - www.gnu.org
-!----------------------------------------------------------------------- 
+!-----------------------------------------------------------------------
