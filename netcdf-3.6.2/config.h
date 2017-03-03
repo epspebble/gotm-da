@@ -220,13 +220,13 @@
 /* #undef f2cFortran */
 
 /* Turned on by netCDF configure. */
-/* #undef gFortran */
+#define gFortran 1
 
 /* Define to `long int' if <sys/types.h> does not define. */
 /* #undef off_t */
 
 /* Turned on by netCDF configure. */
-#define pgiFortran 1
+/* #undef pgiFortran */
 
 /* Define to `unsigned int' if <sys/types.h> does not define. */
 /* #undef size_t */
