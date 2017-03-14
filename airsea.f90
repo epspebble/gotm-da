@@ -414,7 +414,7 @@
 
 !
 ! !LOCAL VARIABLES:
-  double precision  :: dummy,adjustment,qb_down,lwrcloud,top,bottom
+  double precision  :: dummy,adjustment,qb_down,lwrcloud,top,bottom,cloud_factor
   integer           :: i,ios,count=1,count2=1,count3=0
 !
 !
@@ -441,15 +441,14 @@
    call short_wave_radiation(jul,secs,alat,alon)  !SP placed comment here
 
    !Net shortwave radiation
-   I_0=I_0_calc
-
+ !  I_0=I_0_calc
 !     The heat fluxes
 
       select case (flux_method)
          case (CONSTVAL)
             heat=const_qout
          case (FROMFILE)
-             call read_heat_flux(jul,secs,adjustment,heat,qb_down)
+             call read_heat_flux(jul,secs,adjustment,cloud_factor,qb_down)
          case default
       end select
 
@@ -461,30 +460,24 @@
                PRINT*,'ERROR'
                READ*
             else
-!               I_0=I_0_calc*adjustment
-!               cloud=1-adjustment  !cloud index 
-               I_0=adjustment*(1.-albedo) ! adjustment comes from heat.dat 3rd column
-!               cloud=1-I_0/I_0_calc
+ !              I_0=adjustment*(1.-albedo) ! adjustment comes from heat.dat 3rd column
+                I_0=cloud_factor*I_0_calc  ! cloud_factor comes from heat.dat 2nd column
+
+                cloud = min(1.,max(0.,cloud_factor))  ! fixed fraction cloud values between 0 and 1
 
 ! SP June 2016 - determine cloud fraction
-		if(I_0_calc .ne. 0) then 
-                        !170301 If we revise this and compute directly use the fraction
-                        ! I_0/I_0_calc, then there is no need of this?
-			cloud = ((1 - (I_0/I_0_calc) + 0.0019*sunbet)/0.62)
-			if(cloud .LT. 0.0) then
-				cloud = 0.0
-			end if
-			if(cloud .GT. 1.0) then
-				cloud = 1.0
-			end if
-		else
-			cloud = 0.0;
-		end if
+!		if(I_0_calc .ne. 0) then
+!			cloud = ((1 - (I_0/I_0_calc) + 0.0019*sunbet)/0.62)
+!			if(cloud .LT. 0.0) then
+!				cloud = 0.0
+!			end if
+!			if(cloud .GT. 1.0) then
+!				cloud = 1.0
+!			end if
+!		else
+!			cloud = 0.0;
+!		end if
 ! SP June 2016 - recalculate swr (now with cloud values)
-
-                !170301 No need to call the subroutine again here?
-                call short_wave_radiation(jul,secs,alat,alon) 
-                I_0=I_0_calc
 
             end if 
          case default
@@ -1190,10 +1183,11 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
 
    ! WT local version of jul and secs, also lon in degrees.   
    integer                  :: ljul,lsecs
-   double precision                  :: lon 
+   double precision                  :: lon
+double precision                  :: lat,eqtime,solar_time
 
    double precision                  :: eclips=23.439*deg2rad
-   double precision                  :: tau=0.66  !Arab=0.74,COARE=0.63,Sub=0.7
+   double precision                  :: tau=0.7  !Arab=0.74,COARE=0.63,Sub=0.7
    double precision                  :: aozone=0.09
 
 
@@ -1231,31 +1225,69 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
 
 !  number of days in a year :
    lon = alon / deg2rad
-   call UTC_to_local(jul,secs,lon,ljul,lsecs)
+   lat = alat / deg2rad
+
+!print*, "UTM ", jul,secs
+call UTC_to_local(jul,secs,lon,ljul,lsecs)
+!print*, "local ", ljul,lsecs
    call calendar_date(ljul,yy,mm,dd)
+!call calendar_date(jul,yy,mm,dd)
+
    days=float(yday(mm))+float(dd)
+
    hour=1.0*lsecs/3600.
+!   hour=1.0*secs/3600.
+
 !kbk   if (mod(yy,4) .eq. 0 ! leap year I forgot
    yrdays=365.
 
-   th0 = 2.*pi*days/yrdays
+! Sources:
+! https://www.esrl.noaa.gov/gmd/grad/solcalc/solareqns.PDF
+! https://arxiv.org/pdf/1102.3825.pdf
+
+!   th0 = 2.*pi*days/yrdays
+! fractional year in radians
+th0 = (2.*pi/yrdays)*(days-1+((hour-12)/24))  ! hour should be UTC decimal time
    th02 = 2.*th0
    th03 = 3.*th0
-!  sun declination :
+!  sun declination (the Spencer formula (Spencer, 1971)):
    sundec = 0.006918 - 0.399912*cos(th0) + 0.070257*sin(th0)         &
            - 0.006758*cos(th02) + 0.000907*sin(th02)                 &
-           - 0.002697*cos(th03) + 0.001480*sin(th03)
+           - 0.002697*cos(th03) + 0.001480*sin(th03)  ! in radians
+! An alternative
+!sundec = 23.45*pi / 180.*sin(2.*pi*(284. + days) / 365.)
 
-!  sun declination :
-!SP from http://solardat.uoregon.edu/SolarRadiationBasics.html
-!   sundec = 1.00011 + 0.034221 * cos(th0) + 0.001280 * sin(th0)   &           
-!                + 0.000719 * cos(th02) + 0.000077 * sin(th02)
+eqtime = 229.18*(0.000075+0.001868*cos(th0)-0.032077*sin(th0)-0.014615*cos(th02)-0.040849*sin(th02))  ! in minutes
+
+! An alternative
+!IF ((days.GE.1).AND.(days.LE.106)) THEN
+!    eqtime = -14.2*sin(pi*(days+7.)/111.)
+!ELSE IF ((days.GE.107).AND.(days.LE.166)) THEN
+!    eqtime = 4.0*sin(pi*(days-106.)/59.)
+!ELSE IF ((days.GE.167).AND.(days.LE.246)) THEN
+!    eqtime = -6.5*sin(pi*(days-166.)/80.)
+!ELSE IF ((days.GE.247).AND.(days.LE.365)) THEN
+!    eqtime = 16.4*sin(pi*(days-247.)/113.)
+!END IF
+
+
+!solar_time = hour + (eqtime/60) + ((30.-lon)/15) ! in hours
+!solar_time = hour + (eqtime/60) - lon/15 ! in hours (UTC time), lon=degrees
+solar_time = hour*60 +eqtime + 4*lon - (lsecs-secs)/60
+
 
 !  sun hour angle :
-   thsun = (hour-12.)*15.*deg2rad + alon
+!   thsun = (hour-12.)*15.*deg2rad + alon
+!thsun = (hour-12.)*15.*deg2rad
+!thsun = (12.-hour)*pi/12.
+!thsun = (12.-solar_time)*pi/12.
+!thsun = pi*((solar_time/12)-1)  ! radians
+thsun = pi*((solar_time/(4*180))-1)  ! radians
 
+!PRINT*, thsun
 !  cosine of the solar zenith angle (Rosati(88) eq. 3.4 :
    coszen =sin(alat)*sin(sundec)+cos(alat)*cos(sundec)*cos(thsun)
+
    if (coszen .le. 0.0) then
       coszen = 0.0           !SP-this is when sun is below horizon
       qatten = 0.0           !i.e between dusk and dawn
@@ -1307,50 +1339,15 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
 !  Rosati,Miyakoda 1988 ; eq. 3.8
 !  clouds from COADS perpetual data set
 
-!SP-this represents the possible errors in the derived cloud value
-!   if((cloud.LT.0.1).AND.(ABS(swr_error+0.1).LT.0.0001)) then
-!       swr_error=0.0
-!   else if((cloud.LT.0.1).AND.(ABS(swr_error-0.1).LT.0.0001)) then
-!       swr_error=0.2
-!   else if ((cloud.GT.0.9).AND.(ABS(swr_error-0.1).LT.0.0001)) then
-!       swr_error=0.0
-!   else if((cloud.GT.0.9).AND.(ABS(swr_error+0.1).LT.0.0001)) then
-!       swr_error=-0.2
-!   end if
-
-         if(swr_error.ne.0.0) then
-            if(ABS(cloud-0.001).LT.0.0001) then  !SP IR obs therefore no cloud
-               cloud=0.0
-               border=1
-            else if(ABS(swr_error-9.0).LT.0.0001) then
-               swr_error=0.0
-               if(ABS(border).LT.0.0001) then
-                  border=2
-               end if
-            else 
-               cloud=cloud+swr_error
-               if (cloud.GT.1.0) then
-                  cloud=1.0
-                  border=3
-               else if (cloud.LT.0.0) then
-                  cloud=0.0
-                  border=3
-               else
-                  if((ABS(border).LT.0.0001).OR.(ABS(border-2.0).LT.0.0001)) then
-                     border=1
-                  end if
-               end if
-            end if
-         end if
-!SP end swr_error section
 
 !170301 Reed formula used here.
-   if(cloud .lt.0.3) then
+!   if(cloud .lt.0.3) then
 !   if(cloud.eq.0.0) then
-      qshort  = qtot*(1.-albedo)        !SP albedo factor needed here
-   else !170301 consider removing this case... over the top?
-      qshort  = qtot*(1.-.62*cloud + .0019*sunbet)*(1.-albedo) 
-   end if
+!      qshort  = qtot*(1.-albedo)        !SP albedo factor needed here
+!   else !170301 consider removing this case... over the top?
+!      qshort  = qtot*(1.-.62*cloud + .0019*sunbet)*(1.-albedo)
+!   end if
+qshort=qtot*(1.-albedo)
 
    if (present(swr)) then
       swr = qshort
