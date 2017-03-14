@@ -5,6 +5,11 @@
 ! !ROUTINE: The temperature equation \label{sec:temperature}
 !
 ! !INTERFACE:
+   
+  
+!------------------------------------------------------------
+    
+!------------------------------------------------------------
     subroutine temperature(nlev,dt,cnpar,I_0,heat,advect,qdir_frac,qdiff_frac,cosr,nuh,rad)
 !
 !
@@ -237,6 +242,9 @@
 
 ! case 12 is the solar radiation transmission through the upper ocean based on the parameterisation developed from Ohlmann and Siegel, J. Phys. Oceangr. 2000
 ! it uses satellite derived chlorophyll cencentrations, cloud amount and solar zenith angle.
+     IF (I_0.le.0) then 
+        rad(i)=0
+     ElSE      
              trans=0.0
              IF(cloud.gt.0) then
                 DO j=1,4
@@ -246,18 +254,20 @@
                 END DO
              ELSE
                 DO j=9,12
-                   !for very low value of coszen the parameterisation breaks down!  SP 22/02/06
-                   IF(coszen.lt.0.15) THEN
-                      coszen=0.15   
+                   IF(coszen.lt.(2.49/(17.81+7.68*chlo))) then
+            !for very low value of coszen the parameterisation breaks down!  SP 22/02/06 revised 28/02/17
+                      para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
+                      para_K = 0.0
+                      trans=trans+para_A*exp(-para_K*z)
+                   ELSE                    
+                      para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
+                      para_K=C1(j+4)*chlo+(C3(j+4)/coszen)+C4(j+4)
+                      trans=trans+para_A*exp(-para_K*z)		
                    END IF
-                   para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
-                   para_K=C1(j+4)*chlo+(C3(j+4)/coszen)+C4(j+4)
-                   trans=trans+para_A*exp(-para_K*z)
                 END DO
              END IF
-!	     PRINT*,trans,chlo,cloud,coszen
              rad(i)=I_0*trans/(rho_0*cp)
-            
+      END IF    
        case default 
 ! extinct_methods 1-7 - these are defined in observations.f90
 ! leave out diffuse / direct discrimination
@@ -290,7 +300,6 @@
    return
    end subroutine temperature
 !EOC
-
 !-----------------------------------------------------------------------
 ! Copyright by the GOTM-team under the GNU Public License - www.gnu.org
 !----------------------------------------------------------------------- 
