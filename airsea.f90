@@ -33,1065 +33,1068 @@
 ! !MODULE: airsea --- atmopheric fluxes \label{sec:airsea}
 !
 ! !INTERFACE:
-   module airsea
-!
-! !DESCRIPTION:
-!  This module provides various ways to calculate the heat, momentum 
-!  and freshwater fluxes. They are either prescribed as constant values,
-!  see {\tt airsea.inp}, read in from files or calculated by means of
-!  bulk formulae, using observed or modelled meteorological parameters.
-!
-! !USES:
-   use time, only: julian_day, time_diff, calendar_date, write_time_string 
-   use time, only: UTC_to_local !WT new function
-   use observations, only: read_obs
-!
-   IMPLICIT NONE
-!  default: all is private.
-   private
-!
-! !PUBLIC MEMBER FUNCTIONS:
+module airsea
+  !
+  ! !DESCRIPTION:
+  !  This module provides various ways to calculate the heat, momentum 
+  !  and freshwater fluxes. They are either prescribed as constant values,
+  !  see {\tt airsea.inp}, read in from files or calculated by means of
+  !  bulk formulae, using observed or modelled meteorological parameters.
+  !
+  ! !USES:
+  use time, only: julian_day, time_diff, calendar_date, write_time_string 
+  use time, only: UTC_to_local, tz !WT new function
+  use observations, only: read_obs
+  !
+  IMPLICIT NONE
+  !  default: all is private.
+  private
+  !
+  ! !PUBLIC MEMBER FUNCTIONS:
 
-   public                              :: init_air_sea
-   public                              :: air_sea_interaction
-   public                              :: set_sst
-   public                              :: integrated_fluxes
-   public                              :: do_calc_fluxes
+  public                              :: init_air_sea
+  public                              :: air_sea_interaction
+  public                              :: set_sst
+  public                              :: integrated_fluxes
+  public                              :: do_calc_fluxes
 
-! !PUBLIC DATA MEMBERS:
-   logical,  public                    :: calc_fluxes=.false.
-!  tx and ty are the surface stress components:
-   double precision, public                    :: tx,ty
-!  I_0 and heat are short-wave radiation and heat flux at the surface:
-   double precision, public                    :: I_0,heat,qb,qh,qe,cloud
-!  sst and sss are sea surface temperature and sea surface salinity:
-   double precision, public                    :: sst,sss,skint
-!  integrated short-wave radiation, heat flux and total heat flux:
-   double precision, public                    :: int_sw=0.,int_hf=0.
-   double precision, public                    :: int_total=0.,int_cs=0.
-!
+  ! !PUBLIC DATA MEMBERS:
+  logical,  public                    :: calc_fluxes=.false.
+  !  tx and ty are the surface stress components:
+  double precision, public                    :: tx,ty
+  !  I_0 and heat are short-wave radiation and heat flux at the surface:
+  double precision, public                    :: I_0,heat,qb,qh,qe,cloud
+  !  sst and sss are sea surface temperature and sea surface salinity:
+  double precision, public                    :: sst,sss,skint
+  !  integrated short-wave radiation, heat flux and total heat flux:
+  double precision, public                    :: int_sw=0.,int_hf=0.
+  double precision, public                    :: int_total=0.,int_cs=0.
+  !
 !!!!! SH - 14/08/2003 - additional parameters for thermal skin etc
-!
-   double precision, public	:: I_0_calc,coszen,cosr,qdir_frac,qdiff_frac
-   double precision, public	:: deltaTo=0., sssto=0., deltaT=0.
-   double precision, public	:: sssT=0., delta=0.,I_0_cs
-   double precision, public	:: I_cool = 0.,albedo,qtot,sunbet
-!   double precision, public	:: qb,qe,qh
-   double precision, public	:: dlr,w_10
+  !
+  double precision, public	:: I_0_calc,coszen,cosr,qdir_frac,qdiff_frac
+  double precision, public	:: deltaTo=0., sssto=0., deltaT=0.
+  double precision, public	:: sssT=0., delta=0.,I_0_cs
+  double precision, public	:: I_cool = 0.,albedo,qtot,sunbet
+  !   double precision, public	:: qb,qe,qh
+  double precision, public	:: dlr,w_10
 
-   double precision, public       :: seviri_diff=0.,amsre_diff=0.,tmi_diff=0.
-   double precision, public       :: ostia_diff=0.,ostia_seviri_diff=0.
-   double precision, public       :: ostia_amsre_diff=0.,ostia_tmi_diff=0.
-   double precision, public       :: seviri_sq_diff=0.,amsre_sq_diff=0.
-   double precision, public       :: tmi_sq_diff=0.,ostia_sq_diff=0.
-   double precision, public       :: ostia_seviri_sq_diff=0.
-   double precision, public       :: ostia_amsre_sq_diff=0.
-   double precision, public       :: ostia_tmi_sq_diff=0.,seviri_obs=0.
-   double precision, public       :: amsre_obs=0.,tmi_obs=0.
-!
-! !DEFINED PARAMETERS:
-   integer, parameter                  :: meteo_unit=20
-   integer, parameter                  :: heat_unit=21
-   integer, parameter                  :: momentum_unit=22
-   integer, parameter                  :: p_e_unit=23
-   integer, parameter                  :: sst_unit=24
-   integer, parameter                  :: sst_unit2=27
-   integer, parameter                  :: sss_unit=25
-   integer, parameter                  :: airt_unit=26
+  double precision, public       :: seviri_diff=0.,amsre_diff=0.,tmi_diff=0.
+  double precision, public       :: ostia_diff=0.,ostia_seviri_diff=0.
+  double precision, public       :: ostia_amsre_diff=0.,ostia_tmi_diff=0.
+  double precision, public       :: seviri_sq_diff=0.,amsre_sq_diff=0.
+  double precision, public       :: tmi_sq_diff=0.,ostia_sq_diff=0.
+  double precision, public       :: ostia_seviri_sq_diff=0.
+  double precision, public       :: ostia_amsre_sq_diff=0.
+  double precision, public       :: ostia_tmi_sq_diff=0.,seviri_obs=0.
+  double precision, public       :: amsre_obs=0.,tmi_obs=0.
+  !
+  ! !DEFINED PARAMETERS:
+  integer, parameter                  :: meteo_unit=20
+  integer, parameter                  :: heat_unit=21
+  integer, parameter                  :: momentum_unit=22
+  integer, parameter                  :: p_e_unit=23
+  integer, parameter                  :: sst_unit=24
+  integer, parameter                  :: sst_unit2=27
+  integer, parameter                  :: sss_unit=25
+  integer, parameter                  :: airt_unit=26
 
-   double precision, parameter                :: cpa=1004.67 !J/kg/K specific heat of dry air (Businger 1982)
-!   double precision, parameter                :: cp=3995   !3985.
-   double precision, parameter                :: emiss=0.98
-   double precision, parameter                :: bolz=5.67e-8
-   double precision, parameter                :: Kelvin=273.16
-   double precision, parameter                :: const06=0.62198
-   double precision, parameter                :: pi=3.14159265358979323846
-   double precision, parameter                :: deg2rad=pi/180.
-   double precision, parameter                :: rad2deg=180./pi
+  double precision, parameter                :: cpa=1004.67 !J/kg/K specific heat of dry air (Businger 1982)
+  !   double precision, parameter                :: cp=3995   !3985.
+  double precision, parameter                :: emiss=0.98
+  double precision, parameter                :: bolz=5.67e-8
+  double precision, parameter                :: Kelvin=273.16
+  double precision, parameter                :: const06=0.62198
+  double precision, parameter                :: pi=3.14159265358979323846
+  double precision, parameter                :: deg2rad=pi/180.
+  double precision, parameter                :: rad2deg=180./pi
 
-   integer, parameter                  :: CONSTVAL=1
-   integer, parameter                  :: FROMFILE=2
+  integer, parameter                  :: CONSTVAL=1
+  integer, parameter                  :: FROMFILE=2
 
 !!!!! SH
-   integer, parameter                  :: SET_TO_SST=1
-!
-!
-! !REVISION HISTORY:
-!  Original author(s): Karsten Bolding, Hans Burchard
-!
-!  $Log: airsea_tested.f90,v $
-!Revision 1.1  2003/10/24  10:24:54  helen
-!Initial revision
-!
-!  Revision 1.6  2003/03/28 09:20:34  kbk
-!  added new copyright to files
-!
-!  Revision 1.5  2003/03/28 08:13:47  kbk
-!  removed tabs
-!
-!  Revision 1.4  2003/03/10 08:37:56  gotm
-!  HB fixed the Kondo calculations
-!
-!  Revision 1.3  2001/11/18 11:43:48  gotm
-!  Cleaned
-!
-!  Revision 1.2  2001/06/13 07:40:39  gotm
-!  Lon, lat was hardcoded in meteo.F90 - now passed via init_meteo()
-!
-!  Revision 1.1.1.1  2001/02/12 15:55:57  gotm
-!  initial import into CVS
+  integer, parameter                  :: SET_TO_SST=1
+  !
+  !
+  ! !REVISION HISTORY:
+  !  Original author(s): Karsten Bolding, Hans Burchard
+  !
+  !  $Log: airsea_tested.f90,v $
+  !Revision 1.1  2003/10/24  10:24:54  helen
+  !Initial revision
+  !
+  !  Revision 1.6  2003/03/28 09:20:34  kbk
+  !  added new copyright to files
+  !
+  !  Revision 1.5  2003/03/28 08:13:47  kbk
+  !  removed tabs
+  !
+  !  Revision 1.4  2003/03/10 08:37:56  gotm
+  !  HB fixed the Kondo calculations
+  !
+  !  Revision 1.3  2001/11/18 11:43:48  gotm
+  !  Cleaned
+  !
+  !  Revision 1.2  2001/06/13 07:40:39  gotm
+  !  Lon, lat was hardcoded in meteo.F90 - now passed via init_meteo()
+  !
+  !  Revision 1.1.1.1  2001/02/12 15:55:57  gotm
+  !  initial import into CVS
 !!!!! SH - added solar and non solar heat methods
-! retained original heat method for backwards compatibility
-!
-!EOP
-!
-! private data members
-   integer, public                   :: flux_method
-   integer, public                   :: swr_method
-   integer, public             	     :: lwr_method
-   integer, public                   :: longwave_method
-   integer, public                   :: momentum_method
-   integer, public                   :: p_e_method
-   integer, public                   :: sst_method
-   integer, public                   :: sst_method2
-   integer, public                   :: sss_method
-   integer, public                   :: airt_method
+  ! retained original heat method for backwards compatibility
+  !
+  !EOP
+  !
+  ! private data members
+  integer, public                   :: flux_method
+  integer, public                   :: swr_method
+  integer, public             	     :: lwr_method
+  integer, public                   :: longwave_method
+  integer, public                   :: momentum_method
+  integer, public                   :: p_e_method
+  integer, public                   :: sst_method
+  integer, public                   :: sst_method2
+  integer, public                   :: sss_method
+  integer, public                   :: airt_method
 
 
-!!HK - make meteo_file public)
-   character(len=255), public   :: meteo_file
-   character(len=255), public   :: heatflux_file
-   character(len=255), public   :: momentumflux_file
-   character(len=255), public   :: p_e_flux_file
-   character(len=255), public   :: sss_file
-   character(len=255), public   :: sst_file
-   character(len=255), public   :: sst_file2
-   character(len=255), public   :: airt_file
+  !!HK - make meteo_file public)
+  character(len=255), public   :: meteo_file
+  character(len=255), public   :: heatflux_file
+  character(len=255), public   :: momentumflux_file
+  character(len=255), public   :: p_e_flux_file
+  character(len=255), public   :: sss_file
+  character(len=255), public   :: sst_file
+  character(len=255), public   :: sst_file2
+  character(len=255), public   :: airt_file
 
-   double precision                  :: wx,wy
-   double precision                  :: wx_obs,wy_obs
-!HK added :
-   double precision, public :: u10,v10
-!end of added
+  double precision                  :: wx,wy
+  double precision                  :: wx_obs,wy_obs
+  !HK added :
+  double precision, public :: u10,v10
+  !end of added
 
-   double precision                  :: w
-   double precision                  :: airp
+  double precision                  :: w
+  double precision                  :: airp
 !!!!! SH Make public airt - leave twet private to this module
-!   double precision                  :: airt,twet
-   double precision                  :: twet
-!   double precision                  :: cloud
-   double precision                  :: rh
-   double precision                  :: spec_hum,dew_pt
-   double precision, public                  :: rho_air
-   double precision, public                  :: const_tx,const_ty
-   double precision, public                  :: const_qin,const_qout
-   double precision, public                  :: swr_error,wind_error  !SP
-   double precision, public                  :: wind_h,rh_h,airt_h   !SP
-   double precision, public                  :: border,ostia
+  !   double precision                  :: airt,twet
+  double precision                  :: twet
+  !   double precision                  :: cloud
+  double precision                  :: rh
+  double precision                  :: spec_hum,dew_pt
+  double precision, public                  :: rho_air
+  double precision, public                  :: const_tx,const_ty
+  double precision, public                  :: const_qin,const_qout
+  double precision, public                  :: swr_error,wind_error  !SP
+  double precision, public                  :: wind_h,rh_h,airt_h   !SP
+  double precision, public                  :: border,ostia
 
-   double precision                  :: es,ea,e,qs,q,mr,xlv,rnl
-   double precision                  :: cdd,chd,ced,Du,zt,dqer
+  double precision                  :: es,ea,e,qs,q,mr,xlv,rnl
+  double precision                  :: cdd,chd,ced,Du,zt,dqer
 
-   double precision                  :: alat,alon
+  double precision                  :: alat,alon
 
 !!!!! SH 14/08/2003
-   double precision, public	:: airt
-   double precision, public	:: solar
-   double precision, public	:: net_ir=1353 !1350.
-
-   !WT 2016-09-24 Debug
-   character(len=19) :: assim_timestr
-   
-!-----------------------------------------------------------------------
-
-   contains
-
-!-----------------------------------------------------------------------
-!BOP
-!
-! !IROUTINE: Initialise the air--sea interaction module
-!
-! !INTERFACE:
-   subroutine init_air_sea(namlst,lat,lon,julday,secs)
-!
-! !DESCRIPTION:
-!  This routine initialises the air--sea module by reading various variables
-!  from a namelist and open relevant files.
-!
-! !USES:
-   IMPLICIT NONE
-!
-! !INPUT PARAMETERS:
-   integer, intent(in)                 :: namlst
-   integer, intent(in)                 :: julday,secs
-   double precision, intent(in)                :: lat,lon
-!
-! !REVISION HISTORY:
-!  Original author(s): Karsten Bolding
-!
-!  See log for airsea module
-!
-!EOP
-!
-! !LOCAL VARIABLES:
-   namelist /airsea/ calc_fluxes, &
-                     meteo_file, &
-                     flux_method,	  &
-                     swr_method,		  &
-                     lwr_method,             &
-                     longwave_method,             &     !SP
-                     wind_h,                      &     !SP
-                     rh_h,                        &     !SP
-                     airt_h,                      &     !SP
-                     solar,                       &
-                     net_ir,  &
-                     swr_error, &
-                     wind_error, &
-                     const_qin,&
-                     const_qout, &
-                     heatflux_file, &
-                     momentum_method, &
-                     const_tx,&
-                     const_ty, &
-                     momentumflux_file, &
-                     p_e_method,p_e_flux_file, &
-                     sst_method, sst_file, &
-                     sst_method2, sst_file2, &
-                     sss_method, sss_file, &
-                     airt_method, airt_file
-!
-!-----------------------------------------------------------------------
-!BOC
-   write(0,*) '   ', 'init_air_sea'
-
-   open(namlst,file='airsea.inp',action='read',status='old',err=90)
-   read(namlst,nml=airsea,err=91)
-   close(namlst)
-
-   if (calc_fluxes) then
-
-      open(meteo_unit,file=meteo_file,action='read',status='old',err=92)
-      write(0,*) '       ', 'Reading meteo data from:'
-      write(0,*) '           ', trim(meteo_file)
-   end if
-
-!   else
-
-      if (flux_method .eq. FROMFILE) then
-            open(heat_unit,file=heatflux_file,action='read',status='old',err=93)
-            write(0,*) '       ', 'Reading heat fluxes from:'
-            write(0,*) '           ', trim(heatflux_file)
-      end if
-
-!     The momentum fluxes
-      select case (momentum_method)
-         case (FROMFILE)
-            open(momentum_unit,file=momentumflux_file,action='read', &
-                 status='old',err=94)
-            write(0,*) '       ', 'Reading momentum fluxes from:'
-            write(0,*) '           ', trim(momentumflux_file)
-         case default
-      end select
-
-!     The fresh water fluxes
-      select case (p_e_method)
-         case (FROMFILE)
-            open(p_e_unit,file=p_e_flux_file,action='read', &
-                 status='old',err=95)
-            write(0,*) '       ', 'Reading precipitatio/evaporation data from:'
-            write(0,*) '           ', trim(p_e_flux_file)
-         case default
-      end select
-
-!     The sea surface temperature
-      select case (sst_method)
-         case (FROMFILE)
-            open(sst_unit,file=sst_file,action='read',status='old',err=96)
-            write(0,*) '       ', 'Reading sea surface temperature from:'
-            write(0,*) '           ', trim(sst_file)
-          !  call read_sst(julday,secs,sst)
-         case default
-      end select
-      select case (sst_method2)
-         case (FROMFILE)
-            open(sst_unit2,file=sst_file2,action='read',status='old',err=99)
-            write(0,*) '       ', 'Reading sea surface temperature from:'
-            write(0,*) '           ', trim(sst_file2)
-         case default
-      end select
-
-!     The sea surface salinity
-      select case (sss_method)
-         case (FROMFILE)
-            open(sss_unit,file=sss_file,action='read',status='old',err=97)
-            write(0,*) '       ', 'Reading sea surface salinity from:'
-            write(0,*) '           ', trim(sss_file)
-         case default
-      end select
-
-!     The air temperature
-      select case (airt_method)
-         case (FROMFILE)
-            open(airt_unit,file=airt_file,action='read',status='old',err=98)
-            write(0,*) '       ', 'Reading air temperatur from from:'
-            write(0,*) '           ', trim(airt_file)
-         case default
-      end select
-
-!   end if
-
-   twet=0.
-   rh=0.
-   spec_hum=0.
-   dew_pt=0.
-   cloud=0.
-   sss=0.
-   airt=0.
-
-   alon = deg2rad*lon
-   alat = deg2rad*lat
-
-   return
-
-90 write(0,*) 'FATAL ERROR: ', 'I could not open airsea.inp'
-   stop 'init_airsea'
-91 write(0,*) 'FATAL ERROR: ', 'I could not read airsea namelist'
-   stop 'init_airsea'
-92 write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(meteo_file)
-   stop 'init_airsea'
-93 write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(heatflux_file)
-   stop 'init_airsea'
-94 write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(momentumflux_file)
-   stop 'init_airsea'
-95 write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(p_e_flux_file)
-   stop 'init_airsea'
-96 write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(sst_file)
-   stop 'init_airsea'
-99 write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(sst_file2)
-   stop 'init_airsea'
-97 write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(sss_file)
-   stop 'init_airsea'
-98 write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(airt_file)
-   stop 'init_airsea'
-
-   end subroutine init_air_sea
-!EOC
-
-!-----------------------------------------------------------------------
-!BOP
-!
-! !IROUTINE: Obtain the air--sea fluxes
-!
-! !INTERFACE:
-   subroutine air_sea_interaction(jul,secs)
-!
-! !DESCRIPTION:
-!
-!  Depending on the value of the boolean variable {\tt calc\_fluxes},
-!  the calculation of the fluxes and the short wave radiation are
-!  called or the fluxes are directly read in from the namelist
-!  {\tt airsea.inp} as constants or read in from files. With the present
-!  version of GOTM, the 
-!  surface momentum flux and the surface heat flux can be caluclated.
-!  The surface salinity flux is not coded yet. 
-!
-!  On the long run this will be the routine to call, to calculate and
-!  to obtain air--sea related variables. 
-!
-! !USES:
-   IMPLICIT NONE
-!
-! !INPUT PARAMETERS:
-   integer, intent(in)                 :: jul,secs
-!
-! !REVISION HISTORY:
-!  Original author(s): Karsten Bolding
-!
-!  See log for airsea module
-
-!  See airsea module
-!
-
-!
-! !LOCAL VARIABLES:
-  double precision  :: dummy,adjustment,qb_down,lwrcloud,top,bottom,cloud_factor
-  integer           :: i,ios,count=1,count2=1,count3=0
-!
-!
-!EOP
-!-----------------------------------------------------------------------
-!BOC
-!SP moved SST up the order (was after wind_error correction) 28/04/06
-!     The sea surface temperature
-      select case (sst_method)
-         case (FROMFILE)
-            call read_sst(jul,secs,sst)
-         case default
-            select case (sst_method2)
-               case (FROMFILE)
-                  call read_sst(jul,secs,sst)
-               case default
-            end select
-      end select
-
-  if (calc_fluxes) then 
-        call flux_from_meteo(jul,secs)     
-  end if
-
-   call short_wave_radiation(jul,secs,alat,alon)  !SP placed comment here
-
-   !Net shortwave radiation
- !  I_0=I_0_calc
-!     The heat fluxes
-
-      select case (flux_method)
-         case (CONSTVAL)
-            heat=const_qout
-         case (FROMFILE)
-             call read_heat_flux(jul,secs,adjustment,cloud_factor,qb_down)
-         case default
-      end select
-
-      select case (swr_method)
-         case (CONSTVAL)
-            I_0=const_qin
-         case (FROMFILE)
-            if (flux_method .ne. FROMFILE ) then
-               PRINT*,'ERROR'
-               READ*
-            else
- !              I_0=adjustment*(1.-albedo) ! adjustment comes from heat.dat 3rd column
-                I_0=cloud_factor*I_0_calc  ! cloud_factor comes from heat.dat 2nd column
-
-                cloud = min(1.,max(0.,cloud_factor))  ! fixed fraction cloud values between 0 and 1
-
-! SP June 2016 - determine cloud fraction
-!		if(I_0_calc .ne. 0) then
-!			cloud = ((1 - (I_0/I_0_calc) + 0.0019*sunbet)/0.62)
-!			if(cloud .LT. 0.0) then
-!				cloud = 0.0
-!			end if
-!			if(cloud .GT. 1.0) then
-!				cloud = 1.0
-!			end if
-!		else
-!			cloud = 0.0;
-!		end if
-! SP June 2016 - recalculate swr (now with cloud values)
-
-            end if 
-         case default
-      end select
-
-      select case (lwr_method)
-         case (CONSTVAL)
-            print*,'ERROR'
-         case (FROMFILE)
-            if (flux_method .ne. FROMFILE ) then
-               PRINT*,'ERROR'
-               READ*
-            else
-              qb=(emiss*bolz*(sst+kelvin)**4)-(0.955*qb_down)
-            end if
-         case default
-      end select
-
-!     The momentum fluxes
-      select case (momentum_method)
-         case (CONSTVAL)
-            tx=const_tx
-            ty=const_ty
-         case (FROMFILE)
-            call read_momentum_flux(jul,secs,tx,ty)
-         case default
-      end select
-
-
-!     The sea surface salinity
-      select case (sss_method)
-         case (FROMFILE)
-         case default
-      end select
-
-!     The air temperature
-      select case (airt_method)
-         case (FROMFILE)
-         case (SET_TO_SST)
-            airt=sst
-         case default
-      end select
-
-      if(calc_fluxes) then
-      else
-         !   Calculate cool skin effect (Wick, 96) SP: 13/03/06
-         call skin_temp(sst,skint)
-      end if
-
-   return
-   end subroutine air_sea_interaction
-!EOC
-!-----------------------------------------------------------------------
-   subroutine skin_temp(sst,skint)
-
-! USES:
-
-use meanflow,     only:  gravity,rho_0,cp
-
-     IMPLICIT NONE
-
-     double precision, intent(in)   :: sst
-     double precision, intent(out)  :: skint
-
-     !LOCAL VARIABLES:
-     double precision               :: al,visw,tcw,charn
-     double precision               :: u_star,delta_t,zo
-     double precision               :: visa,airt
-     double precision               :: c_shear,c_conv,Ri_crit,Ri
-
-!-----------------------------------------------------------------------   
-
-     visw=1.e-6                   !m2/s kinematic viscosity water
-     tcw=0.6                      !W/m/K   Thermal conductivity water
-     charn=0.011
-     al=2.1e-5*(sst+3.2)**0.79      !water thermal expansion coefft.
-     
-     airt=sst-1 !airt not known, so guess!
-! Kinematic viscosity of dry air, in m2/s - Andreas (1989) CRREL Rep. 89-11
-      visa=1.326e-5*(1.+6.542e-3*airt+8.301e-6*airt**2-4.84e-9*airt**3)
-
-
-     !mean of table 4 values in Wick, 1996 JPO
-     c_shear=226.5
-     c_conv=2.71
-     Ri_crit=-1.6e-4
-
-     u_star=sqrt(sqrt(tx*tx+ty*ty)/rho_0)
-     zo=charn*u_star*u_star/gravity + 0.11*visa/u_star    !after Smith 1988
-
-     !surface Richardson number as defined by Soloviev and Schlussel, 1994
-     Ri=-al*gravity*(-heat-I_0*.1)*visw/(rho_0*cp*(u_star**4))
-
-     if(-heat-I_0*.1.GT.0) then
-     delta_t=((-heat-I_0*.1)/(rho_0*cp*sqrt(tcw/(rho_0*cp))))* &
-          sqrt(c_shear*sqrt(visw*zo/(u_star**3)) + &
-          (c_conv*sqrt(visw*rho_0*cp/(al*gravity*(-heat-I_0*.1))) - &
-                 c_shear*sqrt(visw*zo/(u_star**3)))*exp(-Ri_crit/Ri))
-     else
-        delta_t=0.
-     end if
-
-     skint=sst-delta_t
-
-     end subroutine skin_temp
-!-----------------------------------------------------------------------
-
-!-----------------------------------------------------------------------
-!BOP
-!
-! !IROUTINE: Finish the air--sea interactions
-!
-! !INTERFACE:
-   subroutine finish_air_sea_interaction
-!
-! !DESCRIPTION:
-!  Various files are closed in this routine.
-!
-! !USES:
-   IMPLICIT NONE
-!
-! !REVISION HISTORY:
-!  Original author(s): Karsten Bolding
-!
-!  See log for airsea module
-!
-!EOP
-!-----------------------------------------------------------------------
-!BOC
-   if (calc_fluxes) then
-      close(meteo_unit)
-   else
-      if (flux_method .eq. FROMFILE) close(heat_unit)
-      if (momentum_method .eq. FROMFILE) close(momentum_unit)
-      if (p_e_method      .eq. FROMFILE) close(p_e_unit)
-      if (sst_method      .eq. FROMFILE) close(sst_unit)
-      if (sst_method2      .eq. FROMFILE) close(sst_unit2)
-      if (sss_method      .eq. FROMFILE) close(sss_unit)
-      if (airt_method     .eq. FROMFILE) close(airt_unit)
-   end if
-   return
-   end subroutine finish_air_sea_interaction
-!EOC
-
-!-----------------------------------------------------------------------
-!BOP
-!
-! !IROUTINE: Compute the exchange coefficients \label{sec:calcCoeff}
-!
-! !INTERFACE:
-   subroutine exchange_coefficients()
-!
-! !DESCRIPTION:
-!  
-!
-! !USES:
-
-use meanflow,     only:  gravity,rho_0,cp
-
-   IMPLICIT NONE
-!
-! !DEFINED PARAMETERS:
-   
-!
-! !REVISION HISTORY:
-!  Original author(s): Sam Pimentel, using code taken from COARE Bulk Flux 
-!                      Algorithm version 3.0a.  See Fairall et al.,2003
-!                      J. Climate. Code then slightly adapted by Simon Josey.
-!
-!  See log for the airsear module
-!
-!EOP
-!
-! !LOCAL VARIABLES:
-   double precision                  ::zu,zq,sst_depth,zs,zi 
-   double precision                  ::esatu,qsatu,qa 
-   double precision                  ::Rgas,Cpv,al,be,cpw,rhow,von  !,grav 
-   double precision                  ::Rns,charn 
-   double precision                  ::beta,visw,tcw,bigc,wetc,visa,ta 
-   double precision                  ::dter,zo,Wg,Bf,tkt,Dt,Dq
-   double precision                  ::u10,usr,zo10,Cd10,Ch10,Ct10,zot10
-   double precision                  ::Ct,CC,Ribcu,Ribu,zetu,L10,qsr,tsr
-   double precision                  ::rr,zoq,zot,zL,L,psu,pst
-   double precision                  ::usrold,tsrold,qsrold,conusr,contsr,conqsr
-   double precision                  ::hsb,hlb,qout,dels,qcol,alq,xlamx
-   integer                           ::iter
-
-   integer                           ::i,ios,count=1,count2=1,count3=0
-
-!
-!
-!-----------------------------------------------------------------------
-!BOC
-
-   !SP-this represents the possible errors in obs
-   IF(border.NE.0) THEN
-      wx=(1+wind_error)*wx
-      wy=(1+wind_error)*wy
-   ELSE
-      if((wind_error.NE.0.0).AND.(ABS(wind_error-0.25).GT.0.0001).AND.(ABS(wind_error+0.25).GT.0.0001)) then
-         if(ABS(wind_error-9.0).LT.0.0001) then
-            wind_error=0.0
-            border=2
-!         else if(wind_error.LT.-0.999) then
-!            wind_error=-0.999
-!            border=3
-!         else if(wind_error.LT.-0.95) then
-!            wind_error=-0.95
-!            border=3
-!         else if(wind_error.GE.3) then
-!            wind_error=3.0
-!            border=3
-         else
-            border=1
-         end if
-      end if
-            wx=(1+wind_error)*wx
-            wy=(1+wind_error)*wy
-   END IF
-   !SP end wind errors section
-
-   w = sqrt(wx*wx+wy*wy)
-
-!  set up fixed instrument levels
-      zu=wind_h                 !height of wind measurement Arabian Sea
-      zt=airt_h                 !height of air temp Arabian Sea
-      zq=rh_h                   !height of humidity Arabian Sea
-      sst_depth=0.005           !top layer in GOTM's grid
-
-!  default values for standard height (normally 10m) pressure and mixed layer height
-      zs=10.
-      zi=600. 
-      airp=airp*.01
-
-call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at air temp., ea, in mb
-
-      qa=.62197*(ea/(airp-0.378*ea))   !convert vapour pressure to mixing ratio (saturated at air temp.)
-
-!The below 2 formula are used in relative humidity is observed (rh)
-!      e=ea*rh*0.01                     !relative humidity = vapour pressure/satuated vapour pressure
-!      q=.62197*(e/(airp-0.378*e))     !mixing ratio   (kg/kg)
-
-!W-H. Tse 160910 debug.      
-!      print *, "e,ea,rh,airp,q"
-!      print *,e,ea,rh,airp,q    
-   
-
-      !W-H. Tse 160910 The information in the link is good, but the following formula was wrongly input by the previous guy,
-      !where q and spec_hum is reversed in relationship.
-
-      ! PREVIOUS 
-      !The below formula is used if specific humidity is observed (spec_hum)
-      !from http://amsglossary.allenpress.com/glossary/search?id=specific-humidity1 using specific humidity (spec_hum) in Kg/Kg
-      !      q=spec_hum/(1+spec_hum)           !mixing ratio  (kg/kg)
-      ! END PREVIOUS
-
-      ! NEW
-      ! The formula by solving for q in spec_hum = q/(1+q), which gives q = spec_hum/(1-spec_hum).
-
-      q = spec_hum/(1-spec_hum)
-
-      ! END NEW      
-      rh=q*100/qa                       !relative humidity
-
-!W-H. Tse 160910 debug.            
-!      print *, "spec_hum,q,qa,rh"
-!      print *, spec_hum,q,qa,rh
-
-!The below is used if dew point temperature is observed (dew_pt)
-      !from http://www.srh.noaa.gov/elp/wxcalc/formulas/vaporPressure.html using dew point temperature (dew_pt) in Celsius
-!      e=6.11*10**(7.5*dew_pt/(237.7+dew_pt))
-!      q=.62197*(e/(airp-0.378*e))     !mixing ratio   (kg/kg)
-!      rh=e*100/ea
-    
-!OPEN(UNIT=77,FILE="OBS/q_with_rh_new2.asc")
-!WRITE(UNIT=77,FMT='(F9.8)') q
- 
-      call humidity(sst,airp,es)        !returns saturated vapour pressure at SST, es, in mb
-      es=es*0.98                     !reduced for salinity Kraus 1972 p. 46
-      qs=.62197*(es/(airp-0.378*es)) !convert from mb to mixing ratio  kg/kg
-      
-! Constants and coefficients (Stull 1988 p640). 
-      Rgas=287.1                    !J/kg/K     gas const. dry air
-      Cpv=Cpa*(1.+0.84*q)         !Moist air - currently not used (Businger 1982)
-      rho_air=airp*100./(Rgas*(airt+Kelvin)*(1.+0.61*q)) !kg/m3  Moist air density
-!      grav=9.78401528445819         !value of gravity at latitude 15.5 
-      al=2.1e-5*(sst+3.2)**0.79      !water thermal expansion coefft.
-      be=0.026                      !salinity expansion coefft.
-      cpw=cp                        !J/kg/K specific heat water
-      rhow=rho_0                    !kg/m3  density water
-      von=0.4                       !von Karman's "constant
-
-! Factors
-      Beta=1.2     !Given as 1.25 in Fairall et al.(1996)
-
-! Additional constants needed for cool skin
-      visw=1.e-6                   !m2/s kinematic viscosity water
-      tcw=0.6                      !W/m/K   Thermal conductivity water
-      bigc=16.*gravity*cpw*(rhow*visw)**3/(tcw*tcw*rho_air*rho_air)
-      xlv=(2.501-0.00237*sst)*1e+6 !J/kg latent heat of vaporization at sst (3C warming=0.3%)
-      wetc=0.622*xlv*qs/(rgas*(sst+Kelvin)**2) !Clausius-Clapeyron
-! Kinematic viscosity of dry air, in m2/s - Andreas (1989) CRREL Rep. 89-11
-      visa=1.326e-5*(1.+6.542e-3*airt+8.301e-6*airt**2-4.84e-9*airt**3) 
-      ta=airt+Kelvin      !air temperature K
- 
-! Initial guesses
-      dter=0.3                    !cool skin Dt
-      dqer=wetc*dter              !cool skin Dq
-      zo=0.0001
-      Wg=0.5                      !Gustiness factor initial guess
-      tkt= 0.001                  !Cool skin thickness first guess
-
-! Air-sea differences - includes warm layer in Dt and Dq
-      Du=(w**2.+Wg**2.)**.5       !include gustiness in wind spd. difference
-      Dt=sst-airt-0.0098*zt       !potential temperature difference.
-      Dq=qs-q                     !mixing ratio difference
-
-! **************** neutral coefficients ******************
-
-      u10=Du*dlog(10/zo)/dlog(zu/zo)
-      usr=0.035*u10
-      zo10=0.011*usr*usr/gravity+0.11*visa/usr
-      Cd10=(von/dlog(10/zo10))**2
-      Ch10=0.00115
-      Ct10=Ch10/sqrt(Cd10)
-      zot10=10./dexp(von/Ct10)
-      cdd=(von/dlog(zu/zo10))**2
-      
-! ************* Grachev and Fairall (JAM, 1997) **********
-
-      Ct=von/dlog(zt/zot10)         ! Temperature transfer coefficient
-      CC=von*Ct/cdd                  ! z/L vs Rib linear coefficient
-      Ribcu=-zu/(zi*0.004*Beta**3)  ! Saturation or plateau Rib 
-      Ribu=-gravity*zu*((Dt-dter)+0.61*ta*Dq)/(ta*Du**2)
-      if (Ribu.lt.0.) then
-          zetu=CC*Ribu/(1.+Ribu/Ribcu)   ! Unstable G and F
-      else
-          zetu=CC*Ribu*(1.+27./9.*Ribu/CC) ! Stable
-      end if
-      L10=zu/zetu                       ! MO length
-
-! First guess M-O stability dependent scaling params.(u*,t*,q*) to estimate zo and z/L
-
-      usr= Du*von/(dlog(zu/zo10)-psiu(zu/L10))
-      tsr=-(Dt-dter)*von/(dlog(zt/zot10)-psit(zt/L10))
-      qsr=-(Dq-dqer)*von/(dlog(zq/zot10)-psit(zq/L10))
-
-      charn=0.011     !then modify Charnock for high wind speeds Chris' data
-      if(Du.gt.10) charn=0.011+(0.018-0.011)*(Du-10)/(18-10)
-      if(Du.gt.18) charn=0.018
-      
-! **** Iterate across u*(t*,q*),zo(zot,zoq) and z/L including cool skin ****
-
-!(sxj) original loop to nits commented out and convergence test introduced
-      do 10 iter=1,30
-         
-        zo=charn*usr*usr/gravity + 0.11*visa/usr    !after Smith 1988
-      rr=zo*usr/visa
-
-! *** zoq and zot fitted to results from several ETL cruises ************
-
-      zoq=min(1.15e-4,5.5e-5/rr**0.6)
-      zot=zoq
-
-	zL=von*gravity*zu*(tsr*(1.+0.61*q)+0.61*ta*qsr)/((airt+Kelvin)*usr*usr*(1.+0.61*q))
-      L=zu/zL
-      psu=psiu(zu/L)
-      pst=psit(zt/L)
-      dqer=wetc*dter
-
-!(sxj) store previous usr,tsr,qsr values and calculate convergence stats
-      usrold=usr
-      tsrold=tsr
-      qsrold=qsr
-
-      usr=Du*von/(dlog(zu/zo)-psiu(zu/L))
-      tsr=-(Dt-dter)*von/(dlog(zt/zot)-psit(zt/L))
-      qsr=-(Dq-dqer)*von/(dlog(zq/zoq)-psit(zq/L))
-
-!(sxj) calculate convergence stats
-      conusr=(usr-usrold)/usrold
-      contsr=(tsr-tsrold)/tsrold
-      conqsr=(qsr-qsrold)/qsrold
-
-      Bf=-gravity/ta*usr*(tsr+0.61*ta*qsr)
+  double precision, public	:: airt
+  double precision, public	:: solar
+  double precision, public	:: net_ir=1353 !1350.
+
+  !WT 2016-09-24 Debug
+  character(len=19) :: assim_timestr
+
+  !-----------------------------------------------------------------------
+
+contains
+
+  !-----------------------------------------------------------------------
+  !BOP
+  !
+  ! !IROUTINE: Initialise the air--sea interaction module
+  !
+  ! !INTERFACE:
+  subroutine init_air_sea(namlst,lat,lon,julday,secs)
+    !
+    ! !DESCRIPTION:
+    !  This routine initialises the air--sea module by reading various variables
+    !  from a namelist and open relevant files.
+    !
+    ! !USES:
+    IMPLICIT NONE
+    !
+    ! !INPUT PARAMETERS:
+    integer, intent(in)                 :: namlst
+    integer, intent(in)                 :: julday,secs
+    double precision, intent(in)                :: lat,lon
+    !
+    ! !REVISION HISTORY:
+    !  Original author(s): Karsten Bolding
+    !
+    !  See log for airsea module
+    !
+    !EOP
+    !
+    ! !LOCAL VARIABLES:
+    namelist /airsea/ calc_fluxes, &
+         meteo_file, &
+         flux_method,	  &
+         swr_method,		  &
+         lwr_method,             &
+         longwave_method,             &     !SP
+         wind_h,                      &     !SP
+         rh_h,                        &     !SP
+         airt_h,                      &     !SP
+         solar,                       &
+         net_ir,  &
+         swr_error, &
+         wind_error, &
+         const_qin,&
+         const_qout, &
+         heatflux_file, &
+         momentum_method, &
+         const_tx,&
+         const_ty, &
+         momentumflux_file, &
+         p_e_method,p_e_flux_file, &
+         sst_method, sst_file, &
+         sst_method2, sst_file2, &
+         sss_method, sss_file, &
+         airt_method, airt_file
+    !
+    !-----------------------------------------------------------------------
+    !BOC
+    write(0,*) '   ', 'init_air_sea'
+
+    open(namlst,file='airsea.inp',action='read',status='old',err=90)
+    read(namlst,nml=airsea,err=91)
+    close(namlst)
+
+    if (calc_fluxes) then
+
+       open(meteo_unit,file=meteo_file,action='read',status='old',err=92)
+       write(0,*) '       ', 'Reading meteo data from:'
+       write(0,*) '           ', trim(meteo_file)
+    end if
+
+    !   else
+
+    if (flux_method .eq. FROMFILE) then
+       open(heat_unit,file=heatflux_file,action='read',status='old',err=93)
+       write(0,*) '       ', 'Reading heat fluxes from:'
+       write(0,*) '           ', trim(heatflux_file)
+    end if
+
+    !     The momentum fluxes
+    select case (momentum_method)
+    case (FROMFILE)
+       open(momentum_unit,file=momentumflux_file,action='read', &
+            status='old',err=94)
+       write(0,*) '       ', 'Reading momentum fluxes from:'
+       write(0,*) '           ', trim(momentumflux_file)
+    case default
+    end select
+
+    !     The fresh water fluxes
+    select case (p_e_method)
+    case (FROMFILE)
+       open(p_e_unit,file=p_e_flux_file,action='read', &
+            status='old',err=95)
+       write(0,*) '       ', 'Reading precipitatio/evaporation data from:'
+       write(0,*) '           ', trim(p_e_flux_file)
+    case default
+    end select
+
+    !     The sea surface temperature
+    select case (sst_method)
+    case (FROMFILE)
+       open(sst_unit,file=sst_file,action='read',status='old',err=96)
+       write(0,*) '       ', 'Reading sea surface temperature from:'
+       write(0,*) '           ', trim(sst_file)
+       !  call read_sst(julday,secs,sst)
+    case default
+    end select
+    select case (sst_method2)
+    case (FROMFILE)
+       open(sst_unit2,file=sst_file2,action='read',status='old',err=99)
+       write(0,*) '       ', 'Reading sea surface temperature from:'
+       write(0,*) '           ', trim(sst_file2)
+    case default
+    end select
+
+    !     The sea surface salinity
+    select case (sss_method)
+    case (FROMFILE)
+       open(sss_unit,file=sss_file,action='read',status='old',err=97)
+       write(0,*) '       ', 'Reading sea surface salinity from:'
+       write(0,*) '           ', trim(sss_file)
+    case default
+    end select
+
+    !     The air temperature
+    select case (airt_method)
+    case (FROMFILE)
+       open(airt_unit,file=airt_file,action='read',status='old',err=98)
+       write(0,*) '       ', 'Reading air temperatur from from:'
+       write(0,*) '           ', trim(airt_file)
+    case default
+    end select
+
+    !   end if
+
+    twet=0.
+    rh=0.
+    spec_hum=0.
+    dew_pt=0.
+    cloud=0.
+    sss=0.
+    airt=0.
+
+    alon = deg2rad*lon
+    alat = deg2rad*lat
+
+    return
+
+90  write(0,*) 'FATAL ERROR: ', 'I could not open airsea.inp'
+    stop 'init_airsea'
+91  write(0,*) 'FATAL ERROR: ', 'I could not read airsea namelist'
+    stop 'init_airsea'
+92  write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(meteo_file)
+    stop 'init_airsea'
+93  write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(heatflux_file)
+    stop 'init_airsea'
+94  write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(momentumflux_file)
+    stop 'init_airsea'
+95  write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(p_e_flux_file)
+    stop 'init_airsea'
+96  write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(sst_file)
+    stop 'init_airsea'
+99  write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(sst_file2)
+    stop 'init_airsea'
+97  write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(sss_file)
+    stop 'init_airsea'
+98  write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(airt_file)
+    stop 'init_airsea'
+
+  end subroutine init_air_sea
+  !EOC
+
+  !-----------------------------------------------------------------------
+  !BOP
+  !
+  ! !IROUTINE: Obtain the air--sea fluxes
+  !
+  ! !INTERFACE:
+  subroutine air_sea_interaction(jul,secs)
+    !
+    ! !DESCRIPTION:
+    !
+    !  Depending on the value of the boolean variable {\tt calc\_fluxes},
+    !  the calculation of the fluxes and the short wave radiation are
+    !  called or the fluxes are directly read in from the namelist
+    !  {\tt airsea.inp} as constants or read in from files. With the present
+    !  version of GOTM, the 
+    !  surface momentum flux and the surface heat flux can be caluclated.
+    !  The surface salinity flux is not coded yet. 
+    !
+    !  On the long run this will be the routine to call, to calculate and
+    !  to obtain air--sea related variables. 
+    !
+    ! !USES:
+    IMPLICIT NONE
+    !
+    ! !INPUT PARAMETERS:
+    integer, intent(in)                 :: jul,secs
+    !
+    ! !REVISION HISTORY:
+    !  Original author(s): Karsten Bolding
+    !
+    !  See log for airsea module
+
+    !  See airsea module
+    !
+
+    !
+    ! !LOCAL VARIABLES:
+    double precision  :: dummy,adjustment,qb_down,lwrcloud,top,bottom,cloud_factor
+    integer           :: i,ios,count=1,count2=1,count3=0
+    !
+    !
+    !EOP
+    !-----------------------------------------------------------------------
+    !BOC
+    !SP moved SST up the order (was after wind_error correction) 28/04/06
+    !     The sea surface temperature
+    select case (sst_method)
+    case (FROMFILE)
+       call read_sst(jul,secs,sst)
+    case default
+       select case (sst_method2)
+       case (FROMFILE)
+          call read_sst(jul,secs,sst)
+       case default
+       end select
+    end select
+
+    if (calc_fluxes) then 
+       call flux_from_meteo(jul,secs)     
+    end if
+
+    call short_wave_radiation(jul,secs,alat,alon)  !SP placed comment here
+
+    !Net shortwave radiation
+    !  I_0=I_0_calc
+    !     The heat fluxes
+
+    select case (flux_method)
+    case (CONSTVAL)
+       heat=const_qout
+    case (FROMFILE)
+       call read_heat_flux(jul,secs,adjustment,cloud_factor,qb_down)
+    case default
+    end select
+
+    select case (swr_method)
+    case (CONSTVAL)
+       I_0=const_qin
+    case (FROMFILE)
+       if (flux_method .ne. FROMFILE ) then
+          PRINT*,'ERROR'
+          READ*
+       else
+          !              I_0=adjustment*(1.-albedo) ! adjustment comes from heat.dat 3rd column
+          !WT 20170315 Should we fix cloud factor between 0 and 1 BEFORE setting I_0?
+          print *, "secs, cloud_factor", secs, cloud_factor
+          print *, "I_0_calc, I_0", I_0_calc, I_0 
+
+          I_0=cloud_factor*I_0_calc  ! cloud_factor comes from heat.dat 2nd column
+          cloud = min(1.,max(0.,cloud_factor))  ! fixed fraction cloud values between 0 and 1
+
+          ! SP June 2016 - determine cloud fraction
+          !		if(I_0_calc .ne. 0) then
+          !			cloud = ((1 - (I_0/I_0_calc) + 0.0019*sunbet)/0.62)
+          !			if(cloud .LT. 0.0) then
+          !				cloud = 0.0
+          !			end if
+          !			if(cloud .GT. 1.0) then
+          !				cloud = 1.0
+          !			end if
+          !		else
+          !			cloud = 0.0;
+          !		end if
+          ! SP June 2016 - recalculate swr (now with cloud values)
+
+       end if
+    case default
+    end select
+
+    select case (lwr_method)
+    case (CONSTVAL)
+       print*,'ERROR'
+    case (FROMFILE)
+       if (flux_method .ne. FROMFILE ) then
+          PRINT*,'ERROR'
+          READ*
+       else
+          qb=(emiss*bolz*(sst+kelvin)**4)-(0.955*qb_down)
+       end if
+    case default
+    end select
+
+    !     The momentum fluxes
+    select case (momentum_method)
+    case (CONSTVAL)
+       tx=const_tx
+       ty=const_ty
+    case (FROMFILE)
+       call read_momentum_flux(jul,secs,tx,ty)
+    case default
+    end select
+
+
+    !     The sea surface salinity
+    select case (sss_method)
+    case (FROMFILE)
+    case default
+    end select
+
+    !     The air temperature
+    select case (airt_method)
+    case (FROMFILE)
+    case (SET_TO_SST)
+       airt=sst
+    case default
+    end select
+
+    if(calc_fluxes) then
+    else
+       !   Calculate cool skin effect (Wick, 96) SP: 13/03/06
+       call skin_temp(sst,skint)
+    end if
+
+    return
+  end subroutine air_sea_interaction
+  !EOC
+  !-----------------------------------------------------------------------
+  subroutine skin_temp(sst,skint)
+
+    ! USES:
+
+    use meanflow,     only:  gravity,rho_0,cp
+
+    IMPLICIT NONE
+
+    double precision, intent(in)   :: sst
+    double precision, intent(out)  :: skint
+
+    !LOCAL VARIABLES:
+    double precision               :: al,visw,tcw,charn
+    double precision               :: u_star,delta_t,zo
+    double precision               :: visa,airt
+    double precision               :: c_shear,c_conv,Ri_crit,Ri
+
+    !-----------------------------------------------------------------------   
+
+    visw=1.e-6                   !m2/s kinematic viscosity water
+    tcw=0.6                      !W/m/K   Thermal conductivity water
+    charn=0.011
+    al=2.1e-5*(sst+3.2)**0.79      !water thermal expansion coefft.
+
+    airt=sst-1 !airt not known, so guess!
+    ! Kinematic viscosity of dry air, in m2/s - Andreas (1989) CRREL Rep. 89-11
+    visa=1.326e-5*(1.+6.542e-3*airt+8.301e-6*airt**2-4.84e-9*airt**3)
+
+
+    !mean of table 4 values in Wick, 1996 JPO
+    c_shear=226.5
+    c_conv=2.71
+    Ri_crit=-1.6e-4
+
+    u_star=sqrt(sqrt(tx*tx+ty*ty)/rho_0)
+    zo=charn*u_star*u_star/gravity + 0.11*visa/u_star    !after Smith 1988
+
+    !surface Richardson number as defined by Soloviev and Schlussel, 1994
+    Ri=-al*gravity*(-heat-I_0*.1)*visw/(rho_0*cp*(u_star**4))
+
+    if(-heat-I_0*.1.GT.0) then
+       delta_t=((-heat-I_0*.1)/(rho_0*cp*sqrt(tcw/(rho_0*cp))))* &
+            sqrt(c_shear*sqrt(visw*zo/(u_star**3)) + &
+            (c_conv*sqrt(visw*rho_0*cp/(al*gravity*(-heat-I_0*.1))) - &
+            c_shear*sqrt(visw*zo/(u_star**3)))*exp(-Ri_crit/Ri))
+    else
+       delta_t=0.
+    end if
+
+    skint=sst-delta_t
+
+  end subroutine skin_temp
+  !-----------------------------------------------------------------------
+
+  !-----------------------------------------------------------------------
+  !BOP
+  !
+  ! !IROUTINE: Finish the air--sea interactions
+  !
+  ! !INTERFACE:
+  subroutine finish_air_sea_interaction
+    !
+    ! !DESCRIPTION:
+    !  Various files are closed in this routine.
+    !
+    ! !USES:
+    IMPLICIT NONE
+    !
+    ! !REVISION HISTORY:
+    !  Original author(s): Karsten Bolding
+    !
+    !  See log for airsea module
+    !
+    !EOP
+    !-----------------------------------------------------------------------
+    !BOC
+    if (calc_fluxes) then
+       close(meteo_unit)
+    else
+       if (flux_method .eq. FROMFILE) close(heat_unit)
+       if (momentum_method .eq. FROMFILE) close(momentum_unit)
+       if (p_e_method      .eq. FROMFILE) close(p_e_unit)
+       if (sst_method      .eq. FROMFILE) close(sst_unit)
+       if (sst_method2      .eq. FROMFILE) close(sst_unit2)
+       if (sss_method      .eq. FROMFILE) close(sss_unit)
+       if (airt_method     .eq. FROMFILE) close(airt_unit)
+    end if
+    return
+  end subroutine finish_air_sea_interaction
+  !EOC
+
+  !-----------------------------------------------------------------------
+  !BOP
+  !
+  ! !IROUTINE: Compute the exchange coefficients \label{sec:calcCoeff}
+  !
+  ! !INTERFACE:
+  subroutine exchange_coefficients()
+    !
+    ! !DESCRIPTION:
+    !  
+    !
+    ! !USES:
+
+    use meanflow,     only:  gravity,rho_0,cp
+
+    IMPLICIT NONE
+    !
+    ! !DEFINED PARAMETERS:
+
+    !
+    ! !REVISION HISTORY:
+    !  Original author(s): Sam Pimentel, using code taken from COARE Bulk Flux 
+    !                      Algorithm version 3.0a.  See Fairall et al.,2003
+    !                      J. Climate. Code then slightly adapted by Simon Josey.
+    !
+    !  See log for the airsear module
+    !
+    !EOP
+    !
+    ! !LOCAL VARIABLES:
+    double precision                  ::zu,zq,sst_depth,zs,zi 
+    double precision                  ::esatu,qsatu,qa 
+    double precision                  ::Rgas,Cpv,al,be,cpw,rhow,von  !,grav 
+    double precision                  ::Rns,charn 
+    double precision                  ::beta,visw,tcw,bigc,wetc,visa,ta 
+    double precision                  ::dter,zo,Wg,Bf,tkt,Dt,Dq
+    double precision                  ::u10,usr,zo10,Cd10,Ch10,Ct10,zot10
+    double precision                  ::Ct,CC,Ribcu,Ribu,zetu,L10,qsr,tsr
+    double precision                  ::rr,zoq,zot,zL,L,psu,pst
+    double precision                  ::usrold,tsrold,qsrold,conusr,contsr,conqsr
+    double precision                  ::hsb,hlb,qout,dels,qcol,alq,xlamx
+    integer                           ::iter
+
+    integer                           ::i,ios,count=1,count2=1,count3=0
+
+    !
+    !
+    !-----------------------------------------------------------------------
+    !BOC
+
+    !SP-this represents the possible errors in obs
+    IF(border.NE.0) THEN
+       wx=(1+wind_error)*wx
+       wy=(1+wind_error)*wy
+    ELSE
+       if((wind_error.NE.0.0).AND.(ABS(wind_error-0.25).GT.0.0001).AND.(ABS(wind_error+0.25).GT.0.0001)) then
+          if(ABS(wind_error-9.0).LT.0.0001) then
+             wind_error=0.0
+             border=2
+             !         else if(wind_error.LT.-0.999) then
+             !            wind_error=-0.999
+             !            border=3
+             !         else if(wind_error.LT.-0.95) then
+             !            wind_error=-0.95
+             !            border=3
+             !         else if(wind_error.GE.3) then
+             !            wind_error=3.0
+             !            border=3
+          else
+             border=1
+          end if
+       end if
+       wx=(1+wind_error)*wx
+       wy=(1+wind_error)*wy
+    END IF
+    !SP end wind errors section
+
+    w = sqrt(wx*wx+wy*wy)
+
+    !  set up fixed instrument levels
+    zu=wind_h                 !height of wind measurement Arabian Sea
+    zt=airt_h                 !height of air temp Arabian Sea
+    zq=rh_h                   !height of humidity Arabian Sea
+    sst_depth=0.005           !top layer in GOTM's grid
+
+    !  default values for standard height (normally 10m) pressure and mixed layer height
+    zs=10.
+    zi=600. 
+    airp=airp*.01
+
+    call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at air temp., ea, in mb
+
+    qa=.62197*(ea/(airp-0.378*ea))   !convert vapour pressure to mixing ratio (saturated at air temp.)
+
+    !The below 2 formula are used in relative humidity is observed (rh)
+    !      e=ea*rh*0.01                     !relative humidity = vapour pressure/satuated vapour pressure
+    !      q=.62197*(e/(airp-0.378*e))     !mixing ratio   (kg/kg)
+
+    !W-H. Tse 160910 debug.      
+    !      print *, "e,ea,rh,airp,q"
+    !      print *,e,ea,rh,airp,q    
+
+
+    !W-H. Tse 160910 The information in the link is good, but the following formula was wrongly input by the previous guy,
+    !where q and spec_hum is reversed in relationship.
+
+    ! PREVIOUS 
+    !The below formula is used if specific humidity is observed (spec_hum)
+    !from http://amsglossary.allenpress.com/glossary/search?id=specific-humidity1 using specific humidity (spec_hum) in Kg/Kg
+    !      q=spec_hum/(1+spec_hum)           !mixing ratio  (kg/kg)
+    ! END PREVIOUS
+
+    ! NEW
+    ! The formula by solving for q in spec_hum = q/(1+q), which gives q = spec_hum/(1-spec_hum).
+
+    q = spec_hum/(1-spec_hum)
+
+    ! END NEW      
+    rh=q*100/qa                       !relative humidity
+
+    !W-H. Tse 160910 debug.            
+    !      print *, "spec_hum,q,qa,rh"
+    !      print *, spec_hum,q,qa,rh
+
+    !The below is used if dew point temperature is observed (dew_pt)
+    !from http://www.srh.noaa.gov/elp/wxcalc/formulas/vaporPressure.html using dew point temperature (dew_pt) in Celsius
+    !      e=6.11*10**(7.5*dew_pt/(237.7+dew_pt))
+    !      q=.62197*(e/(airp-0.378*e))     !mixing ratio   (kg/kg)
+    !      rh=e*100/ea
+
+    !OPEN(UNIT=77,FILE="OBS/q_with_rh_new2.asc")
+    !WRITE(UNIT=77,FMT='(F9.8)') q
+
+    call humidity(sst,airp,es)        !returns saturated vapour pressure at SST, es, in mb
+    es=es*0.98                     !reduced for salinity Kraus 1972 p. 46
+    qs=.62197*(es/(airp-0.378*es)) !convert from mb to mixing ratio  kg/kg
+
+    ! Constants and coefficients (Stull 1988 p640). 
+    Rgas=287.1                    !J/kg/K     gas const. dry air
+    Cpv=Cpa*(1.+0.84*q)         !Moist air - currently not used (Businger 1982)
+    rho_air=airp*100./(Rgas*(airt+Kelvin)*(1.+0.61*q)) !kg/m3  Moist air density
+    !      grav=9.78401528445819         !value of gravity at latitude 15.5 
+    al=2.1e-5*(sst+3.2)**0.79      !water thermal expansion coefft.
+    be=0.026                      !salinity expansion coefft.
+    cpw=cp                        !J/kg/K specific heat water
+    rhow=rho_0                    !kg/m3  density water
+    von=0.4                       !von Karman's "constant
+
+    ! Factors
+    Beta=1.2     !Given as 1.25 in Fairall et al.(1996)
+
+    ! Additional constants needed for cool skin
+    visw=1.e-6                   !m2/s kinematic viscosity water
+    tcw=0.6                      !W/m/K   Thermal conductivity water
+    bigc=16.*gravity*cpw*(rhow*visw)**3/(tcw*tcw*rho_air*rho_air)
+    xlv=(2.501-0.00237*sst)*1e+6 !J/kg latent heat of vaporization at sst (3C warming=0.3%)
+    wetc=0.622*xlv*qs/(rgas*(sst+Kelvin)**2) !Clausius-Clapeyron
+    ! Kinematic viscosity of dry air, in m2/s - Andreas (1989) CRREL Rep. 89-11
+    visa=1.326e-5*(1.+6.542e-3*airt+8.301e-6*airt**2-4.84e-9*airt**3) 
+    ta=airt+Kelvin      !air temperature K
+
+    ! Initial guesses
+    dter=0.3                    !cool skin Dt
+    dqer=wetc*dter              !cool skin Dq
+    zo=0.0001
+    Wg=0.5                      !Gustiness factor initial guess
+    tkt= 0.001                  !Cool skin thickness first guess
+
+    ! Air-sea differences - includes warm layer in Dt and Dq
+    Du=(w**2.+Wg**2.)**.5       !include gustiness in wind spd. difference
+    Dt=sst-airt-0.0098*zt       !potential temperature difference.
+    Dq=qs-q                     !mixing ratio difference
+
+    ! **************** neutral coefficients ******************
+
+    u10=Du*dlog(10/zo)/dlog(zu/zo)
+    usr=0.035*u10
+    zo10=0.011*usr*usr/gravity+0.11*visa/usr
+    Cd10=(von/dlog(10/zo10))**2
+    Ch10=0.00115
+    Ct10=Ch10/sqrt(Cd10)
+    zot10=10./dexp(von/Ct10)
+    cdd=(von/dlog(zu/zo10))**2
+
+    ! ************* Grachev and Fairall (JAM, 1997) **********
+
+    Ct=von/dlog(zt/zot10)         ! Temperature transfer coefficient
+    CC=von*Ct/cdd                  ! z/L vs Rib linear coefficient
+    Ribcu=-zu/(zi*0.004*Beta**3)  ! Saturation or plateau Rib 
+    Ribu=-gravity*zu*((Dt-dter)+0.61*ta*Dq)/(ta*Du**2)
+    if (Ribu.lt.0.) then
+       zetu=CC*Ribu/(1.+Ribu/Ribcu)   ! Unstable G and F
+    else
+       zetu=CC*Ribu*(1.+27./9.*Ribu/CC) ! Stable
+    end if
+    L10=zu/zetu                       ! MO length
+
+    ! First guess M-O stability dependent scaling params.(u*,t*,q*) to estimate zo and z/L
+
+    usr= Du*von/(dlog(zu/zo10)-psiu(zu/L10))
+    tsr=-(Dt-dter)*von/(dlog(zt/zot10)-psit(zt/L10))
+    qsr=-(Dq-dqer)*von/(dlog(zq/zot10)-psit(zq/L10))
+
+    charn=0.011     !then modify Charnock for high wind speeds Chris' data
+    if(Du.gt.10) charn=0.011+(0.018-0.011)*(Du-10)/(18-10)
+    if(Du.gt.18) charn=0.018
+
+    ! **** Iterate across u*(t*,q*),zo(zot,zoq) and z/L including cool skin ****
+
+    !(sxj) original loop to nits commented out and convergence test introduced
+    do 10 iter=1,30
+
+       zo=charn*usr*usr/gravity + 0.11*visa/usr    !after Smith 1988
+       rr=zo*usr/visa
+
+       ! *** zoq and zot fitted to results from several ETL cruises ************
+
+       zoq=min(1.15e-4,5.5e-5/rr**0.6)
+       zot=zoq
+
+       zL=von*gravity*zu*(tsr*(1.+0.61*q)+0.61*ta*qsr)/((airt+Kelvin)*usr*usr*(1.+0.61*q))
+       L=zu/zL
+       psu=psiu(zu/L)
+       pst=psit(zt/L)
+       dqer=wetc*dter
+
+       !(sxj) store previous usr,tsr,qsr values and calculate convergence stats
+       usrold=usr
+       tsrold=tsr
+       qsrold=qsr
+
+       usr=Du*von/(dlog(zu/zo)-psiu(zu/L))
+       tsr=-(Dt-dter)*von/(dlog(zt/zot)-psit(zt/L))
+       qsr=-(Dq-dqer)*von/(dlog(zq/zoq)-psit(zq/L))
+
+       !(sxj) calculate convergence stats
+       conusr=(usr-usrold)/usrold
+       contsr=(tsr-tsrold)/tsrold
+       conqsr=(qsr-qsrold)/qsrold
+
+       Bf=-gravity/ta*usr*(tsr+0.61*ta*qsr)
        if (Bf.gt.0) then
           Wg=Beta*(Bf*zi)**.333
        else
           Wg=0.2
        end if
-         Du=sqrt(w**2.+Wg**2.)        !include gustiness in wind spd.
-!      
-!use net swr and net lwr calculated from previous step
-      rns=I_0
-      rnl=qb   
-!   Cool skin
-           hsb=-rho_air*cpa*usr*tsr
-           hlb=-rho_air*xlv*usr*qsr
-           qout=rnl+hsb+hlb
-           dels=rns*(.065+11.*tkt-6.6e-5/tkt*(1.-dexp(-tkt/8.0e-4))) !Eq.16 Ohlmann 
-           qcol=qout-dels
-         alq=Al*qcol+be*hlb*cpw/xlv                      !Eq. 7 Buoy flux water
-         if(alq.gt.0.) then                              !originally (qcol.gt.0)
-           xlamx=6./(1.+(bigc*alq/usr**4)**.75)**.333      !Eq 13 Saunders coeff.
-           tkt=xlamx*visw/(sqrt(rho_air/rhow)*usr)          !Eq.11 Sublayer thickness
-         else
-           xlamx=6.                                      !prevent excessive warm skins
-           tkt=min(.01,xlamx*visw/(sqrt(rho_air/rhow)*usr)) !Limit tkt
-         end if
+       Du=sqrt(w**2.+Wg**2.)        !include gustiness in wind spd.
+       !      
+       !use net swr and net lwr calculated from previous step
+       rns=I_0
+       rnl=qb   
+       !   Cool skin
+       hsb=-rho_air*cpa*usr*tsr
+       hlb=-rho_air*xlv*usr*qsr
+       qout=rnl+hsb+hlb
+       dels=rns*(.065+11.*tkt-6.6e-5/tkt*(1.-dexp(-tkt/8.0e-4))) !Eq.16 Ohlmann 
+       qcol=qout-dels
+       alq=Al*qcol+be*hlb*cpw/xlv                      !Eq. 7 Buoy flux water
+       if(alq.gt.0.) then                              !originally (qcol.gt.0)
+          xlamx=6./(1.+(bigc*alq/usr**4)**.75)**.333      !Eq 13 Saunders coeff.
+          tkt=xlamx*visw/(sqrt(rho_air/rhow)*usr)          !Eq.11 Sublayer thickness
+       else
+          xlamx=6.                                      !prevent excessive warm skins
+          tkt=min(.01,xlamx*visw/(sqrt(rho_air/rhow)*usr)) !Limit tkt
+       end if
        dter=qcol*tkt/tcw                                 ! Eq.12 Cool skin
        dqer=wetc*dter
 
-!(sxj) check for convergence and leave loop if met
+       !(sxj) check for convergence and leave loop if met
        IF((iter==30).AND.(max(abs(conusr),abs(contsr),abs(conqsr)).gt.0.001)) THEN
-            PRINT*,'convergence error'
-         END IF
+          PRINT*,'convergence error'
+       END IF
        if (max(abs(conusr),abs(contsr),abs(conqsr)).lt.0.001) then
           goto 912
        end if
-   10 continue                                           ! end iterations
+10     continue                                           ! end iterations
 
-!(sxj) jump out point
-912   continue
+       !(sxj) jump out point
+912    continue
 
-! compute surface fluxes and other parameters
+       ! compute surface fluxes and other parameters
        skint=sst-dter                    !final skin temperature this timestep
 
-! compute transfer coefficients
+       ! compute transfer coefficients
        cdd=(USR/Du)**2
        chd=USR*TSR/(Du*(airt-skint+.0098*zt)) 
        ced=USR*QSR/(Du*(Q-QS+dqer))
-      return 
+       return 
 
-   end subroutine exchange_coefficients
-!EOC
-!------------------------------------------------------------------
-      subroutine humidity(T,P,esat)                                 
+     end subroutine exchange_coefficients
+     !EOC
+     !------------------------------------------------------------------
+     subroutine humidity(T,P,esat)                                 
 
-! Tetens' formula for saturation vp Buck(1981) JAM 20, 1527-1532 
-     
-      double precision :: T,P,esat
-     
-      esat = (1.0007+3.46e-6*P)*6.1121*dexp(17.502*T/(240.97+T)) !mb
-      return
-      end subroutine humidity
+       ! Tetens' formula for saturation vp Buck(1981) JAM 20, 1527-1532 
 
-!------------------------------------------------------------------
-      function psiu(zL)
+       double precision :: T,P,esat
 
-! psiu and psit evaluate stability function for wind speed and scalars
-! matching Kansas and free convection forms with weighting f
-! convective form follows Fairall et al (1996) with profile constants
-! from Grachev et al (2000) BLM
-! stable form from Beljaars and Holtslag (1991)
+       esat = (1.0007+3.46e-6*P)*6.1121*dexp(17.502*T/(240.97+T)) !mb
+       return
+     end subroutine humidity
 
-      double precision :: zL,x,y,psik,psic,f,psiu,c
-      if(zL.lt.0) then
-       x=(1-15.*zL)**.25                        !Kansas unstable
-       psik=2.*dlog((1.+x)/2.)+dlog((1.+x*x)/2.)-2.*atan(x)+2.*atan(1.)
-       y=(1.-10.15*zL)**.3333                   !Convective
-       psic=1.5*dlog((1.+y+y*y)/3.)-sqrt(3.)*atan((1.+2.*y)/sqrt(3.)) &
-            +4.*atan(1.)/sqrt(3.)
-       f=zL*zL/(1.+zL*zL)
-       psiu=(1.-f)*psik+f*psic
-      else
-       c=min(50.,0.35*zL)                       !Stable
-       psiu=-((1.+1.*zL)**1.+.6667*(zL-14.28)/dexp(c)+8.525)
-      end if
-      return
-      end function psiu
+     !------------------------------------------------------------------
+     function psiu(zL)
 
-!--------------------------------------------------------------  
-      function psit(zL)
-      double precision :: zL,x,y,psik,psic,f,psit,c
-      if(zL.lt.0) then
-       x=(1-15.*zL)**.5                          !Kansas unstable
-       psik=2.*dlog((1.+x)/2.)
-       y=(1.-34.15*zL)**.3333                    !Convective
-       psic=1.5*dlog((1.+y+y*y)/3.)-sqrt(3.)*atan((1.+2.*y)/sqrt(3.))   &
-            +4.*atan(1.)/sqrt(3.)
-       f=zL*zL/(1.+zL*zL)
-       psit=(1.-f)*psik+f*psic
-      else
-       c=min(50.,0.35*zL)                        !Stable
-       psit=-((1.+2.*zL/3.)**1.5+.6667*(zL-14.28)/dexp(c)+8.525)
-      end if
-      return
-      end function psit
-!-----------------------------------------------------------------------
+       ! psiu and psit evaluate stability function for wind speed and scalars
+       ! matching Kansas and free convection forms with weighting f
+       ! convective form follows Fairall et al (1996) with profile constants
+       ! from Grachev et al (2000) BLM
+       ! stable form from Beljaars and Holtslag (1991)
 
-!-----------------------------------------------------------------------
-!BOP
-!
-! !IROUTINE: Calculate the heat fluxes \label{sec:calcFluxes}
-!
-! !INTERFACE:
-!   subroutine do_calc_fluxes(heatf,taux,tauy) 
-      subroutine do_calc_fluxes(qb,qh,qe,taux,tauy)
-!
-! !DESCRIPTION:
-!  The latent and the sensible heat flux, the long-wave back
-!  radiation (and thus the total net surface heat flux) and
-!  the surface momentum flux are calclated here. For the
-!  long--wave back radiation, the formulae of \cite{Clarketal74} 
-!  and \cite{HastenrathLamb78} may be used as alternatives. 
-!
-! !USES:
-   IMPLICIT NONE
-!
-! !OUTPUT PARAMETERS:
-   double precision, optional, intent(out)     :: qb,qh,qe,taux,tauy
+       double precision :: zL,x,y,psik,psic,f,psiu,c
+       if(zL.lt.0) then
+          x=(1-15.*zL)**.25                        !Kansas unstable
+          psik=2.*dlog((1.+x)/2.)+dlog((1.+x*x)/2.)-2.*atan(x)+2.*atan(1.)
+          y=(1.-10.15*zL)**.3333                   !Convective
+          psic=1.5*dlog((1.+y+y*y)/3.)-sqrt(3.)*atan((1.+2.*y)/sqrt(3.)) &
+               +4.*atan(1.)/sqrt(3.)
+          f=zL*zL/(1.+zL*zL)
+          psiu=(1.-f)*psik+f*psic
+       else
+          c=min(50.,0.35*zL)                       !Stable
+          psiu=-((1.+1.*zL)**1.+.6667*(zL-14.28)/dexp(c)+8.525)
+       end if
+       return
+     end function psiu
 
-!
-! !DEFINED PARAMETERS:
-!   integer, parameter        :: clark=1  ! Clark et. al, 1974
-!   integer, parameter        :: hastenrath=2  ! Hastenrath and Lamb, 1978
-!
-! !REVISION HISTORY:
-!  Original author(s): Karsten Bolding
-!
-!  See log for airsea module
-! SH Nov 2002
-!! Added modifications to include cloud physics (unfinished)
-!  See airsea module
-!
+     !--------------------------------------------------------------  
+     function psit(zL)
+       double precision :: zL,x,y,psik,psic,f,psit,c
+       if(zL.lt.0) then
+          x=(1-15.*zL)**.5                          !Kansas unstable
+          psik=2.*dlog((1.+x)/2.)
+          y=(1.-34.15*zL)**.3333                    !Convective
+          psic=1.5*dlog((1.+y+y*y)/3.)-sqrt(3.)*atan((1.+2.*y)/sqrt(3.))   &
+               +4.*atan(1.)/sqrt(3.)
+          f=zL*zL/(1.+zL*zL)
+          psit=(1.-f)*psik+f*psic
+       else
+          c=min(50.,0.35*zL)                        !Stable
+          psit=-((1.+2.*zL/3.)**1.5+.6667*(zL-14.28)/dexp(c)+8.525)
+       end if
+       return
+     end function psit
+     !-----------------------------------------------------------------------
+
+     !-----------------------------------------------------------------------
+     !BOP
+     !
+     ! !IROUTINE: Calculate the heat fluxes \label{sec:calcFluxes}
+     !
+     ! !INTERFACE:
+     !   subroutine do_calc_fluxes(heatf,taux,tauy) 
+     subroutine do_calc_fluxes(qb,qh,qe,taux,tauy)
+       !
+       ! !DESCRIPTION:
+       !  The latent and the sensible heat flux, the long-wave back
+       !  radiation (and thus the total net surface heat flux) and
+       !  the surface momentum flux are calclated here. For the
+       !  long--wave back radiation, the formulae of \cite{Clarketal74} 
+       !  and \cite{HastenrathLamb78} may be used as alternatives. 
+       !
+       ! !USES:
+       IMPLICIT NONE
+       !
+       ! !OUTPUT PARAMETERS:
+       double precision, optional, intent(out)     :: qb,qh,qe,taux,tauy
+
+       !
+       ! !DEFINED PARAMETERS:
+       !   integer, parameter        :: clark=1  ! Clark et. al, 1974
+       !   integer, parameter        :: hastenrath=2  ! Hastenrath and Lamb, 1978
+       !
+       ! !REVISION HISTORY:
+       !  Original author(s): Karsten Bolding
+       !
+       !  See log for airsea module
+       ! SH Nov 2002
+       !! Added modifications to include cloud physics (unfinished)
+       !  See airsea module
+       !
 !!!!! SH - added parameterisations for long wave radiation, 3,4,5,6
-! 6 - based on parameterisation in skin_2_bulk.pro
-!
-!
-! !LOCAL VARIABLES:
-   double precision                  :: tmp
-   real                              :: clark_lambda
+       ! 6 - based on parameterisation in skin_2_bulk.pro
+       !
+       !
+       ! !LOCAL VARIABLES:
+       double precision                  :: tmp
+       real                              :: clark_lambda
 
 !!!!! SH
-   double precision		:: flwclr ! (clearsky component Swinbank,1963)
-   double precision		:: airtk ! air temperature in Kelvin
-   double precision		:: cl_tk ! cloud temperature in Kelvin
-   double precision		:: alr, cl_ht, n_eff  ! 
-   double precision		:: lw_in, lw_out ! 
-   double precision		:: q10,dtemp
+       double precision		:: flwclr ! (clearsky component Swinbank,1963)
+       double precision		:: airtk ! air temperature in Kelvin
+       double precision		:: cl_tk ! cloud temperature in Kelvin
+       double precision		:: alr, cl_ht, n_eff  ! 
+       double precision		:: lw_in, lw_out ! 
+       double precision		:: q10,dtemp
 
-!   integer, parameter	:: clark=1	! Clark et. al, 1974
-!   integer, parameter	:: hastenrath=2	! Hastenrath and Lamb, 1978
-!   integer, parameter	:: zillman=3    ! Zillman, 1972 
-!   integer, parameter	:: Brunt_type=4    ! Coud physics
-!   integer, parameter   :: binami=5      !Binami et al, 1995
-!   integer, parameter   :: josey=6       !Josey and Pascal, 2003
+       !   integer, parameter	:: clark=1	! Clark et. al, 1974
+       !   integer, parameter	:: hastenrath=2	! Hastenrath and Lamb, 1978
+       !   integer, parameter	:: zillman=3    ! Zillman, 1972 
+       !   integer, parameter	:: Brunt_type=4    ! Coud physics
+       !   integer, parameter   :: binami=5      !Binami et al, 1995
+       !   integer, parameter   :: josey=6       !Josey and Pascal, 2003
 
-!
-!EOP
+       !
+       !EOP
 
-!BOC
+       !BOC
        qh=cpa*rho_air*chd*Du*(skint-airt-.0098*zt)     !sensible W/m2
        qe=xlv*rho_air*ced*Du*(qs-q-dqer)               !latent W/m2 
 
-!OPEN(UNIT=77,FILE="inputs_detail.asc")
-!WRITE(UNIT=77,FMT='(F18.16,2X,F5.2,2X,F6.3,2X,F18.13)') w,airt,sst,airp
+       !OPEN(UNIT=77,FILE="inputs_detail.asc")
+       !WRITE(UNIT=77,FMT='(F18.16,2X,F5.2,2X,F6.3,2X,F18.13)') w,airt,sst,airp
 
-   tmp=skint+Kelvin
-   select case(longwave_method)    ! back radiation
-      
-      case(1)
-         !values from Table 3 in Josey et al, 1997, JGR
-         if ((alat/deg2rad.GT.-2.5).AND.(alat/deg2rad.LT.2.5)) then
-            clark_lambda=.51
-         else if ((alat/deg2rad.GT.-7.5).AND.(alat/deg2rad.LT.7.5)) then
-            clark_lambda=.53
-         else if ((alat/deg2rad.GT.-15).AND.(alat/deg2rad.LT.15)) then
-            clark_lambda=.56
-         else if ((alat/deg2rad.GT.-25).AND.(alat/deg2rad.LT.25)) then
-            clark_lambda=.6
-         else if ((alat/deg2rad.GT.-35).AND.(alat/deg2rad.LT.35)) then
-            clark_lambda=.64
-         else if ((alat/deg2rad.GT.-45).AND.(alat/deg2rad.LT.45)) then
-            clark_lambda=.69
-         else if ((alat/deg2rad.GT.-55).AND.(alat/deg2rad.LT.55)) then
-            clark_lambda=.73
-         else if ((alat/deg2rad.GT.-65).AND.(alat/deg2rad.LT.65)) then
-            clark_lambda=.77
-         else if ((alat/deg2rad.GT.-75).AND.(alat/deg2rad.LT.75)) then
-            clark_lambda=.81
-         else
-            clark_lambda=.85
-         end if
+       tmp=skint+Kelvin
+       select case(longwave_method)    ! back radiation
 
-         qb=(1.0-clark_lambda*cloud*cloud)                                     &
-            *emiss*bolz*(tmp**4)*(0.39-0.05*sqrt(es*rh/100.))          &
-            +4.0*emiss*bolz*(tmp**3)*(sst-airt)
-         
-       
-      case(2)                    ! qa in g(water)/kg(wet air)
-         qb=(1.0-.8*cloud*cloud)                                     &
-            *emiss*bolz*(tmp**4)*(0.39-0.056*sqrt(1000*q))          &
-            +4.0*emiss*bolz*(tmp**3)*(sst-airt)
+       case(1)
+          !values from Table 3 in Josey et al, 1997, JGR
+          if ((alat/deg2rad.GT.-2.5).AND.(alat/deg2rad.LT.2.5)) then
+             clark_lambda=.51
+          else if ((alat/deg2rad.GT.-7.5).AND.(alat/deg2rad.LT.7.5)) then
+             clark_lambda=.53
+          else if ((alat/deg2rad.GT.-15).AND.(alat/deg2rad.LT.15)) then
+             clark_lambda=.56
+          else if ((alat/deg2rad.GT.-25).AND.(alat/deg2rad.LT.25)) then
+             clark_lambda=.6
+          else if ((alat/deg2rad.GT.-35).AND.(alat/deg2rad.LT.35)) then
+             clark_lambda=.64
+          else if ((alat/deg2rad.GT.-45).AND.(alat/deg2rad.LT.45)) then
+             clark_lambda=.69
+          else if ((alat/deg2rad.GT.-55).AND.(alat/deg2rad.LT.55)) then
+             clark_lambda=.73
+          else if ((alat/deg2rad.GT.-65).AND.(alat/deg2rad.LT.65)) then
+             clark_lambda=.77
+          else if ((alat/deg2rad.GT.-75).AND.(alat/deg2rad.LT.75)) then
+             clark_lambda=.81
+          else
+             clark_lambda=.85
+          end if
+
+          qb=(1.0-clark_lambda*cloud*cloud)                                     &
+               *emiss*bolz*(tmp**4)*(0.39-0.05*sqrt(es*rh/100.))          &
+               +4.0*emiss*bolz*(tmp**3)*(sst-airt)
+
+
+       case(2)                    ! qa in g(water)/kg(wet air)
+          qb=(1.0-.8*cloud*cloud)                                     &
+               *emiss*bolz*(tmp**4)*(0.39-0.056*sqrt(1000*q))          &
+               +4.0*emiss*bolz*(tmp**3)*(sst-airt)
 
 !!!!! SH - added options
-      case(3)
-        dlr= ((9.2e-6)*(airtk**2)*bolz*(airtk**4) &
-           -0.96*n_eff*bolz*(airtk**4)*(1-(9.2e-6)*(airtk**2))) 
-        airtk=airt+Kelvin
-        qb=emiss*bolz*(tmp**4) - dlr        ! Zillman, 1972
-! From IDL code
-      case(4)      !(QJR met soc. (58), pp 389-420, year: 1932)
-        airtk=airt+Kelvin
+       case(3)
+          dlr= ((9.2e-6)*(airtk**2)*bolz*(airtk**4) &
+               -0.96*n_eff*bolz*(airtk**4)*(1-(9.2e-6)*(airtk**2))) 
+          airtk=airt+Kelvin
+          qb=emiss*bolz*(tmp**4) - dlr        ! Zillman, 1972
+          ! From IDL code
+       case(4)      !(QJR met soc. (58), pp 389-420, year: 1932)
+          airtk=airt+Kelvin
 
-!        q10 = RH * 610.8*exp(19.85*(1.0 - 273.16 / airtk)) / (554.0 * airtk)
-        ! gas constant for moist air
-!        Rgma = 8.31436 / (( 1.0 - q10 ) * 0.028966 + q10 * 0.018016) 
-        q10 = 0.00001 * rh * &
-        (6.1094*exp(17.625*(airtk-273.16)/(243.04+airtk-273.16))*1.00071*exp(0.0000045*(airp)))* &
-        (100000.0/(8.31451*airtk/0.018016)) / rho_air
-        dlr=(0.24+4.33*sqrt(q10))*bolz*(airtk**4)
+          !        q10 = RH * 610.8*exp(19.85*(1.0 - 273.16 / airtk)) / (554.0 * airtk)
+          ! gas constant for moist air
+          !        Rgma = 8.31436 / (( 1.0 - q10 ) * 0.028966 + q10 * 0.018016) 
+          q10 = 0.00001 * rh * &
+               (6.1094*exp(17.625*(airtk-273.16)/(243.04+airtk-273.16))*1.00071*exp(0.0000045*(airp)))* &
+               (100000.0/(8.31451*airtk/0.018016)) / rho_air
+          dlr=(0.24+4.33*sqrt(q10))*bolz*(airtk**4)
 
-        qb=emiss*bolz*(tmp**4) - dlr
+          qb=emiss*bolz*(tmp**4) - dlr
 
        case(5)         !JGR, 1995
           airtk=airt+Kelvin
@@ -1100,264 +1103,293 @@ call humidity(airt,airp,ea)         !Teten's returns sat. vapour pressure, at ai
        case(6)      !Josey and Pascal JGR 2003
           airtk=airt+Kelvin
           dtemp=34.07 +4157/LOG(2.1718e8/(es*rh/100.))   !dew point temp 
-                                                    !(Henderson-Sellers,1984)
+          !(Henderson-Sellers,1984)
           dlr=(1.-0.045)*bolz* &
                (airtk+10.77*(cloud**2)+2.34*cloud-18.44+0.84*(dtemp-airtk+4.01))**4 
           qb=emiss*bolz*(tmp**4) - dlr
 
-      case default
+       case default
+
+       end select
+
+       !   if(present(heatf)) then
+       !     heatf = -(qe+qh+qb)
+       !   else
+       !     heat = -(qe+qh+qb)
+       !   end if
+
+       tmp=rho_air*cdd*Du                            !stress N/m2
+
+
+       !OPEN(UNIT=78,FILE="data_feb_hourly_mean.asc")
+       !WRITE(UNIT=78,FMT='(F5.2,2X,F17.14,2X,2(F6.2,2X),F18.13,2X,F5.2,2X,F17.12,2x,F17.13)') &
+       !     airt,sst,wx,wy,airp,rh,I_0,rnl
+       !OPEN(UNIT=79,FILE="fluxes_feb_hourly_mean_data.asc")
+       !WRITE(UNIT=79,FMT='(F17.13,2X,F17.13,2X,F17.13,2X,F17.14)') & 
+       !     qe,qh,qb,tmp
+
+
+       if(present(taux)) then
+          taux  = tmp*wx
+       else
+          tx = tmp*wx
+       end if
+       if(present(tauy)) then
+          tauy  = tmp*wy
+       else
+          ty = tmp*wy
+       end if
+
+       return
+     end subroutine do_calc_fluxes
+
+     !EOC
+     !-----------------------------------------------------------------------
+     !BOP
+     !
+     ! !IROUTINE: Calculate the short--wave radiation \label{sec:swr}
+     !
+     ! !INTERFACE:
+     subroutine short_wave_radiation(jul,secs,alat,alon,swr)
+       !
+       ! !DESCRIPTION:
+       !  This subroutine calculates the short--wave net radiation based on 
+       !  latitude, longitude, time, fractional cloud cover and albedo.
+       !  The albedo monthly values from \cite{Payne72} are given here
+       !  as means of the values between 
+       !  at 30$^{\circ}$ N and 40$^{\circ}$ N for the Atlantic Ocean 
+       !  (hence the same latitudinal band of the Mediterranean Sea).
+       !
+       ! !USES:
+       IMPLICIT NONE
+       !
+       ! !INPUT PARAMETERS:
+       integer, intent(in)                 :: jul,secs
+       double precision, intent(in)                :: alat,alon !WT assume radian
+       !
+       ! !OUTPUT PARAMETERS:
+       double precision, optional, intent(out)     :: swr
+       !   
+       ! !REVISION HISTORY:
+       !  Original author(s): Karsten Bolding
+       !
+       ! SH - 2003 - retain fractions of direct and diffuse radiation
+       ! SH 08/2003 - keep a calculated 'clear sky' value of I_0 
+       !
+       !  See log for airsea module
+       !
+       !EOP
+       !
+       ! !LOCAL VARIABLES:
+       !
+       !   double precision                  :: solar=1350.
+
+       ! WT local version of jul and secs, also lon in degrees.   
+       integer                           :: ljul,lsecs
+       double precision                  :: lon,lat
+       double precision                  :: eqtime,solar_time
+       double precision                  :: tst,tst_offset,ha ! true solar time, and offset from UTC
+
+       double precision                  :: eclips=23.439*deg2rad
+       double precision                  :: tau=0.66  !Arab=0.74,COARE=0.63,Sub=0.7
+       double precision                  :: aozone=0.09
+
+
+       double precision                  :: th0,th02,th03,sundec
+       double precision                  :: thsun,zen,dzen  !,sunbet
+       double precision                  :: qatten,qzer,qdir,qdiff,qshort
+       double precision                  :: altitude !, qtot
+       integer                   :: jab,count1,count2,k
+       ! WT 20170315 Modifying new code by SP
+       integer                   :: yyyy,mm,dd
+       integer                   :: one=1
+       integer                           :: ljul0, ljul1 !WT 20170315 temp vars.
+       double precision                  :: yrdays,days,hour,tjul
+       double precision           ::alpha(1:480)
+
+       !SP-cummulative days at each month
+       integer                   :: yday(12) = &
+            (/ 0,31,59,90,120,151,181,212,243,273,304,334 /)
+
+       !SP-values of albedo taken from Table 1 (Payne,72), with atmospheric transmittance of T=.70
+       double precision                  :: alb1(46) = &
+            (/.719,.656,.603,.480,.385,.300,.250,.193,.164,.145, &
+            .131,.116,.103,.092,.084,.076,.071,.065,.061,.057, &
+            .054,.051,.049,.039,.037,.035,.035,.035,.034,.033, &
+            .033,.032,.032,.032,.029,.029,.029,.029,.028,.028, &
+            .028,.028,.027,.027,.028,.028/)
+
+       !SP-corresponding values of sun altitude
+       double precision                  :: alt(46) = &
+            (/0.0,2.,4.,6.,8.,10.,12.,14.,16.,18.,20.,22.,24.,26.,28., &
+            30.,32.,34.,36.,38.,40.,42.,44.,46.,48.,50.,52.,54.,56., &
+            58.,60.,62.,64.,66.,68.,70.,72.,74.,76.,78.,80.,82.,84.,86., &
+            88.,90./)
+       !
+       !
+       !-----------------------------------------------------------------------
+       !BOC
+
+       !Convert back to degrees
+       lon = alon / deg2rad
+       lat = alat / deg2rad
+
+       ! Find the local calendar date: yyyy-mm-dd.
+       !print*, "UTM ", jul,secs
+       call UTC_to_local(jul,secs,lon,ljul,lsecs)
+       !print *, "jul,secs,lon,ljul,lsecs", jul,secs,lon,ljul,lsecs
+       !print*, "local ", ljul,lsecs
+       call calendar_date(ljul,yyyy,mm,dd)
+       !call calendar_date(jul,yyyy,mm,dd)
+
+       ! Find the julian day of the final day of last year, save to ljul0.
+       call julian_day(yyyy-1,12,31,ljul0)
+       ! Now get the day number of the local day of year.
+       !days=float(yday(mm))+float(dd) ! SP's version.
+       days = float(ljul-ljul0) ! int to float, for later formulas
+       !print *, "yyyy,mm,dd,days,ljul,ljul0", yyyy,mm,dd,days,ljul,ljul0
+       !print *, "days, ljul-ljul0", days, ljul-ljul0 ! Should be the same.
        
-   end select
- 
-!   if(present(heatf)) then
-!     heatf = -(qe+qh+qb)
-!   else
-!     heat = -(qe+qh+qb)
-!   end if
 
-   tmp=rho_air*cdd*Du                            !stress N/m2
+       !hour=1.0*lsecs/3600. !WT See the comment for th0 below.
+       hour=1.0*secs/3600.
+
+       !kbk   if (mod(yy,4) .eq. 0 ! leap year I forgot
+       !yrdays=365. ! GOTM's version.
+       ! Find the julian day number of the final day of this year, save to ljul1.
+       call julian_day(yyyy,12,31,ljul1)
+       yrdays = float(ljul1-ljul0) ! int to float, for later formulas
+       !print *, "yrdays",yrdays
+
+       ! Sources:
+       ! https://www.esrl.noaa.gov/gmd/grad/solcalc/solareqns.PDF
+       ! https://arxiv.org/pdf/1102.3825.pdf
+
+       !   th0 = 2.*pi*days/yrdays
+       
+       ! Fractional year in radians.
+       !th0 = (2.*pi/yrdays)*(days-1+((hour-12)/24))  ! hour should be UTC decimal time
+       th0 = (2.*pi/yrdays)*(days-1+((secs/3600.0-12)/24))  ! let us emphasize the fractional hour since midnight is used.
+       th02 = 2.*th0
+       th03 = 3.*th0
+       ! Sun declination is the angle between the equator and sun ray.
+       ! The Spencer formula (Spencer, 1971):
+       sundec = 0.006918 - 0.399912*cos(th0) + 0.070257*sin(th0)         &
+            - 0.006758*cos(th02) + 0.000907*sin(th02)                 &
+            - 0.002697*cos(th03) + 0.001480*sin(th03)  ! in radians
+       ! An alternative
+       !sundec = 23.45*pi / 180.*sin(2.*pi*(284. + days) / 365.)
+
+       eqtime = 229.18*(0.000075+0.001868*cos(th0)-0.032077*sin(th0)-0.014615*cos(th02)-0.040849*sin(th02))  ! in minutes
+
+       ! An alternative
+       !IF ((days.GE.1).AND.(days.LE.106)) THEN
+       !    eqtime = -14.2*sin(pi*(days+7.)/111.)
+       !ELSE IF ((days.GE.107).AND.(days.LE.166)) THEN
+       !    eqtime = 4.0*sin(pi*(days-106.)/59.)
+       !ELSE IF ((days.GE.167).AND.(days.LE.246)) THEN
+       !    eqtime = -6.5*sin(pi*(days-166.)/80.)
+       !ELSE IF ((days.GE.247).AND.(days.LE.365)) THEN
+       !    eqtime = 16.4*sin(pi*(days-247.)/113.)
+       !END IF
 
 
-!OPEN(UNIT=78,FILE="data_feb_hourly_mean.asc")
-!WRITE(UNIT=78,FMT='(F5.2,2X,F17.14,2X,2(F6.2,2X),F18.13,2X,F5.2,2X,F17.12,2x,F17.13)') &
-!     airt,sst,wx,wy,airp,rh,I_0,rnl
-!OPEN(UNIT=79,FILE="fluxes_feb_hourly_mean_data.asc")
-!WRITE(UNIT=79,FMT='(F17.13,2X,F17.13,2X,F17.13,2X,F17.14)') & 
-!     qe,qh,qb,tmp
+       ! WT Be careful, does hour mean the hour or day, or the fractional number of hours since midnight?
+       !solar_time = hour + (eqtime/60) + ((30.-lon)/15) ! in hours
+       !solar_time = hour + (eqtime/60) - lon/15 ! in hours (UTC time), lon=degrees
+       solar_time = hour*60 +eqtime + 4*lon - (lsecs-secs)/60 ! The value should not exceed 1440.
 
-   
-   if(present(taux)) then
-     taux  = tmp*wx
-   else
-     tx = tmp*wx
-   end if
-   if(present(tauy)) then
-     tauy  = tmp*wy
-   else
-     ty = tmp*wy
-   end if
+       tst_offset = eqtime + 4.0*lon - 60.0*tz(lon)
+       tst = secs/60.0 + tst_offset
+       !print *,"tst,solar_time",tst,solar_time
+     
+       !  sun hour angle :
+       !   thsun = (hour-12.)*15.*deg2rad + alon
+       !thsun = (hour-12.)*15.*deg2rad
+       !thsun = (12.-hour)*pi/12.
+       !thsun = (12.-solar_time)*pi/12.
+       !thsun = pi*((solar_time/12)-1)  ! radians
+       thsun = pi*((solar_time/(4*180))-1)  ! radians
 
-   return
-   end subroutine do_calc_fluxes
+       ha = (tst/4-180)*deg2rad
+       !print *,"thsun,ha,thsun-ha",thsun,ha,thsun-ha
 
-!EOC
-!-----------------------------------------------------------------------
-!BOP
-!
-! !IROUTINE: Calculate the short--wave radiation \label{sec:swr}
-!
-! !INTERFACE:
-   subroutine short_wave_radiation(jul,secs,alat,alon,swr)
-!
-! !DESCRIPTION:
-!  This subroutine calculates the short--wave net radiation based on 
-!  latitude, longitude, time, fractional cloud cover and albedo.
-!  The albedo monthly values from \cite{Payne72} are given here
-!  as means of the values between 
-!  at 30$^{\circ}$ N and 40$^{\circ}$ N for the Atlantic Ocean 
-!  (hence the same latitudinal band of the Mediterranean Sea).
-!
-! !USES:
-   IMPLICIT NONE
-!
-! !INPUT PARAMETERS:
-   integer, intent(in)                 :: jul,secs
-   double precision, intent(in)                :: alat,alon !WT assume radian
-!
-! !OUTPUT PARAMETERS:
-   double precision, optional, intent(out)     :: swr
-!   
-! !REVISION HISTORY:
-!  Original author(s): Karsten Bolding
-!
+       !PRINT*, thsun
+       !  cosine of the solar zenith angle (Rosati(88) eq. 3.4 :
+       !coszen =sin(alat)*sin(sundec)+cos(alat)*cos(sundec)*cos(thsun)
+       !20170315 WT There seem to be some problem with thsun, use a different version for now.
+       coszen =sin(alat)*sin(sundec)+cos(alat)*cos(sundec)*cos(ha) ! ha not needed from this point onwards.
+
+       if (coszen .le. 0.0) then
+          coszen = 0.0           !SP-this is when sun is below horizon
+          qatten = 0.0           !i.e between dusk and dawn
+       else
+          qatten = tau**(1./coszen)
+       end if
+
+       qzer  = coszen * solar                       
+       qdir  = qzer * qatten                        !Rosati(88) eq. (3.5)
+       qdiff = ((1.-aozone)*qzer - qdir) * 0.5      !Rosati(88) eq. (3.6)
+       qtot  =  qdir + qdiff                        !Rosati(88) eq. (3.7)
+
 !!!!! SH - 2003 - retain fractions of direct and diffuse radiation
-!!!!! SH 08/2003 - keep a calculated 'clear sky' value of I_0 
-!
-!  See log for airsea module
-!
-!EOP
-!
-! !LOCAL VARIABLES:
-!
-!   double precision                  :: solar=1350.
-
-   ! WT local version of jul and secs, also lon in degrees.   
-   integer                  :: ljul,lsecs
-   double precision                  :: lon
-double precision                  :: lat,eqtime,solar_time
-
-   double precision                  :: eclips=23.439*deg2rad
-   double precision                  :: tau=0.7  !Arab=0.74,COARE=0.63,Sub=0.7
-   double precision                  :: aozone=0.09
-
-
-   double precision                  :: th0,th02,th03,sundec
-   double precision                  :: thsun,zen,dzen  !,sunbet
-   double precision                  :: qatten,qzer,qdir,qdiff,qshort
-   double precision                  :: altitude !, qtot
-   integer                   :: jab,count1,count2,k
-   integer                   :: yy,mm,dd
-   double precision                  :: yrdays,days,hour,tjul
-   double precision           ::alpha(1:480)
-
-!SP-cummulative days at each month
-   integer                   :: yday(12) = &
-                 (/ 0,31,59,90,120,151,181,212,243,273,304,334 /)
-
-!SP-values of albedo taken from Table 1 (Payne,72), with atmospheric transmittance of T=.70
-   double precision                  :: alb1(46) = &
-                 (/.719,.656,.603,.480,.385,.300,.250,.193,.164,.145, &
-                   .131,.116,.103,.092,.084,.076,.071,.065,.061,.057, &
-                   .054,.051,.049,.039,.037,.035,.035,.035,.034,.033, &
-                   .033,.032,.032,.032,.029,.029,.029,.029,.028,.028, &
-                   .028,.028,.027,.027,.028,.028/)
-
-!SP-corresponding values of sun altitude
-   double precision                  :: alt(46) = &
-                 (/0.0,2.,4.,6.,8.,10.,12.,14.,16.,18.,20.,22.,24.,26.,28., &
-                 30.,32.,34.,36.,38.,40.,42.,44.,46.,48.,50.,52.,54.,56., &
-                 58.,60.,62.,64.,66.,68.,70.,72.,74.,76.,78.,80.,82.,84.,86., &
-                 88.,90./)
-!
-!
-!-----------------------------------------------------------------------
-!BOC
-
-!  number of days in a year :
-   lon = alon / deg2rad
-   lat = alat / deg2rad
-
-!print*, "UTM ", jul,secs
-call UTC_to_local(jul,secs,lon,ljul,lsecs)
-!print*, "local ", ljul,lsecs
-   call calendar_date(ljul,yy,mm,dd)
-!call calendar_date(jul,yy,mm,dd)
-
-   days=float(yday(mm))+float(dd)
-
-   hour=1.0*lsecs/3600.
-!   hour=1.0*secs/3600.
-
-!kbk   if (mod(yy,4) .eq. 0 ! leap year I forgot
-   yrdays=365.
-
-! Sources:
-! https://www.esrl.noaa.gov/gmd/grad/solcalc/solareqns.PDF
-! https://arxiv.org/pdf/1102.3825.pdf
-
-!   th0 = 2.*pi*days/yrdays
-! fractional year in radians
-th0 = (2.*pi/yrdays)*(days-1+((hour-12)/24))  ! hour should be UTC decimal time
-   th02 = 2.*th0
-   th03 = 3.*th0
-!  sun declination (the Spencer formula (Spencer, 1971)):
-   sundec = 0.006918 - 0.399912*cos(th0) + 0.070257*sin(th0)         &
-           - 0.006758*cos(th02) + 0.000907*sin(th02)                 &
-           - 0.002697*cos(th03) + 0.001480*sin(th03)  ! in radians
-! An alternative
-!sundec = 23.45*pi / 180.*sin(2.*pi*(284. + days) / 365.)
-
-eqtime = 229.18*(0.000075+0.001868*cos(th0)-0.032077*sin(th0)-0.014615*cos(th02)-0.040849*sin(th02))  ! in minutes
-
-! An alternative
-!IF ((days.GE.1).AND.(days.LE.106)) THEN
-!    eqtime = -14.2*sin(pi*(days+7.)/111.)
-!ELSE IF ((days.GE.107).AND.(days.LE.166)) THEN
-!    eqtime = 4.0*sin(pi*(days-106.)/59.)
-!ELSE IF ((days.GE.167).AND.(days.LE.246)) THEN
-!    eqtime = -6.5*sin(pi*(days-166.)/80.)
-!ELSE IF ((days.GE.247).AND.(days.LE.365)) THEN
-!    eqtime = 16.4*sin(pi*(days-247.)/113.)
-!END IF
-
-
-!solar_time = hour + (eqtime/60) + ((30.-lon)/15) ! in hours
-!solar_time = hour + (eqtime/60) - lon/15 ! in hours (UTC time), lon=degrees
-solar_time = hour*60 +eqtime + 4*lon - (lsecs-secs)/60
-
-
-!  sun hour angle :
-!   thsun = (hour-12.)*15.*deg2rad + alon
-!thsun = (hour-12.)*15.*deg2rad
-!thsun = (12.-hour)*pi/12.
-!thsun = (12.-solar_time)*pi/12.
-!thsun = pi*((solar_time/12)-1)  ! radians
-thsun = pi*((solar_time/(4*180))-1)  ! radians
-
-!PRINT*, thsun
-!  cosine of the solar zenith angle (Rosati(88) eq. 3.4 :
-   coszen =sin(alat)*sin(sundec)+cos(alat)*cos(sundec)*cos(thsun)
-
-   if (coszen .le. 0.0) then
-      coszen = 0.0           !SP-this is when sun is below horizon
-      qatten = 0.0           !i.e between dusk and dawn
-   else
-      qatten = tau**(1./coszen)
-   end if
-
-   qzer  = coszen * solar                       
-   qdir  = qzer * qatten                        !Rosati(88) eq. (3.5)
-   qdiff = ((1.-aozone)*qzer - qdir) * 0.5      !Rosati(88) eq. (3.6)
-   qtot  =  qdir + qdiff                        !Rosati(88) eq. (3.7)
-  
-!!!!! SH - 2003 - retain fractions of direct and diffuse radiation
-! ensure fractions remain finite
-   if (qtot .gt. 0) then 
-      qdir_frac = qdir/qtot
-      qdiff_frac = qdiff/qtot
-      else
-      qdir_frac = 0.
-      qdiff_frac = 0.
-   end if
+       ! ensure fractions remain finite
+       if (qtot .gt. 0) then 
+          qdir_frac = qdir/qtot
+          qdiff_frac = qdiff/qtot
+       else
+          qdir_frac = 0.
+          qdiff_frac = 0.
+       end if
 
 !!!!!
 
-   tjul = (days-81.)/yrdays*2.*pi
+       tjul = (days-81.)/yrdays*2.*pi
 
-!  sin of the solar noon altitude in radians (Rosati, 88) eq. 3.9:
-   sunbet=sin(alat)*sin(eclips*sin(tjul))+cos(alat)*cos(eclips*sin(tjul))
-!  solar noon altitude in degrees :
-   sunbet = asin(sunbet)*rad2deg
+       !  sin of the solar noon altitude in radians (Rosati, 88) eq. 3.9:
+       sunbet=sin(alat)*sin(eclips*sin(tjul))+cos(alat)*cos(eclips*sin(tjul))
+       !  solar noon altitude in degrees :
+       sunbet = asin(sunbet)*rad2deg
 
-!  calculates the albedo as a function of sun altitude :
-!  (after Payne jas 1972)
-!  solar zenith angle in degrees :
-   zen=(180./pi)*acos(coszen)
-!  sun altitude :
-   altitude=90.-zen
+       !  calculates the albedo as a function of sun altitude :
+       !  (after Payne jas 1972)
+       !  solar zenith angle in degrees :
+       zen=(180./pi)*acos(coszen)
+       !  sun altitude :
+       altitude=90.-zen
 
-   jab=0.5*altitude + 1.
+       jab=0.5*altitude + 1.
 
-!linear interpolation
-   albedo=alb1(jab)+.5*(alb1(jab+1)-alb1(jab))*(altitude-alt(jab))      
+       !linear interpolation
+       albedo=alb1(jab)+.5*(alb1(jab+1)-alb1(jab))*(altitude-alt(jab))      
 
-!SH  calculate cosine of angle of direct refracted entrant radiation 
-   cosr = cos(asin((3./4.)*sin(acos(coszen))))
+       !SH  calculate cosine of angle of direct refracted entrant radiation 
+       cosr = cos(asin((3./4.)*sin(acos(coszen))))
 
-!  radiation as from Reed(1977), Simpson and Paulson(1979)
-!  calculates SHORT WAVE FLUX ( watt/m*m )
-!  Rosati,Miyakoda 1988 ; eq. 3.8
-!  clouds from COADS perpetual data set
+       !  radiation as from Reed(1977), Simpson and Paulson(1979)
+       !  calculates SHORT WAVE FLUX ( watt/m*m )
+       !  Rosati,Miyakoda 1988 ; eq. 3.8
+       !  clouds from COADS perpetual data set
 
 
-!170301 Reed formula used here.
-!   if(cloud .lt.0.3) then
-!   if(cloud.eq.0.0) then
-!      qshort  = qtot*(1.-albedo)        !SP albedo factor needed here
-!   else !170301 consider removing this case... over the top?
-!      qshort  = qtot*(1.-.62*cloud + .0019*sunbet)*(1.-albedo)
-!   end if
-qshort=qtot*(1.-albedo)
+       !170301 Reed formula used here.
+       !   if(cloud .lt.0.3) then
+       !   if(cloud.eq.0.0) then
+       !      qshort  = qtot*(1.-albedo)        !SP albedo factor needed here
+       !   else !170301 consider removing this case... over the top?
+       !      qshort  = qtot*(1.-.62*cloud + .0019*sunbet)*(1.-albedo)
+       !   end if
+       qshort=qtot*(1.-albedo)
 
-   if (present(swr)) then
-      swr = qshort
-   else
-      I_0_calc = qshort
-      I_0_cs   = qtot*(1.-albedo)
-   end if
-  
-   return
-   end subroutine short_wave_radiation
+       if (present(swr)) then
+          swr = qshort
+       else
+          I_0_calc = qshort
+          I_0_cs   = qtot*(1.-albedo)
+       end if
+
+       return
+     end subroutine short_wave_radiation
 !EOC
 
 !-----------------------------------------------------------------------
