@@ -123,7 +123,7 @@ AS = as
 AUTOCONF = ${SHELL} /home/simon/gotm-da/netcdf-3.6.2/missing --run autoconf
 AUTOHEADER = ${SHELL} /home/simon/gotm-da/netcdf-3.6.2/missing --run autoheader
 AUTOMAKE = ${SHELL} /home/simon/gotm-da/netcdf-3.6.2/missing --run automake-1.11
-AWK = gawk
+AWK = mawk
 CC = cc
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2
