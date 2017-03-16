@@ -1185,31 +1185,31 @@ contains
        !   double precision                  :: solar=1350.
 
        ! WT local version of jul and secs, also lon in degrees.   
-       integer                           :: ljul,lsecs
+       !integer                           :: ljul,lsecs
        double precision                  :: lon,lat
-       double precision                  :: eqtime,solar_time
-       double precision                  :: tst,tst_offset,ha ! true solar time, and offset from UTC
 
        double precision                  :: eclips=23.439*deg2rad
-       double precision                  :: tau=0.66  !Arab=0.74,COARE=0.63,Sub=0.7
+       ! tau = 0.7 gives a better fit compared to 0.66 in medsea.
+       double precision                  :: tau=0.7  !Arab=0.74,COARE=0.63,Sub=0.7
        double precision                  :: aozone=0.09
 
-
-       double precision                  :: th0,th02,th03,sundec
-       double precision                  :: thsun,zen,dzen  !,sunbet
+       double precision                  :: th0,th02,th03,thsun,solar_time,sundec !, coszen
+       double precision                  :: T,tst,tst_offset,eqtime,ha,decl!, coszen
+       double precision                  :: zen,dzen  !,sunbet
        double precision                  :: qatten,qzer,qdir,qdiff,qshort
        double precision                  :: altitude !, qtot
        integer                   :: jab,count1,count2,k
        ! WT 20170315 Modifying new code by SP
        integer                   :: yyyy,mm,dd
        integer                   :: one=1
-       integer                           :: ljul0, ljul1 !WT 20170315 temp vars.
-       double precision                  :: yrdays,days,hour,tjul
+       integer                           :: jul0, jul1 !WT 20170316 temp vars.
+       double precision                  :: yrdays,days,hours !WT renamed hour to hours
+       double precision                  :: tjul
        double precision           ::alpha(1:480)
 
        !SP-cummulative days at each month
-       integer                   :: yday(12) = &
-            (/ 0,31,59,90,120,151,181,212,243,273,304,334 /)
+       !integer                   :: yday(12) = &
+       !     (/ 0,31,59,90,120,151,181,212,243,273,304,334 /)
 
        !SP-values of albedo taken from Table 1 (Payne,72), with atmospheric transmittance of T=.70
        double precision                  :: alb1(46) = &
@@ -1234,51 +1234,84 @@ contains
        lon = alon / deg2rad
        lat = alat / deg2rad
 
-       ! Find the local calendar date: yyyy-mm-dd.
+       !!! WT 20170316 The sundec formula below is defined from the UTC time zone.
+       !   The following effort to to find local values of date and times in hours,
+       !   number of seconds since midnight etc... are no longer necessary.
+       !
+       !
+       ! 1. Find the local calendar date: yyyy-mm-dd.
        !print*, "UTM ", jul,secs
-       call UTC_to_local(jul,secs,lon,ljul,lsecs)
+       !call UTC_to_local(jul,secs,lon,ljul,lsecs)
        !print *, "jul,secs,lon,ljul,lsecs", jul,secs,lon,ljul,lsecs
        !print*, "local ", ljul,lsecs
-       call calendar_date(ljul,yyyy,mm,dd)
+       !call calendar_date(ljul,yyyy,mm,dd)
        !call calendar_date(jul,yyyy,mm,dd)
-
-       ! Find the julian day of the final day of last year, save to ljul0.
-       call julian_day(yyyy-1,12,31,ljul0)
-       ! Now get the day number of the local day of year.
+       !
+       ! 2. Find the julian day of the final day of last year, save to ljul0.
+       !call julian_day(yyyy-1,12,31,ljul0)
+       !
+       ! 3. Now get the day number of the local day of year.
        !days=float(yday(mm))+float(dd) ! SP's version.
-       days = float(ljul-ljul0) ! int to float, for later formulas
+       !days = float(ljul-ljul0) ! int to float, for later formulas
        !print *, "yyyy,mm,dd,days,ljul,ljul0", yyyy,mm,dd,days,ljul,ljul0
        !print *, "days, ljul-ljul0", days, ljul-ljul0 ! Should be the same.
 
        !kbk   if (mod(yy,4) .eq. 0 ! leap year I forgot
        !yrdays=365. ! GOTM's version.
-       ! Find the julian day number of the final day of this year, save to ljul1.
-       call julian_day(yyyy,12,31,ljul1)
-       yrdays = float(ljul1-ljul0) ! int to float, for later formulas
-       !print *, "yrdays",yrdays
 
+       ! 4. Find the julian day number of the final day of this year, save to ljul1.
+       !call julian_day(yyyy,12,31,ljul1)
+       !
+       ! 5. Find the number of days in this year.
+       !yrdays = float(ljul1-ljul0) ! int to float, for later formulas
+       !print *, "yrdays",yrdays
+       !
+       ! !!! WT End of the previous calculations using local timezone.
+
+       !!! Calculation of true solar time to find clear sky value of solar SWR, I_0_calc
+       !
        ! Sources:
        ! https://www.esrl.noaa.gov/gmd/grad/solcalc/solareqns.PDF
        ! https://arxiv.org/pdf/1102.3825.pdf
 
-       !th0 = 2.*pi*days/yrdays
+       ! 1. Find calendar date from julian day number in UTC: yyyy-mm-dd, and yrdays of that year
+       call calendar_date(jul,yyyy,mm,dd)
+       if (mod(yyyy,4) .eq. 0) then
+          yrdays = 366
+       else
+          yrdays = 365
+       end if
+
+       ! 2. Find number of days since yyyy-01-01, and the fractional hour since midnight.
+       call julian_day(yyyy,1,1,jul0) ! jul0 = julian day number of the first day of year.
+       days = jul - jul0
+       hours = 1.*secs/3600.
        
-       ! Fractional solar year in radians, beginning the noon on Dec 31 the year before.
-       hours=1.0*secs/3600.
-       th0 = (2.*pi/yrdays)*(days-1+((hours-12)/24))  ! hour should be UTC decimal time
-       
-       ! Sun declination is the angle between the equator and sun ray.
+       ! 3. The fractional solar year (\gamma) in solareqns.pdf, which begins noon on civil New Year Day.
+       T = (2.*pi/yrdays)*(days-1+((hours-12)/24))  ! hour should be UTC decimal time
+      
+       ! 4. Finding sun declination, the angle between the equator and sun ray.
        ! The Spencer formula (Spencer, 1971):
-       th02 = 2.*th0
-       th03 = 3.*th0
-       sundec = 0.006918 - 0.399912*cos(th0) + 0.070257*sin(th0)         &
-            - 0.006758*cos(th02) + 0.000907*sin(th02)                 &
-            - 0.002697*cos(th03) + 0.001480*sin(th03)  ! in radians
-       ! An alternative
+       decl = 0.006918 - 0.399912*cos(T)    + 0.070257*sin(T)        &
+                       - 0.006758*cos(2.*T) + 0.000907*sin(2.*T)     &
+                       - 0.002697*cos(3.*T) + 0.001480*sin(3.*T)  ! in radians
+ 
+       !th0 = (2.*pi/yrdays)*(days-1+((hour-12)/24))  ! hour should be UTC decimal time
+       !! An alternative (crude)
+       !!th0 = 2.*pi*days/yrdays
+       !
+       !th02 = 2.*th0
+       !th03 = 3.*th0
+       !sundec = 0.006918 - 0.399912*cos(th0) + 0.070257*sin(th0)         &
+       !     - 0.006758*cos(th02) + 0.000907*sin(th02)                 &
+       !     - 0.002697*cos(th03) + 0.001480*sin(th03)  ! in radians
+       !An alternative
        !sundec = 23.45*pi / 180.*sin(2.*pi*(284. + days) / 365.)
 
-       ! the coefficient 0.0000075 is correct: http://www.mail-archive.com/sundial@uni-koeln.de/msg01050.html
-       ! the erroneous coefficient 0.000075 is reproduced in multiple documents, including the NOAA pdf quoted above.
+       ! 5. Equation of time, i.e. difference between apparent solar time (by sundials),
+       ! and mean solar time (by civil calendar & clock).
+       ! * the coefficient 0.0000075 is correct: http://www.mail-archive.com/sundial@uni-koeln.de/msg01050.html
+       ! * the erroneous coefficient 0.000075 is reproduced in multiple documents, including the NOAA pdf quoted above.
        eqtime = 229.18*(0.0000075+0.001868*cos(th0)-0.032077*sin(th0)-0.014615*cos(th02)-0.040849*sin(th02))  ! in minutes
 
        ! An alternative
@@ -1296,10 +1329,12 @@ contains
        ! WT Be careful, does hour mean the hour or day, or the fractional number of hours since midnight?
        !solar_time = hour + (eqtime/60) + ((30.-lon)/15) ! in hours
        !solar_time = hour + (eqtime/60) - lon/15 ! in hours (UTC time), lon=degrees
-       solar_time = hour*60 +eqtime + 4*lon - (lsecs-secs)/60 ! The value should not exceed 1440.
+       !solar_time = hour*60 +eqtime + 4*lon - (lsecs-secs)/60 ! The value should not exceed 1440.
 
-       tst_offset = eqtime + 4.0*lon - 60.0*tz(lon)
-       tst = secs/60.0 + tst_offset
+       ! 5. Find true solar time in local time at a position with longitude = `lon`.
+       ! Along prime meridian, with theoretical timezone tz = 0, the only offset is due to eqtime.
+       tst_offset = eqtime + 4.0*lon - 60.0*tz(lon) 
+       tst = secs/60.0 + tst_offset ! Find local solar time from UTC time, in minutes
        !print *,"tst,solar_time",tst,solar_time
      
        !  sun hour angle :
@@ -1308,17 +1343,23 @@ contains
        !thsun = (12.-hour)*pi/12.
        !thsun = (12.-solar_time)*pi/12.
        !thsun = pi*((solar_time/12)-1)  ! radians
-       thsun = pi*((solar_time/(4*180))-1)  ! radians
+       !thsun = pi*((solar_time/(4*180))-1)  ! radians
 
-       ha = (tst/4-180)*deg2rad
+       ! 6. Find the solar hour angle.
+       ha = (tst/4-180)*deg2rad ! radians
        !print *,"thsun,ha,thsun-ha",thsun,ha,thsun-ha
-
        !PRINT*, thsun
-       !  cosine of the solar zenith angle (Rosati(88) eq. 3.4 :
+       
+       ! 7. Cosine of the solar zenith angle
+       !(Rosati(88) eq. 3.4 :
        !coszen =sin(alat)*sin(sundec)+cos(alat)*cos(sundec)*cos(thsun)
-       !20170315 WT There seem to be some problem with thsun, use a different version for now.
-       coszen =sin(alat)*sin(sundec)+cos(alat)*cos(sundec)*cos(ha) ! ha not needed from this point onwards.
+       coszen =sin(alat)*sin(decl)+cos(alat)*cos(decl)*cos(ha) ! ha, decl not needed anymore from now on
+       !WT 20170316 Consider moving the above to time.f90 or a new solar.f90 for later reuse (e.g. assimilation
+       ! at sunrise or sunset, compare the SST turnaround times with solar sunrise and sunset...)
+       !We could also use NREL's solpos C code also if we know how to recompile everything in separate dynamic linkable
+       !library files. 
 
+       
        if (coszen .le. 0.0) then
           coszen = 0.0           !SP-this is when sun is below horizon
           qatten = 0.0           !i.e between dusk and dawn
