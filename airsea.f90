@@ -462,8 +462,8 @@ contains
        else
           !              I_0=adjustment*(1.-albedo) ! adjustment comes from heat.dat 3rd column
           !WT 20170315 Should we fix cloud factor between 0 and 1 BEFORE setting I_0?
-          print *, "secs, cloud_factor", secs, cloud_factor
-          print *, "I_0_calc, I_0", I_0_calc, I_0 
+          !print *, "secs, cloud_factor", secs, cloud_factor
+          !print *, "I_0_calc, I_0", I_0_calc, I_0 
 
           I_0=cloud_factor*I_0_calc  ! cloud_factor comes from heat.dat 2nd column
           cloud = min(1.,max(0.,cloud_factor))  ! fixed fraction cloud values between 0 and 1
@@ -1194,16 +1194,16 @@ contains
        double precision                  :: aozone=0.09
 
        double precision                  :: th0,th02,th03,thsun,solar_time,sundec !, coszen
-       double precision                  :: T,tst,tst_offset,eqtime,ha,decl!, coszen
+       double precision                  :: T,tst,tst_offset,eqtime,ha,decl!, coszen, NOAA
        double precision                  :: zen,dzen  !,sunbet
        double precision                  :: qatten,qzer,qdir,qdiff,qshort
        double precision                  :: altitude !, qtot
        integer                   :: jab,count1,count2,k
        ! WT 20170315 Modifying new code by SP
-       integer                   :: yyyy,mm,dd
-       integer                   :: one=1
+       integer                   :: yyyy,mm,dd       
        integer                           :: jul0, jul1 !WT 20170316 temp vars.
        double precision                  :: yrdays,days,hours !WT renamed hour to hours
+       
        double precision                  :: tjul
        double precision           ::alpha(1:480)
 
@@ -1312,8 +1312,9 @@ contains
        ! and mean solar time (by civil calendar & clock).
        ! * the coefficient 0.0000075 is correct: http://www.mail-archive.com/sundial@uni-koeln.de/msg01050.html
        ! * the erroneous coefficient 0.000075 is reproduced in multiple documents, including the NOAA pdf quoted above.
-       eqtime = 229.18*(0.0000075+0.001868*cos(th0)-0.032077*sin(th0)-0.014615*cos(th02)-0.040849*sin(th02))  ! in minutes
-
+       !eqtime = 229.18*(0.0000075+0.001868*cos(th0)-0.032077*sin(th0)-0.014615*cos(th02)-0.040849*sin(th02))  ! in minutes
+       eqtime = 229.18*(0.0000075 + 0.001868*cos(T)    - 0.032077*sin(T) &
+                                  - 0.014615*cos(2.*T) - 0.040849*sin(2.*T))  ! in minutes
        ! An alternative
        !IF ((days.GE.1).AND.(days.LE.106)) THEN
        !    eqtime = -14.2*sin(pi*(days+7.)/111.)
@@ -1326,7 +1327,7 @@ contains
        !END IF
 
 
-       ! WT Be careful, does hour mean the hour or day, or the fractional number of hours since midnight?
+       ! WT Be careful, does hour mean the hour of day, or the fractional number of hours since midnight?
        !solar_time = hour + (eqtime/60) + ((30.-lon)/15) ! in hours
        !solar_time = hour + (eqtime/60) - lon/15 ! in hours (UTC time), lon=degrees
        !solar_time = hour*60 +eqtime + 4*lon - (lsecs-secs)/60 ! The value should not exceed 1440.

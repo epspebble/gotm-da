@@ -460,7 +460,6 @@ contains
              case (1) ! assimiluate at "sunrise"
                 !WT 2016/09/13 "sunrise" means the first moment after
                 ! 00:00:00 in tprof.dat that I_0 is found to be nonzero.
-                print *, "I_0", I_0
                 if (I_0.gt.1) then
                    call assimilation(T(1:nlev),S(1:nlev),tprof(1:nlev),sprof(1:nlev),cloud,advect,int_cs)
                    mark = 1
