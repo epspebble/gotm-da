@@ -1249,10 +1249,6 @@ contains
        days = float(ljul-ljul0) ! int to float, for later formulas
        !print *, "yyyy,mm,dd,days,ljul,ljul0", yyyy,mm,dd,days,ljul,ljul0
        !print *, "days, ljul-ljul0", days, ljul-ljul0 ! Should be the same.
-       
-
-       !hour=1.0*lsecs/3600. !WT See the comment for th0 below.
-       hour=1.0*secs/3600.
 
        !kbk   if (mod(yy,4) .eq. 0 ! leap year I forgot
        !yrdays=365. ! GOTM's version.
@@ -1265,22 +1261,25 @@ contains
        ! https://www.esrl.noaa.gov/gmd/grad/solcalc/solareqns.PDF
        ! https://arxiv.org/pdf/1102.3825.pdf
 
-       !   th0 = 2.*pi*days/yrdays
+       !th0 = 2.*pi*days/yrdays
        
-       ! Fractional year in radians.
-       !th0 = (2.*pi/yrdays)*(days-1+((hour-12)/24))  ! hour should be UTC decimal time
-       th0 = (2.*pi/yrdays)*(days-1+((secs/3600.0-12)/24))  ! let us emphasize the fractional hour since midnight is used.
-       th02 = 2.*th0
-       th03 = 3.*th0
+       ! Fractional solar year in radians, beginning the noon on Dec 31 the year before.
+       hours=1.0*secs/3600.
+       th0 = (2.*pi/yrdays)*(days-1+((hours-12)/24))  ! hour should be UTC decimal time
+       
        ! Sun declination is the angle between the equator and sun ray.
        ! The Spencer formula (Spencer, 1971):
+       th02 = 2.*th0
+       th03 = 3.*th0
        sundec = 0.006918 - 0.399912*cos(th0) + 0.070257*sin(th0)         &
             - 0.006758*cos(th02) + 0.000907*sin(th02)                 &
             - 0.002697*cos(th03) + 0.001480*sin(th03)  ! in radians
        ! An alternative
        !sundec = 23.45*pi / 180.*sin(2.*pi*(284. + days) / 365.)
 
-       eqtime = 229.18*(0.000075+0.001868*cos(th0)-0.032077*sin(th0)-0.014615*cos(th02)-0.040849*sin(th02))  ! in minutes
+       ! the coefficient 0.0000075 is correct: http://www.mail-archive.com/sundial@uni-koeln.de/msg01050.html
+       ! the erroneous coefficient 0.000075 is reproduced in multiple documents, including the NOAA pdf quoted above.
+       eqtime = 229.18*(0.0000075+0.001868*cos(th0)-0.032077*sin(th0)-0.014615*cos(th02)-0.040849*sin(th02))  ! in minutes
 
        ! An alternative
        !IF ((days.GE.1).AND.(days.LE.106)) THEN
