@@ -2,7 +2,7 @@
 
 # libtool - Provide generalized library-building support services.
 # Generated automatically by config.status (netcdf) 3.6.2
-# Libtool was configured on host bugaboo.westgrid.ca:
+# Libtool was configured on host jubilee:
 # NOTE: Changes made to this file will be lost: look at ltmain.sh.
 #
 #   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2003, 2004, 2005,
@@ -95,7 +95,7 @@ NM="/usr/bin/nm -B"
 LN_S="ln -s"
 
 # What is the maximum length of a command?
-max_cmd_len=38400000
+max_cmd_len=1572864
 
 # Object file suffix (normally "o").
 objext=o
@@ -240,10 +240,10 @@ finish_eval=""
 hardcode_into_libs=yes
 
 # Compile-time system search path for libraries.
-sys_lib_search_path_spec="/usr/local/intel/composer_xe_2013.5.192/compiler/lib/intel64 /usr/lib64"
+sys_lib_search_path_spec="/usr/lib/gcc/x86_64-linux-gnu/5 /usr/lib/x86_64-linux-gnu /usr/lib /lib/x86_64-linux-gnu /lib"
 
 # Run-time system search path for libraries.
-sys_lib_dlsearch_path_spec="/lib64 /usr/lib64 /lib /usr/lib /usr/lib64/atlas /usr/local/lib64 /usr/lib64/mysql /usr/pgsql-9.2/lib/ /usr/lib64/qt-3.3/lib /usr/lib64/tcl8.5/tclx8.4 /usr/lib64/tcl8.5 /usr/lib/wine/ /usr/lib64/xulrunner "
+sys_lib_dlsearch_path_spec="/lib64 /usr/lib64 /lib /usr/lib /usr/lib/x86_64-linux-gnu/libfakeroot /usr/local/lib /lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu /usr/lib/x86_64-linux-gnu/mesa-egl /usr/lib/x86_64-linux-gnu/mesa "
 
 # Whether dlopen is supported.
 dlopen_support=unknown
@@ -272,7 +272,7 @@ CC="cc"
 with_gcc=yes
 
 # Compiler flag to turn off builtin functions.
-no_builtin_flag=" -fno-builtin -fno-rtti -fno-exceptions"
+no_builtin_flag=" -fno-builtin"
 
 # How to pass a linker flag through the compiler.
 wl="-Wl,"
@@ -281,7 +281,7 @@ wl="-Wl,"
 pic_flag=" -fPIC -DPIC"
 
 # Compiler flag to prevent dynamic linking.
-link_static_flag=""
+link_static_flag="-static"
 
 # Does compiler simultaneously support -c and -o options?
 compiler_c_o="yes"
@@ -8936,7 +8936,7 @@ wl="-Wl,"
 pic_flag=" -fPIC -DPIC"
 
 # Compiler flag to prevent dynamic linking.
-link_static_flag=""
+link_static_flag="-static"
 
 # Does compiler simultaneously support -c and -o options?
 compiler_c_o="yes"
@@ -9046,18 +9046,18 @@ file_list_spec=""
 hardcode_action=immediate
 
 # The directories searched by this compiler when creating a shared library.
-compiler_lib_search_dirs="/usr/local/intel/composer_xe_2013.5.192/mkl/lib/intel64 /usr/local/intel/composer_xe_2013.5.192/compiler/lib/intel64 /usr/local/gcc-4.8.0/lib64"
+compiler_lib_search_dirs="/usr/lib/gcc/x86_64-linux-gnu/5 /usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu /usr/lib/gcc/x86_64-linux-gnu/5/../../../../lib /lib/x86_64-linux-gnu /lib/../lib /usr/lib/x86_64-linux-gnu /usr/lib/../lib /usr/lib/gcc/x86_64-linux-gnu/5/../../.."
 
 # Dependencies to place before and after the objects being linked to
 # create a shared library.
-predep_objects="-mIPOPT_obj_output_file_name=/tmp/ipo_icpcboaPJP.o -mGLOB_obj_output_file=/tmp/ipo_icpcboaPJP.o"
-postdep_objects="/usr/lib/../lib64/crti.o /usr/local/gcc-4.8.0/lib/gcc/x86_64-unknown-linux-gnu/4.8.0/crtbeginS.o /usr/local/gcc-4.8.0/lib/gcc/x86_64-unknown-linux-gnu/4.8.0/crtendS.o /usr/lib/../lib64/crtn.o"
+predep_objects="/usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/5/crtbeginS.o"
+postdep_objects="/usr/lib/gcc/x86_64-linux-gnu/5/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu/crtn.o"
 predeps=""
-postdeps="-L/usr/local/intel/composer_xe_2013.5.192/mkl/lib/intel64 -L/usr/local/intel/composer_xe_2013.5.192/compiler/lib/intel64 -L/usr/local/gcc-4.8.0/lib64 -L/usr/local/intel/composer_xe_2013.5.192/compiler/lib/intel64 -L/usr/local/gcc-4.8.0/lib/gcc/x86_64-unknown-linux-gnu/4.8.0/ -L/usr/local/gcc-4.8.0/lib/gcc/x86_64-unknown-linux-gnu/4.8.0/../../../../lib64 -L/usr/local/gcc-4.8.0/lib/gcc/x86_64-unknown-linux-gnu/4.8.0/../../../../lib64/ -L/lib/../lib64 -L/lib/../lib64/ -L/usr/lib/../lib64 -L/usr/lib/../lib64/ -L/usr/local/gcc-4.8.0/lib/gcc/x86_64-unknown-linux-gnu/4.8.0/../../../ -L/lib64 -L/lib/ -L/usr/lib64 -L/usr/lib -limf -lsvml -lirng -lm -lipgo -ldecimal -lcilkrts -lstdc++ -lgcc -lgcc_s -lintlc -lsvml -lc -lgcc -lgcc_s -lirc_s -ldl -lc"
+postdeps="-lstdc++ -lm -lgcc_s -lc -lgcc_s"
 
 # The library search path used internally by the compiler when linking
 # a shared library.
-compiler_lib_search_path="-L/usr/local/intel/composer_xe_2013.5.192/mkl/lib/intel64 -L/usr/local/intel/composer_xe_2013.5.192/compiler/lib/intel64 -L/usr/local/gcc-4.8.0/lib64"
+compiler_lib_search_path="-L/usr/lib/gcc/x86_64-linux-gnu/5 -L/usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/5/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/5/../../.."
 
 # ### END LIBTOOL TAG CONFIG: CXX
 
@@ -9085,7 +9085,7 @@ wl="-Wl,"
 pic_flag=" -fPIC"
 
 # Compiler flag to prevent dynamic linking.
-link_static_flag=""
+link_static_flag="-static"
 
 # Does compiler simultaneously support -c and -o options?
 compiler_c_o="yes"
@@ -9237,7 +9237,7 @@ wl="-Wl,"
 pic_flag=" -fPIC"
 
 # Compiler flag to prevent dynamic linking.
-link_static_flag=""
+link_static_flag="-static"
 
 # Does compiler simultaneously support -c and -o options?
 compiler_c_o="yes"
@@ -9350,17 +9350,17 @@ file_list_spec=""
 hardcode_action=immediate
 
 # The directories searched by this compiler when creating a shared library.
-compiler_lib_search_dirs="/usr/local/lib64 /usr/local/gcc-4.8.0/lib64 /usr/local/gcc-4.8.0/lib/gcc/x86_64-unknown-linux-gnu/4.8.0 /usr/local/intel/composerxe/mkl/lib/intel64 /usr/local/gcc-4.8.0/lib/gcc/x86_64-unknown-linux-gnu/4.8.0 /usr/local/gcc-4.8.0/lib/gcc/x86_64-unknown-linux-gnu/4.8.0/../../../../lib64 /lib/../lib64 /usr/lib/../lib64 /usr/local/gcc-4.8.0/lib/gcc/x86_64-unknown-linux-gnu/4.8.0/../../.."
+compiler_lib_search_dirs="/usr/lib/gcc/x86_64-linux-gnu/5 /usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu /usr/lib/gcc/x86_64-linux-gnu/5/../../../../lib /lib/x86_64-linux-gnu /lib/../lib /usr/lib/x86_64-linux-gnu /usr/lib/../lib /usr/lib/gcc/x86_64-linux-gnu/5/../../.."
 
 # Dependencies to place before and after the objects being linked to
 # create a shared library.
-predep_objects="/usr/lib/../lib64/crti.o /usr/local/gcc-4.8.0/lib/gcc/x86_64-unknown-linux-gnu/4.8.0/crtbeginS.o"
-postdep_objects="/usr/local/gcc-4.8.0/lib/gcc/x86_64-unknown-linux-gnu/4.8.0/crtendS.o /usr/lib/../lib64/crtn.o"
+predep_objects="/usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu/crti.o /usr/lib/gcc/x86_64-linux-gnu/5/crtbeginS.o"
+postdep_objects="/usr/lib/gcc/x86_64-linux-gnu/5/crtendS.o /usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu/crtn.o"
 predeps=""
 postdeps="-lgfortran -lm -lgcc_s -lquadmath -lm -lgcc_s -lc -lgcc_s"
 
 # The library search path used internally by the compiler when linking
 # a shared library.
-compiler_lib_search_path="-L/usr/local/lib64 -L/usr/local/gcc-4.8.0/lib64 -L/usr/local/gcc-4.8.0/lib/gcc/x86_64-unknown-linux-gnu/4.8.0 -L/usr/local/intel/composerxe/mkl/lib/intel64 -L/usr/local/gcc-4.8.0/lib/gcc/x86_64-unknown-linux-gnu/4.8.0 -L/usr/local/gcc-4.8.0/lib/gcc/x86_64-unknown-linux-gnu/4.8.0/../../../../lib64 -L/lib/../lib64 -L/usr/lib/../lib64 -L/usr/local/gcc-4.8.0/lib/gcc/x86_64-unknown-linux-gnu/4.8.0/../../.."
+compiler_lib_search_path="-L/usr/lib/gcc/x86_64-linux-gnu/5 -L/usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu -L/usr/lib/gcc/x86_64-linux-gnu/5/../../../../lib -L/lib/x86_64-linux-gnu -L/lib/../lib -L/usr/lib/x86_64-linux-gnu -L/usr/lib/../lib -L/usr/lib/gcc/x86_64-linux-gnu/5/../../.."
 
 # ### END LIBTOOL TAG CONFIG: FC
