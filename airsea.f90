@@ -1194,14 +1194,15 @@ contains
        double precision                  :: aozone=0.09
 
        double precision                  :: th0,th02,th03,thsun,solar_time,sundec !, coszen
-       double precision                  :: T,tst,tst_offset,eqtime,ha,decl!, coszen, NOAA
+       double precision                  :: gamma,tst,tst_offset,eqtime,ha,decl!, coszen, NOAA
        double precision                  :: zen,dzen  !,sunbet
        double precision                  :: qatten,qzer,qdir,qdiff,qshort
        double precision                  :: altitude !, qtot
        integer                   :: jab,count1,count2,k
        ! WT 20170315 Modifying new code by SP
-       integer                   :: yyyy,mm,dd       
-       integer                           :: jul0, jul1 !WT 20170316 temp vars.
+       integer                   :: yyyy,mm,dd
+       integer                           :: ljul, lsecs !local time
+       integer                           :: jul0, jul1 !temp vars
        double precision                  :: yrdays,days,hours !WT renamed hour to hours
        
        double precision                  :: tjul
@@ -1288,13 +1289,13 @@ contains
        hours = 1.*secs/3600.
        
        ! 3. The fractional solar year (\gamma) in solareqns.pdf, which begins noon on civil New Year Day.
-       T = (2.*pi/yrdays)*(days-1+((hours-12)/24))  ! hour should be UTC decimal time
+       gamma = (2.*pi/yrdays)*(days-1+((hours-12)/24))  ! hour should be UTC decimal time
       
        ! 4. Finding sun declination, the angle between the equator and sun ray.
        ! The Spencer formula (Spencer, 1971):
-       decl = 0.006918 - 0.399912*cos(T)    + 0.070257*sin(T)        &
-                       - 0.006758*cos(2.*T) + 0.000907*sin(2.*T)     &
-                       - 0.002697*cos(3.*T) + 0.001480*sin(3.*T)  ! in radians
+       decl = 0.006918 - 0.399912*cos(gamma)    + 0.070257*sin(gamma)        &
+                       - 0.006758*cos(2.*gamma) + 0.000907*sin(2.*gamma)     &
+                       - 0.002697*cos(3.*gamma) + 0.001480*sin(3.*gamma)  ! in radians
  
        !th0 = (2.*pi/yrdays)*(days-1+((hour-12)/24))  ! hour should be UTC decimal time
        !! An alternative (crude)
@@ -1313,8 +1314,8 @@ contains
        ! * the coefficient 0.0000075 is correct: http://www.mail-archive.com/sundial@uni-koeln.de/msg01050.html
        ! * the erroneous coefficient 0.000075 is reproduced in multiple documents, including the NOAA pdf quoted above.
        !eqtime = 229.18*(0.0000075+0.001868*cos(th0)-0.032077*sin(th0)-0.014615*cos(th02)-0.040849*sin(th02))  ! in minutes
-       eqtime = 229.18*(0.0000075 + 0.001868*cos(T)    - 0.032077*sin(T) &
-                                  - 0.014615*cos(2.*T) - 0.040849*sin(2.*T))  ! in minutes
+       eqtime = 229.18*(0.0000075 + 0.001868*cos(gamma)    - 0.032077*sin(gamma) &
+                                  - 0.014615*cos(2.*gamma) - 0.040849*sin(2.*gamma))  ! in minutes
        ! An alternative
        !IF ((days.GE.1).AND.(days.LE.106)) THEN
        !    eqtime = -14.2*sin(pi*(days+7.)/111.)
@@ -1333,9 +1334,17 @@ contains
        !solar_time = hour*60 +eqtime + 4*lon - (lsecs-secs)/60 ! The value should not exceed 1440.
 
        ! 5. Find true solar time in local time at a position with longitude = `lon`.
-       ! Along prime meridian, with theoretical timezone tz = 0, the only offset is due to eqtime.
-       tst_offset = eqtime + 4.0*lon - 60.0*tz(lon) 
-       tst = secs/60.0 + tst_offset ! Find local solar time from UTC time, in minutes
+       ! Along prime meridian, with theoretical timezone tz = 0, the only offset is due to eqtime. Elsewhere, it's the difference between the longitudinal minute and the timezone offset, which are also zeros at multiples of 15 degress if tz is the theoretical timezone only depending on longitude.
+       tst_offset = eqtime + 4.0*lon - 60.0*tz(lon)
+       call UTC_to_local(jul,secs,lon,ljul,lsecs) ! Get the local time no. of seconds since midnight.
+       tst = lsecs/60.0 + tst_offset ! Now add the offset.
+       if (tst > 86400) then
+          ! ignore the change in calendar date which does not affect the following
+          tst = tst - 86400 
+       else if (tst < 0 ) then
+          tst = tst + 86400
+       end if
+       print *, "lsecs,tst_offset,tst",lsecs,tst_offset,tst
        !print *,"tst,solar_time",tst,solar_time
      
        !  sun hour angle :
