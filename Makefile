@@ -15,7 +15,7 @@ SHELL	= /bin/sh
 #/users/zxb/netcdf/netcdf-350/src/f90/netcdf.mod
 NETCDFINCDIR = /usr/include
 
-NETCDFLIB       = ./netcdf-3.6.2/libsrc/.libs/libnetcdf.a
+NETCDFLIB = libnetcdf.a # Build it and copy it to our working folder
 #/usr/lib/libnetcdf.a
 
 
@@ -127,11 +127,11 @@ LIBS	=	libairsea.a		\
 		libmeanflow.a 		\
 		libobservations.a	\
 		liboutput.a		\
-		libutil.a
+		libutil.a		
 
 all: gotm 
 
-gotm: $(MODULES) $(LIBS) main.o
+gotm: $(MODULES) $(LIBS) $(NETCDFLIB) main.o
 	$(FC) main.o -o $@ gotm.o $(LIBS) $(NETCDFLIB)
 	-rm main.o
 
@@ -148,6 +148,15 @@ libutil.a: $(UTIL)
 libmeanflow.a: $(MEANFLOW)
 
 libobservations.a: $(OBSERVATIONS)
+
+libnetcdf.a: 	
+	# These commands needs to be chained together, and must end with
+	# backslash for MAKE to know it is one single command.
+	cd ./netcdf-3.6.2 && ./configure && \
+	make && \
+	cp ./libsrc/.libs/libnetcdf.a .. && \
+	make distclean && \
+	cd ..
 
 clean:
 	-rm -f lib*.a  *.mod *.o
