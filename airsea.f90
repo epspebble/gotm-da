@@ -1285,11 +1285,11 @@ contains
 
        ! 2. Find number of days since yyyy-01-01, and the fractional hour since midnight.
        call julian_day(yyyy,1,1,jul0) ! jul0 = julian day number of the first day of year.
-       days = jul - jul0
-       hours = 1.*secs/3600.
+       days = jul - jul0 ! = day_of_year-1 = 0 for the first day yyyy:01-01
+       hours = 1.*secs/3600. ! hours should be UTC decimal time
        
-       ! 3. The fractional solar year (\gamma) in solareqns.pdf, which begins noon on civil New Year Day.
-       gamma = (2.*pi/yrdays)*(days-1+((hours-12)/24))  ! hour should be UTC decimal time
+       ! 3. The fractional solar year (\gamma) in solareqns.pdf, which begins noon on civil New Year Day. 
+       gamma = (2.*pi/yrdays)*(days+((hours-12)/24))  
       
        ! 4. Finding sun declination, the angle between the equator and sun ray.
        ! The Spencer formula (Spencer, 1971):
