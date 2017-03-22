@@ -1344,7 +1344,7 @@ contains
        else if (tst < 0 ) then
           tst = tst + 86400
        end if
-       print *, "lsecs,tst_offset,tst",lsecs,tst_offset,tst
+       !print *, "lsecs,tst_offset,tst",lsecs,tst_offset,tst
        !print *,"tst,solar_time",tst,solar_time
      
        !  sun hour angle :
