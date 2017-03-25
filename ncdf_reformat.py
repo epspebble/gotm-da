@@ -21,8 +21,11 @@ met_alias = ['u10m','v10m','sp','t2m','q2m','var144','var228']
 heat_names = ['lwrd','swrd']
 heat_alias = ['var175','var169']
 
+ERA_names = met_names + heat_names
+ERA_alias = met_alias + heat_alias
+
 ### Helper functions
-def get_ERA_yearly_data(folder,year,name,alias):
+def get_ERA_yearly_data(folder,year,name,alias,lat_indices,lon_indices):
     from netCDF4 import Dataset
     fn = 'MEDSEA_ERA-INT_' + name + '_y' + str(year) + '.nc'
     with Dataset(os.path.join(folder,fn),'r') as nc:
@@ -30,7 +33,7 @@ def get_ERA_yearly_data(folder,year,name,alias):
         assert all(nc['lat'][ERA_lat_ind] == GOTM_lat)
         assert all(nc['lon'][ERA_lon_ind] == GOTM_lon)
         # Then return the data unpacked from the netCDF object.
-        return nc[alias][:]
+        return nc[alias][:,lat_indices,lon_indices]
 
 def create_dimensions(nc, epoch, lat=GOTM_lat, lon=GOTM_lon):
     " Declaring dimensions and creating the coordinate variables for each dimension."
@@ -48,16 +51,16 @@ def create_dimensions(nc, epoch, lat=GOTM_lat, lon=GOTM_lon):
     nclon.units = 'degrees east'
     nclat[:] = lat
     nclon[:] = lon
-    print('Done initializing dimensions.')
+    #print('Done initializing dimensions.')
     return nctime, nclat, nclon
 
 def create_variable(nc,varname,datatype,dimensions=('time','lat','lon'),zlib=True, fill_value=1e+20):
     " Default settings applied to create a netCDF variable. 'fill_value' of the rea dataset is used here."
     ncvar = nc.createVariable(varname,datatype,dimensions=dimensions,zlib=zlib,fill_value=fill_value)
-    print('Done initializing variables.')
+    #print('Done initializing variables.')
     return ncvar
 
-def ERA_met_reformat(year):
+def ERA_reformat(year):
     " Reformat the ERA data by combining variables needed for met.dat into monthly files. "
     import os
     from netCDF4 import Dataset
@@ -66,7 +69,8 @@ def ERA_met_reformat(year):
     # The ERA yearly dataset has epoch at the start of that year... 
     # We unify them to 1980-01-01 00:00:00.
     epoch = datetime(1980,1,1,0,0,0)
-    data = {name: get_ERA_yearly_data(ERA_folder,year,name,alias) for name,alias in zip(met_names,met_alias)}
+    #data = {name: get_ERA_yearly_data(ERA_folder,year,name,alias) \
+    #        for name,alias in zip(ERA_names,ERA_alias)}
 
     def timings(month):
         ### MAIN WORK: calculating various date and time offsets.
@@ -74,6 +78,8 @@ def ERA_met_reformat(year):
         ### INTERPRETATION of ERA-INTERIM data source.
         # In ERA-Interim (3-hourly), u10m, v10m, sp, t2m, q2m are instantaneous values at the end
         # of each period, while lwrd, swrd are mean values over each period.
+        # NOTE: To change less Fortran, we opt to move the time stamps of the lwrd and swrd values
+        # 3 hours early, so the the values "persist" for the whole 3-hourly period.
         ###
 
         ### GOTM timing of variables.
@@ -117,31 +123,32 @@ def ERA_met_reformat(year):
 
         return start_hour, end_hour, start_ind, end_ind
 
-    def write(month):
+    # Create the monthly files first with the basic dimensions.
+    for month in range(1,13):
         # Output filename and full path.
-        outfn = 'medsea_ERA_met_{0:d}{1:02d}.nc'.format(year,month)
+        outfn = 'medsea_ERA_{0:d}{1:02d}.nc'.format(year,month)
         fullfile = os.path.join(output_folder,'medsea_ERA-INTERIM',outfn)
-        
         # Interpretation of ERA data timings CRITICAL here to get these indices correct.
         start_hour, end_hour, start_ind, end_ind = timings(month)
-        
-        # Begin writing with clobbering.
-        with Dataset(fullfile,"w",data_model='NETCDF4_CLASSIC') as nc:
+        with Dataset(fullfile,'w') as nc:
             # Routine stuff delegated to a helper funciton.
             nctime, nclat, nclon = create_dimensions(nc,epoch)
             # Write the time values to the nc file.
             nctime[:] = [hour for hour in range(start_hour, end_hour+3,3)]
-            # Write each variable's data to disk., find indices and write to nc.
-            for name, alias in zip(met_names,met_alias):               
-                ncvar = create_variable(nc,name,'f8')
-                ncvar[:] = data[name][start_ind:end_ind,ERA_lat_ind,ERA_lon_ind]
-                print('Done copying over {} values'.format(name))
-        # netCDF file closed by this point.
-        print("Done creating {}.".format(fullfile))
-        return True
+        print(fullfile + ' created with dimensions set up.')
+            
+    # Iterate through the variables and append the data.
+    for name,alias in zip(ERA_names,ERA_alias):
+        # Fetch the yearly data in one go.
+        data = get_ERA_yearly_data(ERA_folder,year,name,alias,ERA_lat_ind,ERA_lon_ind)
 
-    ### TODO: The outermost loop should not be 'month', but the 'name' (of variable), because
-    # the ERA files are grouped by variable names and by year. We would need to use the append mode
-    # when opening the nc files, to append the data one by one.
-    if all([write(month) for month in range(1,13)]):
-        print("ERA file reformatting for the year {}".format(year) + " is now complete.")
+        for month in range(1,13):
+            # Output filename and full path.
+            outfn = 'medsea_ERA_{0:d}{1:02d}.nc'.format(year,month)
+            fullfile = os.path.join(output_folder,'medsea_ERA-INTERIM',outfn)
+            # Append the new variable.
+            with Dataset(fullfile,"a") as nc:
+                ncvar = create_variable(nc,name,'f8')
+                ncvar[:] = data[start_ind:end_ind,:,:]
+        print('Done copying over {} values'.format(name))
+        
