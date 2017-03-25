@@ -140,5 +140,8 @@ def ERA_met_reformat(year):
         print("Done creating {}.".format(fullfile))
         return True
 
+    ### TODO: The outermost loop should not be 'month', but the 'name' (of variable), because
+    # the ERA files are grouped by variable names and by year. We would need to use the append mode
+    # when opening the nc files, to append the data one by one.
     if all([write(month) for month in range(1,13)]):
         print("ERA file reformatting for the year {}".format(year) + " is now complete.")
