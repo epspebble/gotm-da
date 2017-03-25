@@ -29,3 +29,5 @@
 *.app
 gotm
 
+# Python
+*.pyc
