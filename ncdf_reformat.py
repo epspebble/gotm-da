@@ -63,12 +63,14 @@ def create_variable(nc,varname,datatype,dimensions=('time','lat','lon'),zlib=Tru
 def ERA_reformat(year):
     " Reformat the ERA data by combining variables needed for met.dat into monthly files. "
     import os
+    from time import time
     from netCDF4 import Dataset
     from datetime import datetime, timedelta
     
     # The ERA yearly dataset has epoch at the start of that year... 
-    # We unify them to 1980-01-01 00:00:00.
-    epoch = datetime(1980,1,1,0,0,0)
+    # We unify them to 1981-01-01 00:00:00, which seems to be the convention used in UKMO and
+    # Copernicus analysed SST products.
+    epoch = datetime(1981,1,1,0,0,0)
     #data = {name: get_ERA_yearly_data(ERA_folder,year,name,alias) \
     #        for name,alias in zip(ERA_names,ERA_alias)}
 
@@ -96,7 +98,7 @@ def ERA_reformat(year):
         #
         # 'start_sec' time value of our first GOTM record.
         if month == 1:
-            # First record at 03 hour on Jan 1st.
+            # First record at 3 hours on Jan 1st.
             start_hour = int((this_month + timedelta(hours=3) - epoch).total_seconds()/3600)
         else:
             # First records at 00 hour on 1st of Feb, Mar, Apr ..., Dec.
@@ -128,27 +130,35 @@ def ERA_reformat(year):
         # Output filename and full path.
         outfn = 'medsea_ERA_{0:d}{1:02d}.nc'.format(year,month)
         fullfile = os.path.join(output_folder,'medsea_ERA-INTERIM',outfn)
-        # Interpretation of ERA data timings CRITICAL here to get these indices correct.
-        start_hour, end_hour, start_ind, end_ind = timings(month)
-        with Dataset(fullfile,'w') as nc:
-            # Routine stuff delegated to a helper funciton.
-            nctime, nclat, nclon = create_dimensions(nc,epoch)
-            # Write the time values to the nc file.
-            nctime[:] = [hour for hour in range(start_hour, end_hour+3,3)]
-        print(fullfile + ' created with dimensions set up.')
             
     # Iterate through the variables and append the data.
-    for name,alias in zip(ERA_names,ERA_alias):
+    for i,(name,alias) in enumerate(zip(ERA_names,ERA_alias)):
         # Fetch the yearly data in one go.
+        tic = time()
         data = get_ERA_yearly_data(ERA_folder,year,name,alias,ERA_lat_ind,ERA_lon_ind)
-
+        print("Took {:.4g}s to read in {:d}'s ERA-INTERIM data for '{:s}'".format(time()-tic,year,name))
+        
         for month in range(1,13):
             # Output filename and full path.
             outfn = 'medsea_ERA_{0:d}{1:02d}.nc'.format(year,month)
             fullfile = os.path.join(output_folder,'medsea_ERA-INTERIM',outfn)
+            # Interpretation of ERA data timings CRITICAL here to get these indices correct.
+            start_hour, end_hour, start_ind, end_ind = timings(month)
+
+            if i == 0: # Creating the first variable.
+                # Start the nc file with the basic dimensions, overwriting existing file.
+                with Dataset(fullfile,'w') as nc:
+                    # Routine stuff delegated to a helper funciton.
+                    nctime, nclat, nclon = create_dimensions(nc,epoch)
+                    # Write the time values to the nc file.
+                    nctime[:] = [hour for hour in range(start_hour, end_hour+3,3)]
+                    #print(fullfile + ' with time({}), lat({}), lon({}) set up.'.format(len(nctime),len(nclat),len(nclon)))
+                
             # Append the new variable.
+            tic = time()
             with Dataset(fullfile,"a") as nc:
                 ncvar = create_variable(nc,name,'f8')
                 ncvar[:] = data[start_ind:end_ind,:,:]
-        print('Done copying over {} values'.format(name))
+        print("Took {:.4g}s to write '{:s}' values for all months.".format(time()-tic,name))
+        
         

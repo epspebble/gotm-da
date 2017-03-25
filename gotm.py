@@ -266,7 +266,11 @@ def change_base(new_base_folder):
 def timestr(nctime,i):
     " Return a formatted time string from a nc time variable at index i."
     from netCDF4 import datetime, num2date
-    return datetime.strftime(num2date(nctime[i],nctime.units),'%Y-%m-%d %H:%M:%S')        
+    try:
+        ts = datetime.strftime(num2date(nctime[i],nctime.units),'%Y-%m-%d %H:%M:%S')
+    except:
+        print(i,nctime[i],len(nctime))
+    return ts
         
 def print_lat_lon(lat,lon,fmt_str='.2f'):
     "Helper function for printing (lat,lon) as 10.5N2.1E etc. "
@@ -369,11 +373,16 @@ def core_dat(year,month,m,n,**nc_dict):
                         f.write(line)
             elif dat_fn == 'heat':
                 col = [None for i in range(4)]
-                for i in range(len(time)):
+
+                # The following loop is hacked temporarily to accomodate GOTM Fortran code assumption,
+                # reinterpreting the timsteamp to mean the beginning of 3-hourly periods.
+                for i in range(len(time)-1): #  Last record is not used.
+                    #col[0] = timestr(time,i)
                     col[0] = timestr(time,i)
-                    col[1] = nc['swrd'][i,m,n]
-                    col[2] = 1 if 'cloud_factor' not in nc.variables else nc['cloud_factor'][i,m,n]
-                    col[3] = nc['lwrd'][i,m,n]
+                    col[1] = nc['swrd'][i+1,m,n]
+                    col[2] = 1 if 'cloud_factor' not in nc.variables else nc['cloud_factor'][i+1,m,n]
+                    col[3] = nc['lwrd'][i+1,m,n]
+                    
                     print(*col)
                     line = ('{:s} {:g} {:g} {:g}').format(*col)
                     f.write(line)
