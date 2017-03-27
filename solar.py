@@ -1,8 +1,10 @@
 import os,sys
 userhome = os.getenv('HOME')
 project_folder = 'gotm-dst'
-base_folder=os.path.join(userhome,project_folder,'medsea_GOTM')
-sys.path.append(os.path.join(userhome,project_folder,'python'))
+src_folder = 'gotm-da'
+base_folder=os.path.join('/scratch','simontse','medsea_GOTM')
+sys.path.append(os.path.join(userhome,src_folder))
+ERA_folder = os.path.join('/scratch','simontse','medsea_ERA-INTERIM')
 
 from gotm_medsea import *
 from datetime import datetime, timedelta 
@@ -178,10 +180,9 @@ def cloud_factor_calc(year,month,m,n,swr_ERA):
     from datetime import datetime
     from time import time
     from netCDF4 import Dataset
-    from solar import swr_3hourly_mean
     import os
-    GOTM_lat = linspace(30.75,45.75,21)
-    GOTM_lon = linspace(-6.0,36.0,57)
+    from gotm import medsea_lat, medsea_lon
+
     start = datetime(year,month,1)
     stop = datetime(year+1,1,1) if month == 12 else datetime(year,month+1,1)
     nrec = (stop-start).days*8
@@ -192,7 +193,7 @@ def cloud_factor_calc(year,month,m,n,swr_ERA):
     for ndays in range(ndays_start,ndays_stop):
         for i in range(8):
             nsecs = i*3*3600
-            I_0_calc = swr_3hourly_mean(*UTC_to_local(ndays,nsecs,GOTM_lon[n]),GOTM_lat[m],GOTM_lon[n],timestep)
+            I_0_calc = swr_3hourly_mean(*UTC_to_local(ndays,nsecs,medsea_lon[n]),medsea_lat[m],medsea_lon[n],timestep)
             ndays_of_month = ndays-ndays_start
             I_0_ERA = swr_ERA[ndays_of_month*8+i,m,n]
             # Instead of checking I_0_ERA, which can be zero for various reasons, check the clear sky value. 
@@ -208,3 +209,11 @@ def cloud_factor_calc(year,month,m,n,swr_ERA):
     # How long does it take for one grid point and one 3-hourly period?
     print('time elapsed for (m,n) = ({},{}):'.format(m,n), toc-tic)
     return cloud_factor
+
+def append_cloud_factor(year,month):
+    from netCDF4 import Dataset 
+    with Dataset(ERA_folder,'medsea_ERA_{:d}:{:02d}.nc'.format(year,month)):
+        swrd = nc['swrd'][:]
+
+    for m,n in 
+    cloud_factor = cloud_factor_calc(year,month,m,n,swrd)
