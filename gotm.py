@@ -26,7 +26,7 @@ for nml in GOTM_nml_list:
 ## For medsea simulations
 
 # Top-level project folders
-base_folder = os.path.join('/scratch/simontse')
+base_folder = os.path.join('/scratch/simontse/medsea_GOTM')
 
 if not(os.path.isdir(base_folder)):
     raise IOError('The base folder: ' + base_folder + 'is either not accessible or created.')
