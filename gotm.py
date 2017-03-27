@@ -27,11 +27,23 @@ for nml in GOTM_nml_list:
 
 # Top-level project folders
 base_folder = os.path.join(project_folder,'medsea_GOTM')
+#base_folder = os.path.join('/scratch/simontse/medsea_GOTM')
 if not(os.path.isdir(base_folder)):
     raise IOError('The base folder: ' + base_folder + 'is either not accessible or created.')
 run_folder = os.path.join(base_folder,'run')
 if not(os.path.isdir(run_folder)):
     os.mkdir(run_folder)
+
+# The dat files and corresponding netCDF dataset sources.
+def data_sources(year, month):
+    from netCDF4 import Dataset
+    return \
+    {'heat' : Dataset('/scratch/simontse/medsea_ERA-INTERIM/medsea_ERA_{:d}{:02d}.nc'.format(year,month),'r'),
+     'met'  : Dataset('/scratch/simontse/medsea_ERA-INTERIM/medsea_ERA_{:d}{:02d}.nc'.format(year,month),'r'),
+     'tprof': Dataset('/scratch/simontse/medsea_rea/medsea_rea_votemper_{:d}{:02d}.nc'.format(year,month),'r'),
+     'sprof': Dataset('/scratch/simontse/medsea_rea/medsea_rea_vosaline_{:d}{:02d}.nc'.format(year,month),'r')}
+     #'sst'  : Dataset('/scratch/simontse/medsea_OSTIA/medsea_OSTIA_sst_{:d}{:02d}.nc'.format(year,month),'r'),
+     #'chlo' : Dataset('/scratch/simontse/medsea_MODIS/medsea_MODIS_chlor_a_{:d}{:02d}.nc'.format(year,month),'r')}    
     
 # Global setting for the core_dat() routines (and possibly the ERA routines as well)
 overwrite=True
@@ -230,7 +242,6 @@ def updatecfg(path='.', inp_backup = False, verbose = True, **kwargs):
                 print('A backup set of namelists saved at ' + timestr)
             print('GOTM config updated by patching.')
             
-            
     return 
 
 def getval(gotm_cfg, key):
@@ -287,6 +298,14 @@ def print_lat_lon(lat,lon,fmt_str='.2f'):
     lon_str = template.format(lon) + 'E' if lon>=0 else template.format(-lon) + 'W'
     #return lat_str + ' ' + lon_str
     return lat_str + lon_str
+
+def get_m_n(lat,lon):
+    "Return the grid index (m,n) given latlong."
+    return int((lat-medsea_lats[0])/0.75), int((lon-medsea_lons[0])/0.75)
+
+def get_lat_lon(m,n):
+    "Return the latlong given the grid index (m,n)."
+    return medsea_lats[m],medsea_lons[n]
 
 def prepare_engine():
     " Prepare ipyparallel engines by importing settings and dependencies. "
@@ -363,13 +382,13 @@ def core_dat(year,month,m,n,**nc_dict):
                 for i in range(len(time)):
                     f.write(timestr(time,i) + ' 18 2\n') # Always 18 readings and two columns.
                     for j in range(18):
-                        line = ('{:g}'*2).format(-nc['depth'][j],nc['votemper'][i,j,m,n])
+                        line = ('{:g} {:g}\n').format(-nc['depth'][j],nc['votemper'][i,j,m,n])
                         f.write(line)
             elif dat_fn == 'sprof':
                 for i in range(len(time)):
                     f.write(timestr(time,i) + ' 18 2\n') # Always 18 readings and two columns.
                     for j in range(18):
-                        line = ('{:g}'*2).format(-nc['depth'][j],nc['vosaline'][i,j,m,n])
+                        line = ('{:g} {:g}\n').format(-nc['depth'][j],nc['vosaline'][i,j,m,n])
                         f.write(line)
             elif dat_fn == 'heat':
                 col = [None for i in range(4)]
@@ -382,10 +401,18 @@ def core_dat(year,month,m,n,**nc_dict):
                     col[1] = nc['swrd'][i+1,m,n]
                     col[2] = 1 if 'cloud_factor' not in nc.variables else nc['cloud_factor'][i+1,m,n]
                     col[3] = nc['lwrd'][i+1,m,n]
-                    
-                    print(*col)
-                    line = ('{:s} {:g} {:g} {:g}').format(*col)
+                    line = ('{:s}' + ' {:g}'*3 + '\n').format(*col)
                     f.write(line)
+                # Another temporary hack to include the last line being first day next month midnight, whose
+                # value should not be used because of the new interpretation of timing. However, for some 
+                # reason GOTM halted at the last hour of time. So let's just repeat the value 3 hours earlier
+                # at 21:00:00 last day of month.
+                col[0] = timestr(time,-1)
+                col[1] = nc['swrd'][-1,m,n]
+                col[2] = 1 if 'cloud_factor' not in nc.variables else nc['cloud_factor'][-1,m,n]
+                col[3] = nc['lwrd'][-1,m,n]
+                line = ('{:s}' + ' {:g}'*3 + '\n').format(*col)
+                f.write(line)
             elif dat_fn == 'met':
                 col = [None for i in range(9)]
                 for i in range(len(time)):
@@ -398,15 +425,15 @@ def core_dat(year,month,m,n,**nc_dict):
                     col[6] = 0 # "cloud" value?
                     col[7] = nc['precip'][i,m,n]
                     col[8] = nc['snow'][i,m,n]
-                    line = ('{:s}'+' {:g}'*8).format(*col)
+                    line = ('{:s}'+' {:g}'*8 + '\n').format(*col)
                     f.write(line)
             elif dat_fn == 'sst':
                 for i in range(len(time)):
-                    line = '{:s} {:g}'.format(timestr(time,i),nc['analysed_sst'][i,m,n])
+                    line = '{:s} {:g}\n'.format(timestr(time,i),nc['analysed_sst'][i,m,n])
                     f.write(line)
             elif dat_fn == 'chlo':
                 for i in range(len(time)):
-                    line = '{:s} {:g}'.format(timestr(time,i),nc['chlor_a'][i,m,n])
+                    line = '{:s} {:g}\n'.format(timestr(time,i),nc['chlor_a'][i,m,n])
                     f.write(line)
             else:
                 raise Exception("Requested {}.dat has no recipes defined in core_dat()".format(dat_fn))
@@ -415,33 +442,79 @@ def core_dat(year,month,m,n,**nc_dict):
     for dat_fn in nc_dict.keys():
         # print(dat_fn)
         writedat(dat_fn)
-        
     return
 
-def medsea_dat(year=2014, month=1, engine=None):
-    " Generate vaious GOTM dat files for all medsea grid points, using load-balanced ipyparallel engines. "
-    import itertools, os
-    from netCDF4 import Dataset
-    if engine is None:
-        client, engine = prepare_engine()
-    mm,nn = zip(*itertools.product(range(21),range(57)))
-    print('Generating dat files for {0:d}{1:02d} ...'.format(year,month))
-    print('Using netCDF files from ' + base_folder)
-    # The dat files and corresponding netCDF dataset sources.
-    data_sources = \
-    {'heat' : os.path.join(base_folder,'forcing', 'medsea_ERA_heat_{:d}{:02d}.nc'.format(year,month)),
-     'met'  : os.path.join(base_folder,'forcing', 'medsea_ERA_meteo_{:d}{:02d}.nc'.format(year,month)),
-     'tprof': os.path.join(base_folder,'profiles', 'medsea_rea_votemper_{:d}{:02d}.nc'.format(year,month)),
-     'sprof': os.path.join(base_folder,'profiles', 'medsea_rea_vosaline_{:d}{:02d}.nc'.format(year,month)),
-     'sst'  : os.path.join(base_folder,'profiles', 'medsea_OSTIA_sst_{:d}{:02d}.nc'.format(year,month)),
-     'chlo' : os.path.join(base_folder,'forcing', 'medsea_MODIS_chlor_a_{:d}{:02d}.nc'.format(year,month))}
+def core_run(year,month,m=None,n=None,lat=None,lon=None,verbose=False,**gotm_user_args):
+    """ Generate GOTM results for the (m,n)-th grid point for a specified month in the 21x57 (lat,long) medsea grid. 
     
-    results = list()
-    for dat in data_sources.keys():
-        results[dat] = engine.map(core_dat,
-                                  itertools.repeat(year,21*57),
-                                  itertools.repeat(month,21*57),
-                                  mm,nn,itertools.repeat(data_sources,21*57))
+        All necessary files (*.inp, *.dat) are assumed to be present in `core_folder` (see get_core_folder(year,month,m,n)), 
+        except the GOTM executable. The program changes directory into the core folder to run and the log and results are 
+        both saved in core_folder. """
+    from datetime import datetime
+    import os, shutil
+
+    ## Setup GOTM arguments for this run.
+    start = datetime(year,month,1,0,0)
+    stop = datetime(year,month+1,1,0,0) if month < 12 else datetime(year+1,1,1,0,0)
+    if not m is None:
+        lat = medsea_lats[m]
+    if not n is None:
+        lon = medsea_lons[n]
+    latlong = print_lat_lon(lat,lon)
+    run_name = 'medsea_GOTM, #(m,n)=({1:d},{2:d})'.format(latlong,m,n)
+    core_folder = get_core_folder(year,month,lat,lon)    
+    
+    # NOTE 1: The default values for out_fn, t_prof_file, s_prof_file, heatflux_file, meteo_file, extinct_file, sst_file
+    # are set in the template namelist files in the base_folder, but not here. Same for the values of heights of measurements
+    # wind_h, rh_h, airt_h adapted for use of our medsea dataset.
+    # NOTE 2: Explicit cast types to avoid ValueError in f90nml, which only supports the fundmental data types.
+    gotm_args = dict(name = run_name,
+                     start = str(start), stop = str(stop), 
+                     latitude = float(lat), longitude = float(lon), out_dir = str(core_folder))
+    
+    gotm_args.update(**gotm_user_args) 
+    #print(gotm_args) # Debug
+    
+    ## Prepare the core folder.
+    # Symlink the executable.
+    if not(os.path.exists(GOTM_executable)):
+        os.symlink(GOTM_executable,os.path.join(core_folder,'gotm'))    
+    for each in GOTM_nml_list:
+        # All config files are overwritten every time GOTM is run.
+        shutil.copyfile(os.path.join(base_folder,each),os.path.join(core_folder,each))
+    # The actual updates of the namelists are currently done in the gotm() call.
+
+    # Actual GOTM run.
+    os.chdir(core_folder)   
+    try:
+        print('GOTM run: ' + run_name + '...')
+        logfn = 'GOTM_' + datetime.now().strftime("%Y-%m-%d_%H:%M:%S") + '.log'
+        gotm(verbose=verbose, logfn=logfn, run_folder = core_folder, varsout = {}, **gotm_args)
+    except:
+        os.chdir(base_folder)
+        raise # Maybe we should define some sort of exception if GOTM fails.
+        
+    os.chdir(base_folder)
+
+def medsea_dat(year=2014, month=1):
+    " Generate vaious GOTM dat files for all medsea grid points, using load-balanced ipyparallel engines. "
+    import ipyparallel as ipp
+    import itertools as itt
+    
+    rc = ipp.Client()
+    dv = rc[:]
+    lv = rc.load_balanced_view()
+    with dv.sync_imports():
+        import gotm
+        
+    mm,nn = zip(*itt.product(range(21),range(57)))
+    print('Generating dat files for {0:d}{1:02d} ...'.format(year,month))
+    #print('Using netCDF files from ' + base_folder)
+
+    dv.execute('ds = gotm.data_sources({},{})'.format(year,month))
+    run = lambda m,n: gotm.core_dat(year,month,m,n,**ds)
+    results = lv.map(run,mm,nn)
+
     #results.wait_interactive()
     return results
 
