@@ -6,7 +6,7 @@ base_folder=os.path.join('/scratch','simontse','medsea_GOTM')
 sys.path.append(os.path.join(userhome,src_folder))
 ERA_folder = os.path.join('/scratch','simontse','medsea_ERA-INTERIM')
 
-from gotm_medsea import *
+from gotm import *
 from datetime import datetime, timedelta 
 from solar_utils import solposAM as solpos
 from numpy import ones, array, cos, sin, pi, linspace, max, min, mean, argmax, argmin
@@ -153,10 +153,9 @@ def swr(ndays,nsecs,lat,lon):
     return vfunc(ndays,nsecs,lat,lon)
 
 def swr_3hourly_mean(ndays,nsecs,lat,lon,timestep):
-    """Calculate short wave radiation, averaged for the subsequent 3-hourly period.
+    """ Calculate short wave radiation, averaged for the subsequent 3-hourly period.
     Time period begins at the given moment (ndays, nsecs), assumed to be local.
-    Average taken over equally spaced samples with duration of 
-    'timestep' in seconds. 
+    Average taken over equally spaced samples with duration of 'timestep' in seconds. 
     """
    
     # Number of samples
@@ -176,44 +175,76 @@ def swr_3hourly_mean(ndays,nsecs,lat,lon,timestep):
                          lat,lon)
     return cumsum/ns
 
+def swr_3hourly_mean_monthly(year,month,m,n):
+    """ 3-hourly mean computed for a month (UTC day 1 of month midnight to UTC day of of next month, midnight) """
+    from datetime import datetime
+    from time import time
+
+    # The following datetimes are to be interpreted as UTC, wich is also the timezone assumed for all date values used in GOTM 
+    # medsea simulations.
+    start = datetime(year,month,1)
+    stop = datetime(year+1,1,1) if month == 12 else datetime(year,month+1,1)
+    nrec = (stop-start).days*8
+    ndays_start = (start-datetime(start.year,1,1)).days
+    ndays_stop = (stop-datetime(start.year,1,1)).days    
+
+    #tic = time()
+    swr_mean = ones((ndays_stop-ndays_start)*8)
+    for ndays in range(ndays_start,ndays_stop):
+        for i in range(8):
+            nsecs = i*3*3600
+            ndays_of_month = ndays-ndays_start            
+            j = ndays_of_month*8+i
+            I_0_calc = swr_3hourly_mean(*UTC_to_local(ndays,nsecs,medsea_lons[n]),medsea_lats[m],medsea_lons[n],timestep) # local time not necssarily at 0, 3, 6, 9 ... etc hours. Also, swr_3hourly_mean gives the mean over the SUBSEQUENT 3 hours. 
+            swr_mean[j] = I_0_calc
+    #toc = time()
+    # How long does it take for one grid point and one 3-hourly period?
+    print('time elapsed for (m,n) = ({},{}):'.format(m,n), toc-tic)
+    return swr_mean
+
 def cloud_factor_calc(year,month,m,n,swr_ERA):
     from datetime import datetime
     from time import time
     from netCDF4 import Dataset
     import os
-    from gotm import medsea_lat, medsea_lon
+    from gotm import medsea_lats, medsea_lons
 
+    # The following datetimes are to be interpreted as UTC, wich is also the timezone assumed for all date values used in GOTM 
+    # medsea simulations.
     start = datetime(year,month,1)
     stop = datetime(year+1,1,1) if month == 12 else datetime(year,month+1,1)
     nrec = (stop-start).days*8
     ndays_start = (start-datetime(start.year,1,1)).days
     ndays_stop = (stop-datetime(start.year,1,1)).days
-    tic = time()
+    
+    #tic = time()
     cloud_factor = ones((ndays_stop-ndays_start)*8) # Defaults to clear sky value.
+    swr_mean = swr_3hourly_mean_monthly(year,month,m,n)
     for ndays in range(ndays_start,ndays_stop):
         for i in range(8):
             nsecs = i*3*3600
-            I_0_calc = swr_3hourly_mean(*UTC_to_local(ndays,nsecs,medsea_lon[n]),medsea_lat[m],medsea_lon[n],timestep)
             ndays_of_month = ndays-ndays_start
-            I_0_ERA = swr_ERA[ndays_of_month*8+i,m,n]
+            j = ndays_of_month*8+i
+
             # Instead of checking I_0_ERA, which can be zero for various reasons, check the clear sky value. 
             # If it's non-zero, compute the factor, otherwise, sun below horizon, so we just keep it as the defaul
             # value of 1 as initialized. Well, it should not matter.
+            I_0_calc = swr_mean[j]
+            I_0_obs = swr_ERA[j,m,n]
             if I_0_calc > 1: 
                 # If I_0_calc is really small but positive, we get into some trouble...
-                cloud_factor[ndays_of_month*8+i] = I_0_ERA / I_0_calc
-            if I_0_ERA < 0:
+                cloud_factor[j] = I_0_obs / I_0_calc
+            if I_0_obs < 0:
                 # Use cloud_factor to zero out negative values of data.
-                cloud_factor[ndays_of_month*8+i] = 0
-    toc = time()
+                cloud_factor[j] = 0
+    #toc = time()
     # How long does it take for one grid point and one 3-hourly period?
     print('time elapsed for (m,n) = ({},{}):'.format(m,n), toc-tic)
-    return cloud_factor
+    
+    return cloud_factor, swr_mean
 
 def append_cloud_factor(year,month):
     from netCDF4 import Dataset 
     with Dataset(ERA_folder,'medsea_ERA_{:d}:{:02d}.nc'.format(year,month)):
         swrd = nc['swrd'][:]
-
-    for m,n in 
     cloud_factor = cloud_factor_calc(year,month,m,n,swrd)

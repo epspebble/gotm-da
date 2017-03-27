@@ -97,12 +97,20 @@ def ERA_reformat(year):
         ## Calculate the time variables start and end of GOTM records to write.
         #
         # 'start_sec' time value of our first GOTM record.
-        if month == 1:
-            # First record at 3 hours on Jan 1st.
-            start_hour = int((this_month + timedelta(hours=3) - epoch).total_seconds()/3600)
-        else:
-            # First records at 00 hour on 1st of Feb, Mar, Apr ..., Dec.
-            start_hour = int((this_month - epoch).total_seconds()/3600) 
+        
+        ## WT 20170327 This extra padding of 00 hour (i.e. the instananeous data for met variables, but 21:00:00-00:00:00 
+        # the previous day for heat variables is causing debugging trouble. Let's just skip it for now, and let GOTM 
+        # handle missing data at start?
+        #if month == 1:
+        #    # First record at 3 hours on Jan 1st.
+        #    start_hour = int((this_month + timedelta(hours=3) - epoch).total_seconds()/3600)
+        #else:
+        #    # First records at 00 hour on 1st of Feb, Mar, Apr ..., Dec.
+        #    start_hour = int((this_month - epoch).total_seconds()/3600) 
+        
+        # A faithful copy of original ERA data, do not make changes. Just recalculate the time values of 3, 6, 9 hrs etc...
+        start_hour = int((this_month + timedelta(hours=3) - epoch).total_seconds()/3600)
+            
         # Last GOTM record time.
         end_hour = int((next_month - epoch).total_seconds()/3600)
 
@@ -113,15 +121,24 @@ def ERA_reformat(year):
         
         ## Calculate indices of time to read in ERA data.
         #
-        # Include one previous record at 00:00:00 unless at beginning of year.
-        start_ind = start_day*8 if month == 1 else start_day*8-1
+        ## WT 2017037 Do not include previous record. Debugging hazard.
+        ## Include one previous record at 00:00:00 unless at beginning of year.
+        #start_ind = start_day*8 if month == 1 else start_day*8-1
+        
+        # A faithful copy of original ERA data.
+        start_ind = start_day*8
+        
         # Total number of records should be (end_day-start_day)*8
         end_ind = end_day*8
-        # Make doubly sure there's no time-shift by 3-hour periods!
-        if month == 1:
-            assert end_ind - start_ind == nper
-        else:
-            assert end_ind - start_ind == nper + 1
+        
+        ## WT 2017037 Skip this hassle!
+        ## Make doubly sure there's no time-shift by 3-hour periods!
+        #if month == 1:
+        #    assert end_ind - start_ind == nper
+        #else:
+        #    assert end_ind - start_ind == nper + 1
+        
+        assert end_ind - start_ind == nper
 
         return start_hour, end_hour, start_ind, end_ind
 
