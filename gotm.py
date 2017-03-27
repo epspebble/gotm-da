@@ -488,7 +488,7 @@ def core_run(year,month,m=None,n=None,lat=None,lon=None,verbose=False,**gotm_use
     os.chdir(core_folder)   
     try:
         print('GOTM run: ' + run_name + '...')
-        logfn = 'GOTM_' + datetime.now().strftime("%Y-%m-%d_%H:%M:%S") + '.log'
+        logfn = 'GOTM_' + datetime.now().strftime("%Y%m%d_%H%M%S") + '.log'
         gotm(verbose=verbose, logfn=logfn, run_folder = core_folder, varsout = {}, **gotm_args)
     except:
         os.chdir(base_folder)
