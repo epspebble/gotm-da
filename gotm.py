@@ -12,7 +12,7 @@ import os
 
 # Set the default GOTM executable and namelist locations.
 userhome = os.getenv('HOME')
-project_folder = os.path.join(userhome,'gotm-dst')
+project_folder = os.path.join(userhome,'medsea_GOTM')
 GOTM_executable = os.path.join(project_folder,'bin','gotm')
 if not(os.path.isfile(GOTM_executable)):
     raise FileNotFoundError("The GOTM executable not found at " + GOTM_executable)
@@ -26,8 +26,8 @@ for nml in GOTM_nml_list:
 ## For medsea simulations
 
 # Top-level project folders
-base_folder = os.path.join(project_folder,'medsea_GOTM')
-#base_folder = os.path.join('/scratch/simontse/medsea_GOTM')
+base_folder = os.path.join('/scratch/simontse')
+
 if not(os.path.isdir(base_folder)):
     raise IOError('The base folder: ' + base_folder + 'is either not accessible or created.')
 run_folder = os.path.join(base_folder,'run')
