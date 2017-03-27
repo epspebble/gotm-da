@@ -30,4 +30,5 @@
 gotm
 
 # Python
-**/*.pyc
+__pycache__/*
+*.pyc
