@@ -32,12 +32,12 @@ NETCDFLIB = libnetcdf.a # Build it and copy it to our working folder
 #FFLAGS = -I$(NETCDFINCDIR)
 
 #Intel Fortran  compiler for 
-#FC    = ifort
-#FFLAGS = -I$(NETCDFINCDIR)
+FC    = ifort
+FFLAGS = -I$(NETCDFINCDIR)
 
 #Mac Fortran  compiler for 
-FC    = gfortran
-FFLAGS = -I$(NETCDFINCDIR)
+#FC    = gfortran
+#FFLAGS = -I$(NETCDFINCDIR)
 
 #sun fortran compiler
 #FC = f90
