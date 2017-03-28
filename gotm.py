@@ -799,32 +799,35 @@ def cloud_factor_calc(year,month,m,n,swr_ERA,method='quadrature'):
     
     return cloud_factor, swr_mean
 
-def append_cloud_factor(year,month):
+def append_cloud_factor(year,month,ipp=True):
     """ Calculate cloud factor from ERA swrd and internal algorithm, then append a cloud_factor to the ERA dataset. """
     
     ## Get the cloud_factor value for the month
     swr_ERA = data_sources(year,month)['heat']['swrd'][:]
 
-    ## Start an ipcluster to speed up.
-    from ipyparallel import Client
-    rc = Client()
-    dv = rc[:]
-    lv = rc.load_balanced_view()
-
-    with dv.sync_imports():
-        import gotm
-    dv.execute('from gotm import cloud_factor_calc')
-    run = lambda m,n: cloud_factor_calc(year,month,m,n,swr_ERA)
-
-    from gotm import cloud_factor_calc
-    
-    # Push these common values to global scope of each engine.
-    dv.push(dict(year=year,month=month,swr_ERA=swr_ERA))
-
-    import itertools as itt
     mm,nn = zip(*itt.product(range(21),range(57)))
-    results = lv.map(cloud_factor_calc,itt.repeat(year,21*57),itt.repeat(month,21*57),mm,nn,itt.repeat(swr_ERA,21*57))
-    results.wait_interactive()
+    if ipp:
+        ## Start an ipcluster to speed up.
+        from ipyparallel import Client
+        rc = Client()
+        dv = rc[:]
+        lv = rc.load_balanced_view()
+        
+        with dv.sync_imports():
+            import gotm
+            dv.execute('from gotm import cloud_factor_calc')
+            run = lambda m,n: cloud_factor_calc(year,month,m,n,swr_ERA)
+
+            from gotm import cloud_factor_calc
+    
+            # Push these common values to global scope of each engine.
+            dv.push(dict(year=year,month=month,swr_ERA=swr_ERA))
+
+            import itertools as itt
+            results = lv.map(cloud_factor_calc,itt.repeat(year,21*57),itt.repeat(month,21*57),mm,nn,itt.repeat(swr_ERA,21*57))
+            #results.wait_interactive()
+    else:
+        results = [cloud_factor_calc(year,month,mm[i],nn[i],swr_ERA) for i in range(21*57)]
     
     ## Append to the ERA_file.
     with data_sources(year,month,mode='a')['heat'] as ds:
