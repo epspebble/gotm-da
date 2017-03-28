@@ -26,7 +26,7 @@ for nml in GOTM_nml_list:
 ## For medsea simulations
 
 # Top-level project folders
-base_folder = os.path.join('/scratch/simontse/medsea_GOTM')
+base_folder = os.path.join('/global/scratch/simontse/medsea_GOTM')
 
 if not(os.path.isdir(base_folder)):
     raise IOError('The base folder: ' + base_folder + ' is either not accessible or created.')
@@ -38,12 +38,12 @@ if not(os.path.isdir(run_folder)):
 def data_sources(year, month):
     from netCDF4 import Dataset
     return \
-    {'heat' : Dataset('/scratch/simontse/medsea_ERA-INTERIM/medsea_ERA_{:d}{:02d}.nc'.format(year,month),'r'),
-     'met'  : Dataset('/scratch/simontse/medsea_ERA-INTERIM/medsea_ERA_{:d}{:02d}.nc'.format(year,month),'r'),
-     'tprof': Dataset('/scratch/simontse/medsea_rea/medsea_rea_votemper_{:d}{:02d}.nc'.format(year,month),'r'),
-     'sprof': Dataset('/scratch/simontse/medsea_rea/medsea_rea_vosaline_{:d}{:02d}.nc'.format(year,month),'r')}
-     #'sst'  : Dataset('/scratch/simontse/medsea_OSTIA/medsea_OSTIA_sst_{:d}{:02d}.nc'.format(year,month),'r'),
-     #'chlo' : Dataset('/scratch/simontse/medsea_MODIS/medsea_MODIS_chlor_a_{:d}{:02d}.nc'.format(year,month),'r')}    
+    {'heat' : Dataset('/global/scratch/simontse/medsea_ERA-INTERIM/medsea_ERA_{:d}{:02d}.nc'.format(year,month),'r'),
+     'met'  : Dataset('/global/scratch/simontse/medsea_ERA-INTERIM/medsea_ERA_{:d}{:02d}.nc'.format(year,month),'r'),
+     'tprof': Dataset('/global/scratch/simontse/medsea_rea/medsea_rea_votemper_{:d}{:02d}.nc'.format(year,month),'r'),
+     'sprof': Dataset('/global/scratch/simontse/medsea_rea/medsea_rea_vosaline_{:d}{:02d}.nc'.format(year,month),'r')}
+     #'sst'  : Dataset('/global/scratch/simontse/medsea_OSTIA/medsea_OSTIA_sst_{:d}{:02d}.nc'.format(year,month),'r'),
+     #'chlo' : Dataset('/global/scratch/simontse/medsea_MODIS/medsea_MODIS_chlor_a_{:d}{:02d}.nc'.format(year,month),'r')}    
     
 # Global setting for the core_dat() routines (and possibly the ERA routines as well)
 overwrite=True
