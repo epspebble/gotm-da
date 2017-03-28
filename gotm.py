@@ -796,17 +796,22 @@ def cloud_factor_calc(year,month,m,n,swr_ERA,method='quadrature'):
     #toc = time()
     # How long does it take for one grid point and one 3-hourly period?
     #print('time elapsed for (m,n) = ({},{}):'.format(m,n), toc-tic)
-    
+
     return cloud_factor, swr_mean
 
-def append_cloud_factor(year,month,ipp=True):
+def cloud_factor_calc_monthly(year,month,use_ipp,append_to_ERA_dataset_now=False):
     """ Calculate cloud factor from ERA swrd and internal algorithm, then append a cloud_factor to the ERA dataset. """
     
     ## Get the cloud_factor value for the month
     swr_ERA = data_sources(year,month)['heat']['swrd'][:]
 
+    import itertools as itt
+
     mm,nn = zip(*itt.product(range(21),range(57)))
-    if ipp:
+    if use_ipp is None:
+        use_ipp = False
+
+    if use_ipp:
         ## Start an ipcluster to speed up.
         from ipyparallel import Client
         rc = Client()
@@ -823,13 +828,17 @@ def append_cloud_factor(year,month,ipp=True):
             # Push these common values to global scope of each engine.
             dv.push(dict(year=year,month=month,swr_ERA=swr_ERA))
 
-            import itertools as itt
             results = lv.map(cloud_factor_calc,itt.repeat(year,21*57),itt.repeat(month,21*57),mm,nn,itt.repeat(swr_ERA,21*57))
             #results.wait_interactive()
     else:
+        from gotm import cloud_factor_calc
         results = [cloud_factor_calc(year,month,mm[i],nn[i],swr_ERA) for i in range(21*57)]
     
     ## Append to the ERA_file.
+    if not(append_to_ERA_dataset_now):
+        return results
+
+    assert append_to_ERA_dataset_now
     with data_sources(year,month,mode='a')['heat'] as ds:
         if 'cloud_factor' in ds.varibles():
             cf = ds['cloud_factor']
