@@ -39,15 +39,15 @@ if not(os.path.isdir(run_folder)):
     os.mkdir(run_folder)
 
 # The dat files and corresponding netCDF dataset sources.
-def data_sources(year, month):
+def data_sources(year, month, mode = 'r'):
     from netCDF4 import Dataset
     return \
-    {'heat' : Dataset('/global/scratch/simontse/medsea_ERA-INTERIM/medsea_ERA_{:d}{:02d}.nc'.format(year,month),'r'),
-     'met'  : Dataset('/global/scratch/simontse/medsea_ERA-INTERIM/medsea_ERA_{:d}{:02d}.nc'.format(year,month),'r'),
-     'tprof': Dataset('/global/scratch/simontse/medsea_rea/medsea_rea_votemper_{:d}{:02d}.nc'.format(year,month),'r'),
-     'sprof': Dataset('/global/scratch/simontse/medsea_rea/medsea_rea_vosaline_{:d}{:02d}.nc'.format(year,month),'r')}
-     #'sst'  : Dataset('/global/scratch/simontse/medsea_OSTIA/medsea_OSTIA_sst_{:d}{:02d}.nc'.format(year,month),'r'),
-     #'chlo' : Dataset('/global/scratch/simontse/medsea_MODIS/medsea_MODIS_chlor_a_{:d}{:02d}.nc'.format(year,month),'r')}    
+    {'heat' : Dataset('/global/scratch/simontse/medsea_ERA-INTERIM/medsea_ERA_{:d}{:02d}.nc'.format(year,month),mode),
+     'met'  : Dataset('/global/scratch/simontse/medsea_ERA-INTERIM/medsea_ERA_{:d}{:02d}.nc'.format(year,month),mode),
+     'tprof': Dataset('/global/scratch/simontse/medsea_rea/medsea_rea_votemper_{:d}{:02d}.nc'.format(year,month),mode),
+     'sprof': Dataset('/global/scratch/simontse/medsea_rea/medsea_rea_vosaline_{:d}{:02d}.nc'.format(year,month),mode)}
+     #'sst'  : Dataset('/global/scratch/simontse/medsea_OSTIA/medsea_OSTIA_sst_{:d}{:02d}.nc'.format(year,month),mode),
+     #'chlo' : Dataset('/global/scratch/simontse/medsea_MODIS/medsea_MODIS_chlor_a_{:d}{:02d}.nc'.format(year,month),mode)}    
     
 # Global setting for the core_dat() routines (and possibly the ERA routines as well)
 overwrite=True
@@ -658,6 +658,11 @@ def swr_nv(ndays,nsecs,lat,lon):
     tau = 0.7  # atmospheric transmission coefficient (0.7 used in Rossatti)
     aozone = 0.09 # water vapour plus ozone absorption (0.09 used in Rossatti)
     solar = 1370  # solar constant
+
+    if nsecs > 86400:
+        ndays += 1
+        nsecs -= 86400
+        
     cz = coszen_nv(ndays,nsecs,lat,lon)
     if cz <= 0:
         cz = 0.0
@@ -680,12 +685,13 @@ def swr(ndays,nsecs,lat,lon):
     vfunc = vectorize(swr_nv)
     return vfunc(ndays,nsecs,lat,lon)
 
-def swr_3hourly_mean(ndays,nsecs,lat,lon,timestep):
+def swr_3hourly_mean(ndays,nsecs,lat,lon,timestep,method='quadrature'):
     """ Calculate short wave radiation, averaged for the subsequent 3-hourly period.
     Time period begins at the given moment (ndays, nsecs), assumed to be local.
     Average taken over equally spaced samples with duration of 'timestep' in seconds. 
     """
-   
+    from scipy.integrate import quadrature
+    
     # Number of samples
     ns = 3*3600/timestep
     assert ns-int(ns) == 0.0
@@ -694,19 +700,29 @@ def swr_3hourly_mean(ndays,nsecs,lat,lon,timestep):
     else: 
         raise Exception('The timestep given does not divide 3*3600 seconds.')
 
+    ## This method is too slow in Python.
     # Find cumulative sum, then divide by # of samples to get mean.
-    cumsum = 0 
-    for i in range(ns):
-        add_secs = timestep*i
-        cumsum += swr_nv(ndays+int(nsecs/86400),
-                         (nsecs+add_secs)%86400,
-                         lat,lon)
-    return cumsum/ns
+    cumsum = 0
+    if method == 'cumsum':
+        for i in range(ns):
+            add_secs = timestep*i
+            cumsum += swr_nv(ndays+int(nsecs/86400),
+                             (nsecs+add_secs)%86400,
+                             lat,lon)
+            swr_mean = cumsum/ns
+    elif method == 'quadrature':
+        swr_mean =  quadrature(lambda nsecs: swr(ndays,nsecs,lat,lon),
+                               nsecs,nsecs+10800,tol=1e-1,rtol=1e-3)[0]/10800
+    else:
+        raise NotImplementedError('The requested method of integration: {:s}'.format(method), 'is not implemented.')
 
-def swr_3hourly_mean_monthly(year,month,m,n):
+    return swr_mean
+    
+
+def swr_3hourly_mean_monthly(year,month,m,n,method='quadrature'):
     """ 3-hourly mean computed for a month (UTC day 1 of month midnight to UTC day of of next month, midnight) """
-    from datetime import datetime
     from time import time
+    from datetime import datetime
     from numpy import ones
 
     # The following datetimes are to be interpreted as UTC, wich is also the timezone assumed for all date values used in GOTM 
@@ -715,10 +731,11 @@ def swr_3hourly_mean_monthly(year,month,m,n):
     stop = datetime(year+1,1,1) if month == 12 else datetime(year,month+1,1)
     nrec = (stop-start).days*8
     ndays_start = (start-datetime(start.year,1,1)).days
-    ndays_stop = (stop-datetime(start.year,1,1)).days    
+    ndays_stop = (stop-datetime(start.year,1,1)).days
 
     #tic = time()
     swr_mean = ones((ndays_stop-ndays_start)*8)
+    
     for ndays in range(ndays_start,ndays_stop):
         for i in range(8):
             nsecs = i*3*3600
@@ -728,15 +745,16 @@ def swr_3hourly_mean_monthly(year,month,m,n):
             # TAKE CARE BELOW.
             # Local time not necssarily at 0, 3, 6, 9 ... etc hours. 
             # Also, swr_3hourly_mean gives the mean over the SUBSEQUENT 3 hours. 
-            I_0_calc = swr_3hourly_mean(*UTC_to_local(ndays,nsecs,medsea_lons[n]),
-                                        medsea_lats[m],medsea_lons[n],timestep) 
+            I_0_calc = swr_3hourly_mean(*UTC_to_local_nv(ndays,nsecs,medsea_lons[n]),
+                                        medsea_lats[m],medsea_lons[n],timestep,
+                                        method=method) 
             swr_mean[j] = I_0_calc
     #toc = time()
     # How long does it take for one grid point and one 3-hourly period?
     #print('time elapsed for (m,n) = ({},{}):'.format(m,n), toc-tic)
     return swr_mean
 
-def cloud_factor_calc(year,month,m,n,swr_ERA):
+def cloud_factor_calc(year,month,m,n,swr_ERA,method='quadrature'):
     from datetime import datetime
     from time import time
     from netCDF4 import Dataset
@@ -754,7 +772,7 @@ def cloud_factor_calc(year,month,m,n,swr_ERA):
     
     #tic = time()
     cloud_factor = ones((ndays_stop-ndays_start)*8) # Defaults to clear sky value.
-    swr_mean = swr_3hourly_mean_monthly(year,month,m,n)
+    swr_mean = swr_3hourly_mean_monthly(year,month,m,n,method=method)
     for ndays in range(ndays_start,ndays_stop):
         for i in range(8):
             nsecs = i*3*3600
@@ -782,8 +800,44 @@ def cloud_factor_calc(year,month,m,n,swr_ERA):
     return cloud_factor, swr_mean
 
 def append_cloud_factor(year,month):
-    from netCDF4 import Dataset 
-    with Dataset(ERA_folder,'medsea_ERA_{:d}:{:02d}.nc'.format(year,month)):
-        swrd = nc['swrd'][:]
-    cloud_factor = cloud_factor_calc(year,month,m,n,swrd)
+    """ Calculate cloud factor from ERA swrd and internal algorithm, then append a cloud_factor to the ERA dataset. """
+    
+    ## Get the cloud_factor value for the month
+    swr_ERA = data_sources(year,month)['heat']['swrd'][:]
 
+    ## Start an ipcluster to speed up.
+    from ipyparallel import Client
+    rc = Client()
+    dv = rc[:]
+    lv = rc.load_balanced_view()
+
+    with dv.sync_imports():
+        import gotm
+    dv.execute('from gotm import cloud_factor_calc')
+    run = lambda m,n: cloud_factor_calc(year,month,m,n,swr_ERA)
+
+    from gotm import cloud_factor_calc
+    
+    # Push these common values to global scope of each engine.
+    dv.push(dict(year=year,month=month,swr_ERA=swr_ERA))
+
+    import itertools as itt
+    mm,nn = zip(*itt.product(range(21),range(57)))
+    results = lv.map(cloud_factor_calc,itt.repeat(year,21*57),itt.repeat(month,21*57),mm,nn,itt.repeat(swr_ERA,21*57))
+    results.wait_interactive()
+    
+    ## Append to the ERA_file.
+    with data_sources(year,month,mode='a')['heat'] as ds:
+        if 'cloud_factor' in ds.varibles():
+            cf = ds['cloud_factor']
+        else:
+            cf = ds.createVariable('cloud_factor','f8',dimensions=('time','lat','lon'),zlib=True,fill_value=1e+20)
+        if 'swrd_clear_sky' in ds.variables():
+            swr_cs = ds['swrd_clear_sky']
+        else:
+            swr_cs = ds.createVariable('swrd_clear_sky','f8',dimensions=('time','lat','lon'),zlib=True,fill_value=1e+20)
+        for i,(cloud_factor, swr_mean) in enumerate(results):
+            m = mm[i]
+            n = nn[i]
+            cf[:,m,n] = cloud_factor
+            swr_cs[:,m,n] = swr_mean        
