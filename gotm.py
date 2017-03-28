@@ -7,6 +7,7 @@ except NameError:
 
 ### Global settings
 import os
+from numpy import pi, cos, sin
 
 ## For general GOTM setup
 
@@ -23,6 +24,9 @@ for nml in GOTM_nml_list:
     if not(os.path.isfile(GOTM_nml_template)):
            raise FileNotFoundError("The GOTM config namelist " + GOTM_nml_template + " is invalid.")
 
+# GOTM namelist values
+timestep = 30
+            
 ## For medsea simulations
 
 # Top-level project folders
@@ -533,6 +537,10 @@ def medsea_data(year=2014,month=1,results_folder='ASM0'):
 
 ### For SWRD Calcluations
 
+# Temporary global variable
+year = 2014
+
+## Helper functions
 def tz(lon):
     if lon > 0:
         return int((lon+7.5)/15)
@@ -609,6 +617,7 @@ def sundec(t):
                     - 0.002697*cos(3*t) + 0.00148*sin(3*t)
 
 def coszen_nv(ndays,nsecs,lat,lon):
+    from numpy import pi
     alat = lat/180*pi
     alon = lon/180*pi
     decl = sundec(gamma(*local_to_UTC(ndays,nsecs,lon)))
@@ -698,6 +707,7 @@ def swr_3hourly_mean_monthly(year,month,m,n):
     """ 3-hourly mean computed for a month (UTC day 1 of month midnight to UTC day of of next month, midnight) """
     from datetime import datetime
     from time import time
+    from numpy import ones
 
     # The following datetimes are to be interpreted as UTC, wich is also the timezone assumed for all date values used in GOTM 
     # medsea simulations.
@@ -723,7 +733,7 @@ def swr_3hourly_mean_monthly(year,month,m,n):
             swr_mean[j] = I_0_calc
     #toc = time()
     # How long does it take for one grid point and one 3-hourly period?
-    print('time elapsed for (m,n) = ({},{}):'.format(m,n), toc-tic)
+    #print('time elapsed for (m,n) = ({},{}):'.format(m,n), toc-tic)
     return swr_mean
 
 def cloud_factor_calc(year,month,m,n,swr_ERA):
@@ -732,6 +742,7 @@ def cloud_factor_calc(year,month,m,n,swr_ERA):
     from netCDF4 import Dataset
     import os
     from gotm import medsea_lats, medsea_lons
+    from numpy import ones
 
     # The following datetimes are to be interpreted as UTC, wich is also the timezone assumed for all date values used in GOTM 
     # medsea simulations.
@@ -761,9 +772,12 @@ def cloud_factor_calc(year,month,m,n,swr_ERA):
             if I_0_obs < 0:
                 # Use cloud_factor to zero out negative values of data.
                 cloud_factor[j] = 0
+            if I_0_obs < 1:
+                # Maybe we zero out small negligible values as well?
+                cloud_factor[j] = 0
     #toc = time()
     # How long does it take for one grid point and one 3-hourly period?
-    print('time elapsed for (m,n) = ({},{}):'.format(m,n), toc-tic)
+    #print('time elapsed for (m,n) = ({},{}):'.format(m,n), toc-tic)
     
     return cloud_factor, swr_mean
 
