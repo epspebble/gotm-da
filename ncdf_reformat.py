@@ -1,18 +1,18 @@
 ### Common settings
 import sys, os
 home = os.getenv('HOME')
-project_folder = os.path.join(home,'gotm-dst')
+project_folder = os.path.join(home,'medsea_GOTM')
 
 ### Global settings
-output_folder = os.path.join('/scratch','simontse') 
+data_folder = os.path.join('/global/scratch',os.getenv('USER'))
 GOTM_lat = tuple(30.75+0.75*i for i in range(21))
 GOTM_lon = tuple(-6.0+0.75*i for i in range(57))
-print("Output folder: ", output_folder)
+print("Output folder: ", data_folder)
 print("Latitudes: ", GOTM_lat)
 print("Longitudes: ",GOTM_lon)
 
 ## ERA-INTERIM specific settings
-ERA_folder = os.path.join(project_folder,'p_sossta','medsea_ERA-INTERIM','3-hourly')
+ERA_folder = os.path.join(data_folder,'p_sossta','medsea_ERA-INTERIM','3-hourly')
 ERA_lat_ind = slice(-8,4,-1)
 ERA_lon_ind = slice(12,-18,1)
 
@@ -146,7 +146,7 @@ def ERA_reformat(year):
     for month in range(1,13):
         # Output filename and full path.
         outfn = 'medsea_ERA_{0:d}{1:02d}.nc'.format(year,month)
-        fullfile = os.path.join(output_folder,'medsea_ERA-INTERIM',outfn)
+        fullfile = os.path.join(data_folder,'medsea_ERA-INTERIM',outfn)
             
     # Iterate through the variables and append the data.
     for i,(name,alias) in enumerate(zip(ERA_names,ERA_alias)):
@@ -158,13 +158,13 @@ def ERA_reformat(year):
         for month in range(1,13):
             # Output filename and full path.
             outfn = 'medsea_ERA_{0:d}{1:02d}.nc'.format(year,month)
-            fullfile = os.path.join(output_folder,'medsea_ERA-INTERIM',outfn)
+            fullfile = os.path.join(data_folder,'medsea_ERA-INTERIM',outfn)
             # Interpretation of ERA data timings CRITICAL here to get these indices correct.
             start_hour, end_hour, start_ind, end_ind = timings(month)
 
             if i == 0: # Creating the first variable.
                 # Start the nc file with the basic dimensions, overwriting existing file.
-                with Dataset(fullfile,'w') as nc:
+                with Dataset(fullfile,'w',format="NETCDF3_CLASSIC") as nc:
                     # Routine stuff delegated to a helper funciton.
                     nctime, nclat, nclon = create_dimensions(nc,epoch)
                     # Write the time values to the nc file.
