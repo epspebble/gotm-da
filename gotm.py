@@ -30,7 +30,8 @@ timestep = 30
 ## For medsea simulations
 
 # Top-level project folders
-base_folder = os.path.join('/global/scratch/simontse/medsea_GOTM')
+data_folder = os.path.join('/global/scratch',os.getenv('USER'))
+base_folder = os.path.join(data_folder,'medsea_GOTM')
 
 if not(os.path.isdir(base_folder)):
     raise IOError('The base folder: ' + base_folder + ' is either not accessible or created.')
@@ -38,16 +39,22 @@ run_folder = os.path.join(base_folder,'run')
 if not(os.path.isdir(run_folder)):
     os.mkdir(run_folder)
 
-# The dat files and corresponding netCDF dataset sources.
+# Ocean and Satellite products datasets source folders.
+p_sossta_folder = os.path.join(data_folder,'p_sossta')
+ERA_folder = os.path.join(p_sossta_folder,'medsea_ERA-INTERIM','3-hourly')
+rea_folder = os.path.join(p_sossta_folder,'medsea_rea')
+
+# GOTM dat files' netCDF reformatted dataset sources.
 def data_sources(year, month, mode = 'r'):
     from netCDF4 import Dataset
+    import os
     return \
-    {'heat' : Dataset('/global/scratch/simontse/medsea_ERA-INTERIM/medsea_ERA_{:d}{:02d}.nc'.format(year,month),mode),
-     'met'  : Dataset('/global/scratch/simontse/medsea_ERA-INTERIM/medsea_ERA_{:d}{:02d}.nc'.format(year,month),mode),
-     'tprof': Dataset('/global/scratch/simontse/medsea_rea/medsea_rea_votemper_{:d}{:02d}.nc'.format(year,month),mode),
-     'sprof': Dataset('/global/scratch/simontse/medsea_rea/medsea_rea_vosaline_{:d}{:02d}.nc'.format(year,month),mode)}
-     #'sst'  : Dataset('/global/scratch/simontse/medsea_OSTIA/medsea_OSTIA_sst_{:d}{:02d}.nc'.format(year,month),mode),
-     #'chlo' : Dataset('/global/scratch/simontse/medsea_MODIS/medsea_MODIS_chlor_a_{:d}{:02d}.nc'.format(year,month),mode)}    
+    {'heat' : Dataset(os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_{:d}{:02d}.nc'.format(year,month)),mode),
+     'met'  : Dataset(os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_{:d}{:02d}.nc'.format(year,month)),mode),
+     'tprof': Dataset(os.path.join(data_folder,'medsea_rea','medsea_rea_votemper_{:d}{:02d}.nc'.format(year,month)),mode),
+     'sprof': Dataset(os.path.join(data_folder,'medsea_rea','medsea_rea_vosaline_{:d}{:02d}.nc'.format(year,month)),mode)}
+     #'sst'  : Dataset(os.path.join(data_folder,'medsea_OSTIA','medsea_OSTIA_sst_{:d}{:02d}.nc'.format(year,month),mode),
+     #'chlo' : Dataset(os.path.join(data_folder,'medsea_MODIS','medsea_MODIS_chlor_a_{:d}{:02d}.nc'.format(year,month),mode)}    
     
 # Global setting for the core_dat() routines (and possibly the ERA routines as well)
 overwrite=True
@@ -320,8 +327,7 @@ def prepare_engine():
 
     dv.execute('import os,sys')
     dv.execute("userhome = os.getenv('HOME')")
-    dv.execute("project_folder = 'gotm-dst'")
-    dv.execute("sys.path.append(os.path.join(userhome,project_folder,'src'))")
+    dv.execute("project_folder=" + project_folder)
     dv.execute('os.chdir("{}")'.format(base_folder))
     dv.execute('from gotm import *')
     dv.execute('change_base("{}")'.format(base_folder))
@@ -817,8 +823,11 @@ def cloud_factor_calc_monthly(year,month,use_ipp=True,append_to_ERA_dataset_now=
         # Push these common values to global scope of each engine.
         dv.push(dict(year=year,month=month,swr_ERA=swr_ERA))
 
-        import itertools as itt
+        tic()
         results = lv.map(run,mm,nn)
+        results.wait()
+        toc()
+        
             #results.wait_interactive()
     else:
         results = [cloud_factor_calc(year,month,mm[i],nn[i],swr_ERA) for i in range(21*57)]
