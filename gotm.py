@@ -842,3 +842,16 @@ def cloud_factor_calc_monthly(year,month,use_ipp=True,append_to_ERA_dataset_now=
             n = nn[i]
             cf[:,m,n] = cloud_factor
             swr_cs[:,m,n] = swr_mean        
+
+### Other helper functions, e.g. PBS related.
+
+def PBD_log():
+    fn = os.path.join(os.getenv('PBS_O_WORKDIR'),(datetime.now()).strftime("%Y%m%d_%H%M%S") + '.log')
+    f = open(fn,'w')
+    f.write("Elapsed time: {:.2g}s\n\n\n".format(toc-tic))
+    job_id = os.getenv('PBS_JOBID')
+    f.write('CHECKJOB output: \n')
+    run_command('checkjob '+job_id, output=f)
+    f.write('PBS Environment values: \n')
+    run_command('env |grep PBS',output=f)
+    f.close()
