@@ -799,18 +799,14 @@ def cloud_factor_calc(year,month,m,n,swr_ERA,method='quadrature'):
     
     return cloud_factor, swr_mean
 
-def cloud_factor_calc_monthly(year,month,use_ipp,append_to_ERA_dataset_now=False):
+def cloud_factor_calc_monthly(year,month,use_ipp=True,append_to_ERA_dataset_now=False):
     """ Calculate cloud factor from ERA swrd and internal algorithm, then append a cloud_factor to the ERA dataset. """
     
     import itertools as itt
     ## Get the cloud_factor value for the month
     swr_ERA = data_sources(year,month)['heat']['swrd'][:]
 
-    import itertools as itt
-
     mm,nn = zip(*itt.product(range(21),range(57)))
-    if use_ipp is None:
-        use_ipp = False
 
     if use_ipp:
         ## Start an ipcluster to speed up.
@@ -822,7 +818,7 @@ def cloud_factor_calc_monthly(year,month,use_ipp,append_to_ERA_dataset_now=False
         dv.push(dict(year=year,month=month,swr_ERA=swr_ERA))
 
         import itertools as itt
-        results = lv.map(mm,nn)
+        results = lv.map(run,mm,nn)
             #results.wait_interactive()
     else:
         results = [cloud_factor_calc(year,month,mm[i],nn[i],swr_ERA) for i in range(21*57)]
