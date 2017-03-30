@@ -45,17 +45,27 @@ ERA_folder = os.path.join(p_sossta_folder,'medsea_ERA-INTERIM','3-hourly')
 rea_folder = os.path.join(p_sossta_folder,'medsea_rea')
 
 # GOTM dat files' netCDF reformatted dataset sources.
-def data_sources(year, month, mode = 'r'):
+def data_sources(year, month, mode = 'r', dat = ['heat','met','tprof','sprof','sst','chlo']):
     from netCDF4 import Dataset
     import os
-    return \
-    {'heat' : Dataset(os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_{:d}{:02d}.nc'.format(year,month)),mode),
-     'met'  : Dataset(os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_{:d}{:02d}.nc'.format(year,month)),mode),
-     'tprof': Dataset(os.path.join(data_folder,'medsea_rea','medsea_rea_votemper_{:d}{:02d}.nc'.format(year,month)),mode),
-     'sprof': Dataset(os.path.join(data_folder,'medsea_rea','medsea_rea_vosaline_{:d}{:02d}.nc'.format(year,month)),mode)}
-     #'sst'  : Dataset(os.path.join(data_folder,'medsea_OSTIA','medsea_OSTIA_sst_{:d}{:02d}.nc'.format(year,month),mode),
-     #'chlo' : Dataset(os.path.join(data_folder,'medsea_MODIS','medsea_MODIS_chlor_a_{:d}{:02d}.nc'.format(year,month),mode)}    
-    
+
+    if isinstance(dat,str):
+        dat = [dat] # So that list comprehension still works.
+
+    fn_dict = {'heat' : os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_{:d}{:02d}.nc'.format(year,month)),
+               'met'  : os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_{:d}{:02d}.nc'.format(year,month)),
+               'tprof': os.path.join(data_folder,'medsea_rea','medsea_rea_votemper_{:d}{:02d}.nc'.format(year,month)),
+               'sprof': os.path.join(data_folder,'medsea_rea','medsea_rea_vosaline_{:d}{:02d}.nc'.format(year,month)),
+               'sst'  : os.path.join(data_folder,'medsea_OSTIA','medsea_OSTIA_sst_{:d}{:02d}.nc'.format(year,month)),
+               'chlo' : os.path.join(data_folder,'medsea_MODIS','medsea_MODIS_chlor_a_{:d}{:02d}.nc'.format(year,month))}
+    assert all([each in fn_dict.keys() for each in dat])
+    ds_dict = {each : Dataset(fn_dict[each],mode) for each in dat}
+
+    if len(ds_dict.keys()) == 1:
+        return ds_dict[dat[0]] # Return the dataset unwrapped from the dict.
+    else:
+        return ds_dict
+
 # Global setting for the core_dat() routines (and possibly the ERA routines as well)
 overwrite=True
 
@@ -521,6 +531,7 @@ def medsea_dat(year=2014, month=1):
     print('Generating dat files for {0:d}{1:02d} ...'.format(year,month))
     #print('Using netCDF files from ' + base_folder)
 
+    dv.push(dict(year=year,month=month))
     dv.execute('ds = gotm.data_sources({},{})'.format(year,month))
     run = lambda m,n: gotm.core_dat(year,month,m,n,**ds)
     results = lv.map(run,mm,nn)
@@ -547,6 +558,18 @@ def medsea_data(year=2014,month=1,results_folder='ASM0'):
 year = 2014
 
 ## Helper functions
+def tic():
+    import time
+    global lap_time
+    lap_time = time.time()
+
+def toc():
+    import time
+    try:
+        print("Elapsed: {:.4g} seconds.".format(time.time()-lap_time))
+    except NameError:
+        print("Have you run tic()?")
+        
 def tz(lon):
     if lon > 0:
         return int((lon+7.5)/15)
@@ -751,6 +774,7 @@ def swr_3hourly_mean_monthly(year,month,m,n,method='quadrature'):
             # TAKE CARE BELOW.
             # Local time not necssarily at 0, 3, 6, 9 ... etc hours. 
             # Also, swr_3hourly_mean gives the mean over the SUBSEQUENT 3 hours. 
+            print('type(m)',type(m),'type(n)',type(n))
             I_0_calc = swr_3hourly_mean(*UTC_to_local_nv(ndays,nsecs,medsea_lons[n]),
                                         medsea_lats[m],medsea_lons[n],timestep,
                                         method=method) 
@@ -822,13 +846,10 @@ def cloud_factor_calc_monthly(year,month,use_ipp=True,append_to_ERA_dataset_now=
         
         # Push these common values to global scope of each engine.
         dv.push(dict(year=year,month=month,swr_ERA=swr_ERA))
-
         tic()
         results = lv.map(run,mm,nn)
         results.wait()
         toc()
-        
-            #results.wait_interactive()
     else:
         results = [cloud_factor_calc(year,month,mm[i],nn[i],swr_ERA) for i in range(21*57)]
     
