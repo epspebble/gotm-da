@@ -59,11 +59,22 @@ def data_sources(year, month, mode = 'r', dat = ['heat','met','tprof','sprof','s
                'sst'  : os.path.join(data_folder,'medsea_OSTIA','medsea_OSTIA_sst_{:d}{:02d}.nc'.format(year,month)),
                'chlo' : os.path.join(data_folder,'medsea_MODIS','medsea_MODIS_chlor_a_{:d}{:02d}.nc'.format(year,month))}
     assert all([each in fn_dict.keys() for each in dat])
-    ds_dict = {each : Dataset(fn_dict[each],mode) for each in dat}
+
+    for each in fn_dict.keys():
+        try:
+            ds_dict = {each : Dataset(fn_dict[each],mode) for each in dat}
+        except OSError:
+            print('Error accessing {:s}.'.format(fn_dict[each]))
+            raise
+        except:
+            raise
+
 
     if len(ds_dict.keys()) == 1:
-        return ds_dict[dat[0]] # Return the dataset unwrapped from the dict.
+        # If only one dataset requested, return the netcdf dataset unwrapped from the dict. 
+        return ds_dict[dat[0]] 
     else:
+        # Else return a dictionary of datasets.
         return ds_dict
 
 # Global setting for the core_dat() routines (and possibly the ERA routines as well)
