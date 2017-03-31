@@ -501,6 +501,17 @@ def write_dat(m,n,dat_fn,nc,outdir):
                     f.write(line)
         elif dat_fn == 'heat':
             col = [None for i in range(4)]
+            # Temporary hack #1: repeat the first record if it starts at 03:00:00 so that the 
+            # simulation can start at midnight instead. Otherwise, GOTM will generate a
+            # plethora of nan values.
+            if timestr(time,0)[-8:] == '03:00:00':
+                col[0] = timestr(time,0)[:-8] + '00:00:00'
+                col[1] = nc['swrd'][0,m,n]
+                col[2] = 1 if 'cloud_factor' not in nc.variables else nc['cloud_factor'][0,m,n]
+                col[3] = nc['lwrd'][0,m,n]
+                line = ('{:s}' + ' {:g}'*3 + '\n').format(*col)
+                f.write(line)
+
             # The following loop is hacked temporarily to accomodate GOTM Fortran code assumption,
             # reinterpreting the timsteamp to mean the beginning of 3-hourly periods.
             for i in range(len(time)-1): #  Last record is not used.
@@ -511,10 +522,12 @@ def write_dat(m,n,dat_fn,nc,outdir):
                 col[3] = nc['lwrd'][i+1,m,n]
                 line = ('{:s}' + ' {:g}'*3 + '\n').format(*col)
                 f.write(line)
-            # Another temporary hack to include the last line being first day next month midnight, whose
+            
+            # Temporary hack #3: include the last line being first day next month midnight, whose
             # value should not be used because of the new interpretation of timing. However, for some 
             # reason GOTM halted at the last hour of time. So let's just repeat the value 3 hours earlier
             # at 21:00:00 last day of month.
+            assert timestr(time,-1)[-8:] == '00:00:00' # The last record is at midnight.
             col[0] = timestr(time,-1)
             col[1] = nc['swrd'][-1,m,n]
             col[2] = 1 if 'cloud_factor' not in nc.variables else nc['cloud_factor'][-1,m,n]
@@ -523,6 +536,19 @@ def write_dat(m,n,dat_fn,nc,outdir):
             f.write(line)
         elif dat_fn == 'met':
             col = [None for i in range(9)]
+            # Temporary hack #1 (with the one for 'heat'). Just repeat the first value but use it for midnight.
+            if timestr(time,0)[-8:] == '03:00:00':
+                col[0] = timestr(time,0)[:-8] + '00:00:00'
+                col[1] = nc['u10m'][0,m,n]
+                col[2] = nc['v10m'][0,m,n]
+                col[3] = nc['sp'][0,m,n]/100 # surface pressure, convert from Pa to hPa
+                col[4] = nc['t2m'][0,m,n] - 273.15 # a0r temperature at 2m, convert to Celsius
+                col[5] = nc['q2m'][0,m,n] # specific humidity at 2m
+                col[6] = 0 # "cloud" value?
+                col[7] = nc['precip'][0,m,n]
+                col[8] = nc['snow'][0,m,n]
+                line = ('{:s}'+' {:g}'*8 + '\n').format(*col)
+                f.write(line)
             for i in range(len(time)):
                 col[0] = timestr(time,i)
                 col[1] = nc['u10m'][i,m,n]
@@ -554,6 +580,9 @@ def mn_dat(m,n):
     """
 
     from netCDF4 import MFDataset
+    from tempfile import mkdtemp
+    from shutil import copyfile
+    from glob import glob
 
     lat = medsea_lats[m]
     lon = medsea_lons[n]
@@ -565,12 +594,19 @@ def mn_dat(m,n):
     local_folder = os.path.join(run_by_lat_lon_folder,print_lat_lon(lat,lon))
     if not(os.path.isdir(local_folder)):
         os.mkdir(local_folder)
-    nc_dict = dict(heat = MFDataset(os.path.join(data_folder,'medsea_ERA-INTERIM','*.nc')), 
-                   met = MFDataset(os.path.join(data_folder,'medsea_ERA-INTERIM','*.nc')), 
-                   tprof = MFDataset(os.path.join(data_folder,'medsea_rea','*votemper*.nc')), 
-                   sprof = MFDataset(os.path.join(data_folder,'medsea_rea','*vosaline*.nc')))
+
+    temp_folder = mkdtemp()
+    ERA_files = glob(os.path.join(data_folder,'medsea_ERA-INTERIM','*.nc')) 
+    rea_files = glob(os.path.join(data_folder,'medsea_rea','*.nc'))
+    ERA_tempfiles = [copyfile(fn,os.path.join(temp_folder,os.path.basename(fn))) for fn in ERA_files]
+    rea_tempfiles = [copyfile(fn,os.path.join(temp_folder,os.path.basename(fn))) for fn in rea_files]
+
+    nc_dict = dict(heat = MFDataset(os.path.join(temp_folder,'medsea_ERA_*.nc')), 
+                   met = MFDataset(os.path.join(temp_folder,'medsea_ERA_*.nc')), 
+                   tprof = MFDataset(os.path.join(temp_folder,'medsea_rea_votemper_*.nc')), 
+                   sprof = MFDataset(os.path.join(temp_folder,'medsea_rea_vosaline_*.nc')))
     for dat_fn, nc in nc_dict.items():
-        write(m,n,dat_fn,nc,local_folder)
+        write_dat(m,n,dat_fn,nc,local_folder)
 
 
 def core_dat(year,month,m,n,**nc_dict):
