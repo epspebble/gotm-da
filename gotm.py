@@ -84,6 +84,42 @@ overwrite=True
 medsea_lats = tuple(30.75+0.75*i for i in range(21))
 medsea_lons = tuple(-6.0+0.75*i for i in range(57))
 
+# Enumerate the grid points 
+import itertools
+mm, nn = zip(*itertools.product(range(21),range(57)))
+# Make use of a medsea_rea dataset to infer sea, shallow and land locations.
+with data_sources(2014,1,dat='tprof') as rea_ds:
+    votemper = rea_ds['votemper']
+    # Preallocate
+    is_sea = list(None for i in range(21*57))
+    is_shallow = list(None for i in range(21*57))
+    is_land = list(None for i in range(21*57))
+    for i in range(21*57):
+        # Since fill value is 1e20, and sea water should not be boiling...
+        is_sea[i] = (votemper[0,-1,mm[i],nn[i]]<100) # deepest location in our data should be about 100m.
+        is_land[i] = (votemper[0,0,mm[i],nn[i]]>100) # shallowest data
+        is_shallow[i] = \
+            (votemper[0,0,mm[i],nn[i]]<100) and \
+            (votemper[0,-1,mm[i],nn[i]]>100)
+
+# Check that there are no logical loopholes.
+assert sum(is_sea) + sum(is_land) + sum(is_shallow) == 21*57
+
+# Return the counters i for lat/lon index arrays mm and nn.
+sea_i = tuple(itertools.compress(range(21*57),is_sea))
+land_i = tuple(itertools.compress(range(21*57),is_land))
+shallow_i = tuple(itertools.compress(range(21*57),is_shallow))
+
+# Return the actual lat/lon index pairs (m,n)
+sea_mn = tuple((mm[i],nn[i]) for i in sea_i)
+shallow_mn = tuple((mm[i],nn[i]) for i in shallow_i)
+land_mn = tuple((mm[i],nn[i]) for i in land_i)
+
+# Return the actual (lat,lon) coorindates as well
+sea_locations = tuple((medsea_lats[m],medsea_lons[n]) for (m,n) in sea_mn)
+shallow_locations = tuple((medsea_lats[m],medsea_lons[n]) for (m,n) in shallow_mn)
+land_locations = tuple((medsea_lats[m],medsea_lons[n]) for (m,n) in land_mn)
+    
 ### General GOTM wrappers
 
 # Running GOTM console through a subprocess as if we were in a linux terminal.
@@ -883,17 +919,4 @@ def cloud_factor_calc_monthly(year,month,use_ipp=True,append_to_ERA_dataset_now=
             m = mm[i]
             n = nn[i]
             cf[:,m,n] = cloud_factor
-            swr_cs[:,m,n] = swr_mean        
-
-### Other helper functions, e.g. PBS related.
-
-def PBD_log():
-    fn = os.path.join(os.getenv('PBS_O_WORKDIR'),(datetime.now()).strftime("%Y%m%d_%H%M%S") + '.log')
-    f = open(fn,'w')
-    f.write("Elapsed time: {:.2g}s\n\n\n".format(toc-tic))
-    job_id = os.getenv('PBS_JOBID')
-    f.write('CHECKJOB output: \n')
-    run_command('checkjob '+job_id, output=f)
-    f.write('PBS Environment values: \n')
-    run_command('env |grep PBS',output=f)
-    f.close()
+            swr_cs[:,m,n] = swr_mean
