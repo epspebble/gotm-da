@@ -785,7 +785,6 @@ def swr_3hourly_mean_monthly(year,month,m,n,method='quadrature'):
             # TAKE CARE BELOW.
             # Local time not necssarily at 0, 3, 6, 9 ... etc hours. 
             # Also, swr_3hourly_mean gives the mean over the SUBSEQUENT 3 hours. 
-            print('type(m)',type(m),'type(n)',type(n))
             I_0_calc = swr_3hourly_mean(*UTC_to_local_nv(ndays,nsecs,medsea_lons[n]),
                                         medsea_lats[m],medsea_lons[n],timestep,
                                         method=method) 
