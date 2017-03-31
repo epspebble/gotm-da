@@ -577,7 +577,9 @@ def tic():
 def toc():
     import time
     try:
-        print("Elapsed: {:.4g} seconds.".format(time.time()-lap_time))
+        elapsed = time.time() - lap_time
+        print("Elapsed: {:.4g} seconds.".format(elapsed))
+        return elapsed 
     except NameError:
         print("Have you run tic()?")
         
