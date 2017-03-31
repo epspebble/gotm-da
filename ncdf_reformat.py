@@ -1,20 +1,19 @@
 ### Common settings
 import sys, os
-home = os.getenv('HOME')
-project_folder = os.path.join(home,'medsea_GOTM')
+from gotm import *
 
-### Global settings
-data_folder = os.path.join('/global/scratch',os.getenv('USER'))
-GOTM_lat = tuple(30.75+0.75*i for i in range(21))
-GOTM_lon = tuple(-6.0+0.75*i for i in range(57))
-print("Output folder: ", data_folder)
-print("Latitudes: ", GOTM_lat)
-print("Longitudes: ",GOTM_lon)
+# project_folder = os.path.join(home,'medsea_GOTM')
 
-## ERA-INTERIM specific settings
-ERA_folder = os.path.join(data_folder,'p_sossta','medsea_ERA-INTERIM','3-hourly')
-ERA_lat_ind = slice(-8,4,-1)
-ERA_lon_ind = slice(12,-18,1)
+# ### Global settings
+# data_folder = os.path.join('/global/scratch',os.getenv('USER'))
+# medsea_lats = tuple(30.75+0.75*i for i in range(21))
+# medsea_lons = tuple(-6.0+0.75*i for i in range(57))
+# print("Output folder: ", data_folder)
+# print("Latitudes: ", medsea_lats)
+# print("Longitudes: ",medsea_lons)
+#
+# ## ERA-INTERIM specific settings
+# ERA_folder = os.path.join(data_folder,'p_sossta','medsea_ERA-INTERIM','3-hourly')
 
 met_names = ['u10m','v10m','sp','t2m','q2m','precip','snow']
 met_alias = ['u10m','v10m','sp','t2m','q2m','var144','var228']
@@ -23,42 +22,6 @@ heat_alias = ['var175','var169']
 
 ERA_names = met_names + heat_names
 ERA_alias = met_alias + heat_alias
-
-### Helper functions
-def get_ERA_yearly_data(folder,year,name,alias,lat_indices,lon_indices):
-    from netCDF4 import Dataset
-    fn = 'MEDSEA_ERA-INT_' + name + '_y' + str(year) + '.nc'
-    with Dataset(os.path.join(folder,fn),'r') as nc:
-        # First, confirm every time that the indices for lat and lon are correct.
-        assert all(nc['lat'][ERA_lat_ind] == GOTM_lat)
-        assert all(nc['lon'][ERA_lon_ind] == GOTM_lon)
-        # Then return the data unpacked from the netCDF object.
-        return nc[alias][:,lat_indices,lon_indices]
-
-def create_dimensions(nc, epoch, lat=GOTM_lat, lon=GOTM_lon):
-    " Declaring dimensions and creating the coordinate variables for each dimension."
-    # Dimensions
-    nc.createDimension('time') # unlimited
-    nc.createDimension('lat', size = len(lat))
-    nc.createDimension('lon', size = len(lon))
-    
-    # Dimension variables.
-    nctime = nc.createVariable('time','i4',dimensions=('time',))
-    nctime.units = 'hours since ' + str(epoch)
-    nclat = nc.createVariable('lat','f4',dimensions=('lat',))
-    nclat.units = 'degrees north'
-    nclon = nc.createVariable('lon','f4',dimensions=('lon',))
-    nclon.units = 'degrees east'
-    nclat[:] = lat
-    nclon[:] = lon
-    #print('Done initializing dimensions.')
-    return nctime, nclat, nclon
-
-def create_variable(nc,varname,datatype,dimensions=('time','lat','lon'),zlib=True, fill_value=1e+20):
-    " Default settings applied to create a netCDF variable. 'fill_value' of the rea dataset is used here."
-    ncvar = nc.createVariable(varname,datatype,dimensions=dimensions,zlib=zlib,fill_value=fill_value)
-    #print('Done initializing variables.')
-    return ncvar
 
 def ERA_reformat(year):
     " Reformat the ERA data by combining variables needed for met.dat into monthly files. "
@@ -178,4 +141,10 @@ def ERA_reformat(year):
                 ncvar[:] = data[start_ind:end_ind,:,:]
         print("Took {:.4g}s to write '{:s}' values for all months.".format(time()-tic,name))
         
-        
+if __name__ == '__main__':
+    if len(sys.argv) == 1: # No arguments provided, assume 2013, 2014.
+        years = [2013, 2014]
+    else:
+        years = [int(sys.argv[i+1]) for i in range(len(argv)-1)]
+    for year in years:
+        ERA_reformat(year)

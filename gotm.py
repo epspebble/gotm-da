@@ -84,6 +84,10 @@ overwrite=True
 medsea_lats = tuple(30.75+0.75*i for i in range(21))
 medsea_lons = tuple(-6.0+0.75*i for i in range(57))
 
+# The corresponding index ranges in medsea_ERA-INTERIM datasets.
+ERA_lat_ind = slice(-8,4,-1)
+ERA_lon_ind = slice(12,-18,1)
+
 # Enumerate the grid points 
 import itertools
 mm, nn = zip(*itertools.product(range(21),range(57)))
@@ -171,9 +175,13 @@ def run_command(cmd, output='PIPE'):
 # This function should be extended to output a simulation object, encapsulating the run options and the results in 
 # one class. This will in turn allow us to run continuation calls easily.
 def gotm(varsout = {}, run_folder = '.', verbose = False, logfn = 'gotm.log',
-         GOTM_executable = GOTM_executable, inp_templates = None, inp_backup = False, **gotm_args):
+         GOTM_executable = GOTM_executable, GOTM_nml_templates_path = None, inp_backup = False, **gotm_args):
     """ Runs GOTM in with extra functions. """
     import os, shutil
+    
+    # Use default templates if not user-specified.
+    if GOTM_nml_templates_path is None:
+        GOTM_nml_templates_path = GOTM_nml_path
     
     # Remember the current working folder then walk into the run folder.
     home = os.getcwd() 
@@ -186,7 +194,7 @@ def gotm(varsout = {}, run_folder = '.', verbose = False, logfn = 'gotm.log',
     #GOTM_nml_list = ['gotmrun.inp','gotmmean.inp','gotmturb.inp','airsea.inp','obs.inp'] # Moved to the top, as global var.
     for each in GOTM_nml_list:
         if not(os.path.isfile(each)):
-            shutil.copyfile(os.path.join(inp_templates,each),os.path.join(run_folder,each))
+            shutil.copyfile(os.path.join(GOTM_nml_templates_path,each),os.path.join(run_folder,each))
     
     # Update the config as well if user specified extra options.
     if gotm_args:
@@ -375,6 +383,41 @@ def get_lat_lon(m,n):
     "Return the latlong given the grid index (m,n)."
     return medsea_lats[m],medsea_lons[n]
 
+def get_ERA_yearly_data(folder,year,name,alias,lat_indices,lon_indices):
+    from netCDF4 import Dataset
+    fn = 'MEDSEA_ERA-INT_' + name + '_y' + str(year) + '.nc'
+    with Dataset(os.path.join(folder,fn),'r') as nc:
+        # First, confirm every time that the indices for lat and lon are correct.
+        assert all(nc['lat'][ERA_lat_ind] == medsea_lats)
+        assert all(nc['lon'][ERA_lon_ind] == medsea_lons)
+        # Then return the data unpacked from the netCDF object.
+        return nc[alias][:,lat_indices,lon_indices]
+
+def create_dimensions(nc, epoch, lat=medsea_lats, lon=medsea_lons):
+    " Declaring dimensions and creating the coordinate variables for each dimension."
+    # Dimensions
+    nc.createDimension('time') # unlimited
+    nc.createDimension('lat', size = len(lat))
+    nc.createDimension('lon', size = len(lon))
+    
+    # Dimension variables.
+    nctime = nc.createVariable('time','i4',dimensions=('time',))
+    nctime.units = 'hours since ' + str(epoch)
+    nclat = nc.createVariable('lat','f4',dimensions=('lat',))
+    nclat.units = 'degrees north'
+    nclon = nc.createVariable('lon','f4',dimensions=('lon',))
+    nclon.units = 'degrees east'
+    nclat[:] = lat
+    nclon[:] = lon
+    #print('Done initializing dimensions.')
+    return nctime, nclat, nclon
+
+def create_variable(nc,varname,datatype,dimensions=('time','lat','lon'),zlib=True, fill_value=1e+20):
+    " Default settings applied to create a netCDF variable. 'fill_value' of the rea dataset is used here."
+    ncvar = nc.createVariable(varname,datatype,dimensions=dimensions,zlib=zlib,fill_value=fill_value)
+    #print('Done initializing variables.')
+    return ncvar
+
 def prepare_engine():
     " Prepare ipyparallel engines by importing settings and dependencies. "
     from ipyparallel import Client
@@ -382,12 +425,22 @@ def prepare_engine():
     dv = rc[:]
     lv = rc.load_balanced_view()
 
-    dv.execute('import os,sys')
+    with dv.sync_imports():
+        import os, sys
     dv.execute("userhome = os.getenv('HOME')")
-    dv.execute("project_folder=" + project_folder)
-    dv.execute('os.chdir("{}")'.format(base_folder))
     dv.execute('from gotm import *')
-    dv.execute('change_base("{}")'.format(base_folder))
+
+    # Push all possibly changed folder locations from local namesapce to each engine. 
+    dv.execute("project_folder=" + project_folder)
+    dv.push(dict(project_folder = project_folder,
+                 data_folder = data_folder,
+                 run_folder = run_folder,
+                 base_folder = base_folder,
+                 p_sossta_folder = p_sossta_folder,
+                 ERA_folder = ERA_folder,
+                 rea_folder = rea_folder))
+    dv.apply(change_base,base_folder)
+    dv.execute('os.chdir("{}")'.format(base_folder))
     return rc, lv
 
 
@@ -548,8 +601,8 @@ def core_run(year,month,m=None,n=None,lat=None,lon=None,verbose=False,**gotm_use
         os.symlink(GOTM_executable,os.path.join(core_folder,'gotm'))    
     for each in GOTM_nml_list:
         # All config files are overwritten every time GOTM is run.
-        shutil.copyfile(os.path.join(base_folder,each),os.path.join(core_folder,each))
-    # The actual updates of the namelists are currently done in the gotm() call.
+        shutil.copyfile(os.path.join(GOTM_nml_path,each),os.path.join(core_folder,each))
+    # NOTE: The actual updates of the namelists are currently done in the gotm() call.
 
     # Actual GOTM run.
     os.chdir(core_folder)   
