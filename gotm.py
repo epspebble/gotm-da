@@ -595,16 +595,23 @@ def mn_dat(m,n):
     if not(os.path.isdir(local_folder)):
         os.mkdir(local_folder)
 
-    temp_folder = mkdtemp()
-    ERA_files = glob(os.path.join(data_folder,'medsea_ERA-INTERIM','*.nc')) 
-    rea_files = glob(os.path.join(data_folder,'medsea_rea','*.nc'))
-    ERA_tempfiles = [copyfile(fn,os.path.join(temp_folder,os.path.basename(fn))) for fn in ERA_files]
-    rea_tempfiles = [copyfile(fn,os.path.join(temp_folder,os.path.basename(fn))) for fn in rea_files]
+    # temp_folder = mkdtemp(prefix=temp_base_folder)
+    # ERA_files = glob(os.path.join(data_folder,'medsea_ERA-INTERIM','*.nc')) 
+    # rea_files = glob(os.path.join(data_folder,'medsea_rea','*.nc'))
+    # ERA_tempfiles = [copyfile(fn,os.path.join(temp_folder,os.path.basename(fn))) for fn in ERA_files]
+    # rea_tempfiles = [copyfile(fn,os.path.join(temp_folder,os.path.basename(fn))) for fn in rea_files]
 
-    nc_dict = dict(heat = MFDataset(os.path.join(temp_folder,'medsea_ERA_*.nc')), 
-                   met = MFDataset(os.path.join(temp_folder,'medsea_ERA_*.nc')), 
-                   tprof = MFDataset(os.path.join(temp_folder,'medsea_rea_votemper_*.nc')), 
-                   sprof = MFDataset(os.path.join(temp_folder,'medsea_rea_vosaline_*.nc')))
+    # nc_dict = dict(heat = MFDataset(os.path.join(temp_folder,'medsea_ERA_*.nc')), 
+    #                met = MFDataset(os.path.join(temp_folder,'medsea_ERA_*.nc')), 
+    #                tprof = MFDataset(os.path.join(temp_folder,'medsea_rea_votemper_*.nc')), 
+    #                sprof = MFDataset(os.path.join(temp_folder,'medsea_rea_vosaline_*.nc')))
+
+    print("Using nc files in " + data_folder + "...")
+    nc_dict = dict(heat = MFDataset(os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_*.nc')), 
+                   met = MFDataset(os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_*.nc')), 
+                   tprof = MFDataset(os.path.join(data_folder,'medsea_rea','medsea_rea_votemper_*.nc')), 
+                   sprof = MFDataset(os.path.join(data_folder,'medsea_rea','medsea_rea_vosaline_*.nc')))
+
     for dat_fn, nc in nc_dict.items():
         write_dat(m,n,dat_fn,nc,local_folder)
 
