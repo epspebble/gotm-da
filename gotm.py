@@ -45,7 +45,7 @@ ERA_folder = os.path.join(p_sossta_folder,'medsea_ERA-INTERIM','3-hourly')
 rea_folder = os.path.join(p_sossta_folder,'medsea_rea')
 
 # GOTM dat files' netCDF reformatted dataset sources.
-def data_sources(year, month, mode = 'r', dat = ['heat','met','tprof','sprof','sst','chlo']):
+def data_sources(year, month, mode = 'r', dat = ['heat','met','tprof','sprof']):
     from netCDF4 import Dataset
     import os
 
