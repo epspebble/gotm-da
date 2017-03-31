@@ -15,6 +15,16 @@ from gotm import *
 # ## ERA-INTERIM specific settings
 # ERA_folder = os.path.join(data_folder,'p_sossta','medsea_ERA-INTERIM','3-hourly')
 
+# The corresponding index ranges in medsea_ERA-INTERIM datasets.
+ERA_lat_ind = slice(-8,4,-1)
+ERA_lon_ind = slice(12,-18,1)
+
+# The corresponding index ranges in medsea_rea datasets.
+rea_lat_ind = slice(9,250,12)
+rea_lon_ind = slice(0,673,12)
+rea_depth_ind = slice(0,18)
+
+
 met_names = ['u10m','v10m','sp','t2m','q2m','precip','snow']
 met_alias = ['u10m','v10m','sp','t2m','q2m','var144','var228']
 heat_names = ['lwrd','swrd']
@@ -145,6 +155,57 @@ def ERA_reformat(year):
                 ncvar = create_variable(nc,name,'f8')
                 ncvar[:] = data[start_ind:end_ind,:,:]
             toc()
+
+def rea_reformat(year,month,varname,fn_keyword):
+    from netCDF4 import Dataset, MFDataset
+    from numpy import linspace
+    from os.path import isfile
+    output_folder = os.path.join(data_folder,medsea_rea)
+ 
+    outfn = os.path.join(output_folder,'medsea_rea_{2}_{0:d}{1:02d}.nc'.format(year,month,varname,output_folder))
+                         
+    with Dataset(outfn,"w",data_model='NETCDF3_CLASSIC') as nc:
+        nctime, nclat, nclon = create_dimensions(nc,epoch)
+        nc.createDimension('depth', size = 18) # 18 was found manually to get just over 100m.
+        ncdepth = new.createVariable('depth','f4',dimensions=('depth',))
+        print('Done creating dimensions.')
+                
+        with MFDataset(os.path.join(rea_folder,"{0:d}{1:02d}??_{2}_re-fv6.nc".format(year,month,fn_keyword)),'r') as REA_data:
+            ncdepth.units = REA_data['depth'].units
+rea_lat_ind = slice(9,250,12)
+rea_lon_ind = slice(0,673,12)
+rea_depth_ind = slice(0,18)
+
+            temp = REA_data[varname][:,0:18,:,:] # Read continguously first.
+            ncvar[:] = temp[:,:,rea_lat_ind,rea_lon_ind] # Now random-access in RAM to copy over.
+            ncvar.units = REA_data[varname].units
+            print('Done copying over {} values of one month.'.format(varname))
+            
+            ### STOPPED HERE.
+        # Also copy over the data for the first day of the next month.
+        if month == 12:
+            year_new = year+1
+            month_new = 1
+        else:
+            year_new = year
+            month_new = month+1
+        
+        # Cannot do 2014-12 without data for 2015-01
+        if (year == 2014) and (month == 12):
+            return
+        
+        with Dataset("{3}/{0:d}{1:02d}01_{2}_re-fv6.nc".format(year_new,month_new,fn_keyword,REA_folder),'r') as REA_data:
+            print('Before appending first day value of the next month, {0} has dimensions {1}'.format(varname,shape(nc_var)))
+            print('Meanwhile, time has length {}'.format(len(new['time'][:])))
+            last = len(new['time'])
+            new['time'][last] = REA_data['time'][:]
+            temp = REA_data[varname][:,0:18,:,:]
+            nc_var[last,:,:,:] = temp[:,:,9:250:12,0:673:12]
+            print('After appending, the dimensions of {0} become {1}'.format(varname,shape(nc_var)))
+            print('Meanwhile, time has length {}'.format(len(new['time'][:])))
+            
+    print("Done creating {}".format(newfn))
+
         
 if __name__ == '__main__':
     if len(sys.argv) == 1: # No arguments provided, assume 2013, 2014.

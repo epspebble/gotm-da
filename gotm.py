@@ -88,6 +88,11 @@ medsea_lons = tuple(-6.0+0.75*i for i in range(57))
 ERA_lat_ind = slice(-8,4,-1)
 ERA_lon_ind = slice(12,-18,1)
 
+# The corresponding index ranges in medsea_rea datasets.
+rea_lat_ind = slice(9,250,12)
+rea_lon_ind = slice(0,673,12)
+rea_depth_ind = slice(0,18)
+
 # Enumerate the grid points 
 import itertools
 mm, nn = zip(*itertools.product(range(21),range(57)))
