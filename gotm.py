@@ -540,11 +540,37 @@ def write_dat(m,n,dat_fn,nc,outdir):
                 f.write(line)
         else:
             raise Exception("Requested {}.dat has no recipes defined in core_dat()".format(dat_fn))
+
     print('Done writing {}.\n'.format(fn))
+
+def mn_dat(m,n):
+    """
+    Generate *.dat files from all available data. See core_dat() for other explanations.
+    """
+
+    from netCDF4 import MFDataset
+
+    lat = medsea_lats[m]
+    lon = medsea_lons[n]
+
+    run_by_lat_lon_folder = os.path.join(run_folder,'by_lat_lon')
+    if not(os.path.isdir(run_by_lat_lon_folder)):
+        os.mkdir(run_by_lat_lon_folder)
+
+    local_folder = os.path.join(run_by_lat_lon_folder,print_lat_lon(lat,lon))
+    if not(os.path.isdir(local_folder)):
+        os.mkdir(local_folder)
+    nc_dict = dict(heat = MFDataset(os.path.join(data_folder,'medsea_ERA-INTERIM','*.nc')), 
+                   met = MFDataset(os.path.join(data_folder,'medsea_ERA-INTERIM','*.nc')), 
+                   tprof = MFDataset(os.path.join(data_folder,'medsea_rea','*votemper*.nc')), 
+                   sprof = MFDataset(os.path.join(data_folder,'medsea_rea','*vosaline*.nc')))
+    for dat_fn, nc in nc_dict.items():
+        write(m,n,dat_fn,nc,local_folder)
+
 
 def core_dat(year,month,m,n,**nc_dict):
     """
-    Generate *.dat files for each core folder. 
+    Generate *.dat files for each core folder, by months. 
     The critical keyword argument 'nc_dict' provides dat filename to nc Dataset
     handle correspondance, e.g. {'heat': heat_nc} where 
                    heat_nc = Dataset('ERA_heat_yyyymm.nc','r') 

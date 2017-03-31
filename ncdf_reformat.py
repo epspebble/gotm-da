@@ -23,6 +23,76 @@ heat_alias = ['var175','var169']
 ERA_names = met_names + heat_names
 ERA_alias = met_alias + heat_alias
 
+def timings(month,epoch):
+    from datetime import datetime,timedelta
+    ### MAIN WORK: calculating various date and time offsets.
+    
+    ### INTERPRETATION of ERA-INTERIM data source.
+    # In ERA-Interim (3-hourly), u10m, v10m, sp, t2m, q2m are instantaneous values at the end
+    # of each period, while lwrd, swrd are mean values over each period.
+    # NOTE: To change less Fortran, we opt to move the time stamps of the lwrd and swrd values
+    # 3 hours early, so the the values "persist" for the whole 3-hourly period.
+    ###
+
+    ### GOTM timing of variables.
+
+    ## Find no. of 3-hourly periods.
+    # Midnight of first day of this month
+    this_month = datetime(year,month,1,0,0,0)
+    # Midnight of first day of next month
+    next_month = datetime(year,month+1,1,0,0,0) if month < 12 else datetime(year+1,1,1,0,0,0)
+    # No. of 3-hourly periods, must be integer, converting to int explicitly.
+    nper = int((next_month - this_month).total_seconds() / (3*3600))
+        
+    ## Calculate the time variables start and end of GOTM records to write.
+    #
+    # 'start_sec' time value of our first GOTM record.
+        
+    ## WT 20170327 This extra padding of 00 hour (i.e. the instananeous data for met variables, but 21:00:00-00:00:00 
+    # the previous day for heat variables is causing debugging trouble. Let's just skip it for now, and let GOTM 
+    # handle missing data at start?
+    #if month == 1:
+    #    # First record at 3 hours on Jan 1st.
+    #    start_hour = int((this_month + timedelta(hours=3) - epoch).total_seconds()/3600)
+    #else:
+    #    # First records at 00 hour on 1st of Feb, Mar, Apr ..., Dec.
+    #    start_hour = int((this_month - epoch).total_seconds()/3600) 
+        
+    # A faithful copy of original ERA data, do not make changes. Just recalculate the time values of 3, 6, 9 hrs etc...
+    start_hour = int((this_month + timedelta(hours=3) - epoch).total_seconds()/3600)
+            
+    # Last GOTM record time.
+    end_hour = int((next_month - epoch).total_seconds()/3600)
+
+    ## Find the number of days since the first day of year to infer indices of the records we want.        
+    first_day_of_year = datetime(this_month.year,1,1,0,0,0)
+    start_day = (this_month-first_day_of_year).days
+    end_day = (next_month-first_day_of_year).days
+        
+    ## Calculate indices of time to read in ERA data.
+    #
+    ## WT 2017037 Do not include previous record. Debugging hazard.
+    ## Include one previous record at 00:00:00 unless at beginning of year.
+    #start_ind = start_day*8 if month == 1 else start_day*8-1
+        
+    # A faithful copy of original ERA data.
+    start_ind = start_day*8
+        
+    # Total number of records should be (end_day-start_day)*8
+    end_ind = end_day*8
+        
+    ## WT 2017037 Skip this hassle!
+    ## Make doubly sure there's no time-shift by 3-hour periods!
+    #if month == 1:
+    #    assert end_ind - start_ind == nper
+    #else:
+    #    assert end_ind - start_ind == nper + 1
+        
+    assert end_ind - start_ind == nper
+
+    return start_hour, end_hour, start_ind, end_ind
+
+
 def ERA_reformat(year):
     " Reformat the ERA data by combining variables needed for met.dat into monthly files. "
     import os
@@ -37,93 +107,29 @@ def ERA_reformat(year):
     #data = {name: get_ERA_yearly_data(ERA_folder,year,name,alias) \
     #        for name,alias in zip(ERA_names,ERA_alias)}
 
-    def timings(month):
-        ### MAIN WORK: calculating various date and time offsets.
-        
-        ### INTERPRETATION of ERA-INTERIM data source.
-        # In ERA-Interim (3-hourly), u10m, v10m, sp, t2m, q2m are instantaneous values at the end
-        # of each period, while lwrd, swrd are mean values over each period.
-        # NOTE: To change less Fortran, we opt to move the time stamps of the lwrd and swrd values
-        # 3 hours early, so the the values "persist" for the whole 3-hourly period.
-        ###
-
-        ### GOTM timing of variables.
-
-        ## Find no. of 3-hourly periods.
-        # Midnight of first day of this month
-        this_month = datetime(year,month,1,0,0,0)
-        # Midnight of first day of next month
-        next_month = datetime(year,month+1,1,0,0,0) if month < 12 else datetime(year+1,1,1,0,0,0)
-        # No. of 3-hourly periods, must be integer, converting to int explicitly.
-        nper = int((next_month - this_month).total_seconds() / (3*3600))
-        
-        ## Calculate the time variables start and end of GOTM records to write.
-        #
-        # 'start_sec' time value of our first GOTM record.
-        
-        ## WT 20170327 This extra padding of 00 hour (i.e. the instananeous data for met variables, but 21:00:00-00:00:00 
-        # the previous day for heat variables is causing debugging trouble. Let's just skip it for now, and let GOTM 
-        # handle missing data at start?
-        #if month == 1:
-        #    # First record at 3 hours on Jan 1st.
-        #    start_hour = int((this_month + timedelta(hours=3) - epoch).total_seconds()/3600)
-        #else:
-        #    # First records at 00 hour on 1st of Feb, Mar, Apr ..., Dec.
-        #    start_hour = int((this_month - epoch).total_seconds()/3600) 
-        
-        # A faithful copy of original ERA data, do not make changes. Just recalculate the time values of 3, 6, 9 hrs etc...
-        start_hour = int((this_month + timedelta(hours=3) - epoch).total_seconds()/3600)
-            
-        # Last GOTM record time.
-        end_hour = int((next_month - epoch).total_seconds()/3600)
-
-        ## Find the number of days since the first day of year to infer indices of the records we want.        
-        first_day_of_year = datetime(this_month.year,1,1,0,0,0)
-        start_day = (this_month-first_day_of_year).days
-        end_day = (next_month-first_day_of_year).days
-        
-        ## Calculate indices of time to read in ERA data.
-        #
-        ## WT 2017037 Do not include previous record. Debugging hazard.
-        ## Include one previous record at 00:00:00 unless at beginning of year.
-        #start_ind = start_day*8 if month == 1 else start_day*8-1
-        
-        # A faithful copy of original ERA data.
-        start_ind = start_day*8
-        
-        # Total number of records should be (end_day-start_day)*8
-        end_ind = end_day*8
-        
-        ## WT 2017037 Skip this hassle!
-        ## Make doubly sure there's no time-shift by 3-hour periods!
-        #if month == 1:
-        #    assert end_ind - start_ind == nper
-        #else:
-        #    assert end_ind - start_ind == nper + 1
-        
-        assert end_ind - start_ind == nper
-
-        return start_hour, end_hour, start_ind, end_ind
-
     # Create the monthly files first with the basic dimensions.
-    for month in range(1,13):
-        # Output filename and full path.
-        outfn = 'medsea_ERA_{0:d}{1:02d}.nc'.format(year,month)
-        fullfile = os.path.join(data_folder,'medsea_ERA-INTERIM',outfn)
+    #for month in range(1,13):
+    #    # Output filename and full path.
+    #    outfn = 'medsea_ERA_{0:d}{1:02d}.nc'.format(year,month)
+    #    fullfile = os.path.join(data_folder,'medsea_ERA-INTERIM',outfn)
             
     # Iterate through the variables and append the data.
     for i,(name,alias) in enumerate(zip(ERA_names,ERA_alias)):
         # Fetch the yearly data in one go.
-        tic = time()
+        tic()
+        print("Reading in {:d}'s ERA-INTERIM data for {:s}...".format(year,name))
         data = get_ERA_yearly_data(ERA_folder,year,name,alias,ERA_lat_ind,ERA_lon_ind)
-        print("Took {:.4g}s to read in {:d}'s ERA-INTERIM data for '{:s}'".format(time()-tic,year,name))
+        toc()
         
+        # Output monthly and yearly files.
         for month in range(1,13):
+            tic()
+            print("Writing data for the month #{:d}...".format(month))
             # Output filename and full path.
             outfn = 'medsea_ERA_{0:d}{1:02d}.nc'.format(year,month)
             fullfile = os.path.join(data_folder,'medsea_ERA-INTERIM',outfn)
             # Interpretation of ERA data timings CRITICAL here to get these indices correct.
-            start_hour, end_hour, start_ind, end_ind = timings(month)
+            start_hour, end_hour, start_ind, end_ind = timings(month,epoch)
 
             if i == 0: # Creating the first variable.
                 # Start the nc file with the basic dimensions, overwriting existing file.
@@ -135,11 +141,10 @@ def ERA_reformat(year):
                     #print(fullfile + ' with time({}), lat({}), lon({}) set up.'.format(len(nctime),len(nclat),len(nclon)))
                 
             # Append the new variable.
-            tic = time()
             with Dataset(fullfile,"a") as nc:
                 ncvar = create_variable(nc,name,'f8')
                 ncvar[:] = data[start_ind:end_ind,:,:]
-        print("Took {:.4g}s to write '{:s}' values for all months.".format(time()-tic,name))
+            toc()
         
 if __name__ == '__main__':
     if len(sys.argv) == 1: # No arguments provided, assume 2013, 2014.
