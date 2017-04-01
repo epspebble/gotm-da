@@ -1337,13 +1337,17 @@ contains
        ! Along prime meridian, with theoretical timezone tz = 0, the only offset is due to eqtime. Elsewhere, it's the difference between the longitudinal minute and the timezone offset, which are also zeros at multiples of 15 degress if tz is the theoretical timezone only depending on longitude.
        tst_offset = eqtime + 4.0*lon - 60.0*tz(lon)
        call UTC_to_local(jul,secs,lon,ljul,lsecs) ! Get the local time no. of seconds since midnight.
-       tst = lsecs/60.0 + tst_offset ! Now add the offset.
-       if (tst > 86400) then
-          ! ignore the change in calendar date which does not affect the following
-          tst = tst - 86400 
-       else if (tst < 0 ) then
-          tst = tst + 86400
-       end if
+       tst = lsecs/60.0 + tst_offset ! True solar time, in minutes.
+
+       !WT No need for getting the true tst, ha differ by 360 degrees
+       ! after adjusting tst by 1440 minutes. It will not change value of cos(ha)
+       ! if (tst > 24*60) then
+       !    ! ignore the change in calendar date which does not affect the following
+       !    tst = tst - 24*60 
+       ! else if (tst < 0 ) then
+       !    tst = tst + 24*60
+       ! end if
+       
        !print *, "lsecs,tst_offset,tst",lsecs,tst_offset,tst
        !print *,"tst,solar_time",tst,solar_time
      

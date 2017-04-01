@@ -878,17 +878,17 @@ def gamma(ndays,nsecs):
     "Fractional solar year (in radians), which begins on Jan 1st noon. Assumes input in UTC."
     return 2*pi/yrdays(year)*(ndays+(nsecs/3600-12)/24)
 
-def eqtime(t):
-    "Equation of time (in minutes) as a function of fractional solar year (in radians)."
-    # The NOAA version has 0.000075 which, according to Spencer via ... is incorrect.
-    return 229.18*(0.0000075 + 0.001868*cos(t)   - 0.032077*sin(t) \
-                             - 0.014615*cos(2*t) - 0.040849*sin(2*t))
-
 def sundec(t):
     "Sun declination (in radians) as a function of fractional solar year (in radians)"
     return 0.006918 - 0.399912*cos(t) + 0.070257*sin(t) \
                     - 0.006758*cos(2*t) + 0.000907*sin(2*t) \
                     - 0.002697*cos(3*t) + 0.00148*sin(3*t)
+
+def eqtime(t):
+    "Equation of time (in minutes) as a function of fractional solar year (in radians)."
+    # The NOAA version has 0.000075 which, according to Spencer via ... is incorrect.
+    return 229.18*(0.0000075 + 0.001868*cos(t)   - 0.032077*sin(t) \
+                             - 0.014615*cos(2*t) - 0.040849*sin(2*t))
 
 def coszen_nv(ndays,nsecs,lat,lon):
     from numpy import pi
@@ -933,6 +933,7 @@ def swr_nv(ndays,nsecs,lat,lon):
     aozone = 0.09 # water vapour plus ozone absorption (0.09 used in Rossatti)
     solar = 1370  # solar constant
 
+    # Beware if called with a nsecs > 86400 or < 0 because of adjusting the timezone.
     if nsecs > 86400:
         ndays += 1
         nsecs -= 86400
