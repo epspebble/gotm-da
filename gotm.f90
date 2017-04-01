@@ -69,6 +69,10 @@ module gotm
   integer, parameter                  :: unit_sediment=61
 
   integer, parameter                  :: unit_seagrass=62
+
+  ! WT
+  integer, parameter                  :: unit_assim_event=71
+  integer, parameter                  :: unit_sst_event=72
   !
   ! !REVISION HISTORY:
   !  Original author(s): Karsten Bolding & Hans Burchard
@@ -108,8 +112,9 @@ module gotm
   double precision, public    :: advect(1:150)
   !SP 19/09/05 test   
   double precision            :: j_one,j_one_b,j_two,j_three,j_four,j_five
-  !WT 2016-09-24 Debug
-  character(len=19) :: assim_timestr
+  !WT 20170331 temporary variables
+  character(len=19) :: timestr
+  logical :: first
 
   !
   !-----------------------------------------------------------------------
@@ -169,7 +174,7 @@ contains
 
     write(0,*) '       ', trim(title)
     write(0,*) '       ', 'Using ',nlev,' layers to resolve a depth of',depth
-    write(0,*) '       ', 'The station ',trim(name),' is situated at (lat,long) ', &
+    write(0,*) '       ', 'The station ',trim(name),' is located at (lat,long) ', &
          latitude,longitude
     write(0,*) '       ', trim(name)
 
@@ -273,7 +278,7 @@ contains
     !
     !-----------------------------------------------------------------------
     !BOC
-    write(0,*) '   ', 'time_loop'
+
     !SP 30/01/06 calculate local time based on longitude
     !This assumes that gotmrun.inp starts at midnight
     !if (longitude.gt.352) then
@@ -382,9 +387,14 @@ contains
     !	CLOSE (UNIT=73)
     !SP 03/04/06 end print out initial state
 
-    ! Initialize day_cycle and mark to 0.
-    day_cycle = 0
+    ! Initialize by theoretical timezone.
+    day_cycle = tz(lon)*120 ! Assume timestep = 30 seconds
+    if day_cycle < 0 then
+       day_cycle = day_cycle + 2880
+    endif
     mark = 0
+
+    write(0,*) '   ', 'time_loop'
     do n=MinN,MaxN
 512    continue     
 
@@ -469,10 +479,16 @@ contains
           endif
 
           ! restart day_cycle
-          if (day_cycle.eq.2880) then
+          if (day_cycle.eq.2880) .and. (not(first)) then
+      
              if (mark.ne.1) then
                 stop "Assimilation not performed in one full cycle. STOP"
              endif
+
+             ! Look for assimilation failures beginning after the first local midnight.
+             first = .false.
+             
+             ! Reset counters at local midnight.
              day_cycle = 0
              mark = 0
           endif
@@ -524,7 +540,6 @@ contains
        !      s=sprof
        !end SP
        if (t_prof_method .ne. 0.) then
-
           !SP comment below if want persistence only (i.e. null hypothesis)
           call temperature(nlev,dt,cnpar,I_0,heat,advect,qdir_frac,qdiff_frac,cosr,nuh,rad)
        end if
@@ -818,8 +833,8 @@ contains
           S(i)=sprof(i)
        end do
        !WT 2016-09-24
-       call write_time_string(julianday,secondsofday,assim_timestr)
-       print *,'Temperature and salinity profiles assimilated at ', assim_timestr
+       call write_time_string(julianday,secondsofday,timestr)
+       write *,'Temperature and salinity profiles assimilated at ', timestr
     end if
     !end without averaging
 
