@@ -614,7 +614,9 @@ def mn_dat(m,n):
 
     for dat_fn, nc in nc_dict.items():
         write_dat(m,n,dat_fn,nc,local_folder)
-
+        
+    for nc in nc_dict.values():
+        nc.close()
 
 def core_dat(year,month,m,n,**nc_dict):
     """
