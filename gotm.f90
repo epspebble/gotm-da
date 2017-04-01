@@ -182,6 +182,12 @@ contains
          latitude,longitude
     write(0,*) '       ', trim(name)
 
+    ! WT 20170331
+    ! Open the extra files to store daily assimilation and SST events.
+    print *, 'Writing events to ',trim(assim_event_fn), ' and ', trim(sst_event_fn), '... '
+    open(unit=unit_assim_event,file=assim_event_fn,status='replace')
+    open(unit=unit_sst_event,file=sst_event_fn,status='replace')
+
     write(0,*) '       ', 'initializing modules....'
     call init_time(MinN,MaxN)
     call init_eqstate(namlst)
@@ -209,12 +215,6 @@ contains
          gravity,rho_0)
 
     call init_seagrass(namlst,'seagrass.inp',unit_seagrass,nlev,h)
-
-    ! WT 20170331
-    ! Open the extra files to store daily assimilation and SST events.
-    print *, 'Writing events to ',assim_event_fn, ' and ', sst_event_fn
-    open(unit=unit_assim_event,file=assim_event_fn,status='replace')
-    open(unit=unit_sst_event,file=sst_event_fn,status='replace')
 
     write(0,*) '       ', 'done.'
     write(0,*) "------------------------------------------------------------------------"
