@@ -381,7 +381,7 @@ def print_lat_lon(lat,lon,fmt_str='.2f'):
     return lat_str + lon_str
 
 def print_ctime(dt=datetime.now(),sep=' '):
-    return strftime('%Y%m%d' + sep + '%H%M%S')
+    return dt.strftime('%Y%m%d' + sep + '%H%M%S')
 
 def get_m_n(lat,lon):
     "Return the grid index (m,n) given latlong."
@@ -707,16 +707,17 @@ def local_run(year,month,m,n,run,verbose=False,**gotm_user_args):
         logfn = 'GOTM_' + print_ctime(sep='_') + '.log'
         gotm(verbose=verbose, logfn=logfn, run_folder = local_folder, varsout = {})
         stat['elapsed'] = toc()
-        statfn = 'stat-{:d}{:02d}.dat'.format(year,month)
+        statfn = 'stat_{:d}{:02d}.dat'.format(year,month)
         with open(statfn,'a') as f:
-            print('Writing diagnostic statistics to {0}...'.format(statfn))
+            print('Writing diagnostic statistics to {0}...\n'.format(statfn))
+            f.write('--------------------------------------------------------------\n')
             f.write('Run parameters:\n')
             for key, val in gotm_args.items():
-                f.write('{:s} = {!s}'.format(key,val))
-            f.write('--------------------------------------------------------------')
+                f.write('    {:s} = {!s}\n'.format(key,val))
+            f.write('--------------------------------------------------------------\n')
             f.write('Run statistics:\n')
-            f.write('Elapsed: {:.2f} s.'.format(stat['elapsed']))
-            f.write('--------------------------------------------------------------')
+            f.write('Elapsed: {:.2f} seconds.\n'.format(stat['elapsed']))
+            f.write('--------------------------------------------------------------\n')
             f.write('Data statisitics:\n')
             with Dataset(os.path.join(local_folder,gotm_args['out_fn']+'.nc'),'r') as ds:
                 sst = ds['sst'][:]
@@ -727,9 +728,10 @@ def local_run(year,month,m,n,run,verbose=False,**gotm_user_args):
                             sst_min = sst.min(),
                             sst_time_min = num2date(time[sst.argmin()],time.units))
                 f.write('   SST:\n')
-                f.write('      Mean: {sst_mean:.4g}'.format(**stat))
-                f.write('      Max: {sst_max:.4g} at {sst_time_max:s}'.format(**stat))
-                f.write('      Min: {sst_min:.4g} at {sst_time_min:s}\n'.format(**stat))
+                f.write('      Mean: {sst_mean:.4g}\n'.format(**stat))
+                f.write('      Max: {sst_max:.4g} at {sst_time_max!s}\n'.format(**stat))
+                f.write('      Min: {sst_min:.4g} at {sst_time_min!s}\n'.format(**stat))
+            f.write('--------------------------------------------------------------\n')
     except:
         raise
     return stat
