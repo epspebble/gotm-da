@@ -33,7 +33,11 @@ NETCDFLIB = libnetcdf.a # Build it and copy it to our working folder
 
 #Intel Fortran  compiler for 
 FC    = ifort
-FFLAGS = -I$(NETCDFINCDIR)
+#FFLAGS=-g -fbacktrace -ffpe-trap=zero,overflow,underflow
+#FFLAGS=-g -fbacktrace -ffpe-trap=overflow,underflow
+FFLAGS=-g -fbacktrace
+## No more need.
+#FFLAGS = -I$(NETCDFINCDIR)
 
 #Mac Fortran  compiler for 
 #FC    = gfortran

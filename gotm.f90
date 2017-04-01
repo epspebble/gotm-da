@@ -70,7 +70,7 @@ module gotm
 
   integer, parameter                  :: unit_seagrass=62
 
-  ! WT
+  ! WT 20170331
   integer, parameter                  :: unit_assim_event=71
   integer, parameter                  :: unit_sst_event=72
   !
@@ -112,9 +112,12 @@ module gotm
   double precision, public    :: advect(1:150)
   !SP 19/09/05 test   
   double precision            :: j_one,j_one_b,j_two,j_three,j_four,j_five
+
   !WT 20170331 temporary variables
-  character(len=19) :: timestr
+  character(len=19) :: tmp_str
   logical :: first
+  double precision            :: sst_save=0., d_sst=0.
+  
 
   !
   !-----------------------------------------------------------------------
@@ -153,7 +156,8 @@ contains
     namelist /time/        timefmt,MaxN,start,stop
     namelist /output/      out_fmt,out_dir,out_fn,nsave,variances, &
          diagnostics,mld_method,diff_k,Ri_crit,rad_corr, &
-         assimilation_type,cloud_gradient,sst_obs,profile_obs,obs_level,assim_window    !SP
+         assimilation_type,cloud_gradient,sst_obs,profile_obs,obs_level,assim_window, &    !SP
+         assim_event_fn, sst_event_fn !WT 20170331
     !   integer                ::count,ios
     !
     !-----------------------------------------------------------------------
@@ -206,6 +210,12 @@ contains
 
     call init_seagrass(namlst,'seagrass.inp',unit_seagrass,nlev,h)
 
+    ! WT 20170331
+    ! Open the extra files to store daily assimilation and SST events.
+    print *, 'Writing events to ',assim_event_fn, ' and ', sst_event_fn
+    open(unit=unit_assim_event,file=assim_event_fn,status='replace')
+    open(unit=unit_sst_event,file=sst_event_fn,status='replace')
+
     write(0,*) '       ', 'done.'
     write(0,*) "------------------------------------------------------------------------"
 
@@ -225,6 +235,7 @@ contains
     stop 'init_gotm'
 96  write(0,*) 'FATAL ERROR: ', 'I could not read the "turbulence" namelist'
     stop 'init_gotm'
+    
   end subroutine init_gotm
   !EOC
 
@@ -388,8 +399,8 @@ contains
     !SP 03/04/06 end print out initial state
 
     ! Initialize by theoretical timezone.
-    day_cycle = tz(lon)*120 ! Assume timestep = 30 seconds
-    if day_cycle < 0 then
+    day_cycle = tz(longitude)*120 ! Assume timestep = 30 seconds
+    if (day_cycle < 0) then
        day_cycle = day_cycle + 2880
     endif
     mark = 0
@@ -474,12 +485,13 @@ contains
                    call assimilation(T(1:nlev),S(1:nlev),tprof(1:nlev),sprof(1:nlev),cloud,advect,int_cs)
                    mark = 1
                 endif
+                
              end select
 
           endif
 
           ! restart day_cycle
-          if (day_cycle.eq.2880) .and. (not(first)) then
+          if ((day_cycle.eq.2880) .and. (.not.(first))) then
       
              if (mark.ne.1) then
                 stop "Assimilation not performed in one full cycle. STOP"
@@ -492,7 +504,10 @@ contains
              day_cycle = 0
              mark = 0
           endif
+          
        endif
+       
+       
 
        !SP 17/10/05 evaluate cost function
 
@@ -547,6 +562,8 @@ contains
        !start SP : use if want all available observed temp profiles
        !      T=tprof
        !end SP
+
+       call sst_event(T(nlev))
 
        call integrated_fluxes(dt,int_cs)       !SP previously below do_output 18/05/05
 
@@ -833,8 +850,9 @@ contains
           S(i)=sprof(i)
        end do
        !WT 2016-09-24
-       call write_time_string(julianday,secondsofday,timestr)
-       write *,'Temperature and salinity profiles assimilated at ', timestr
+       call write_time_string(julianday,secondsofday,tmp_str)
+       write(unit_assim_event,*) tmp_str, T(nlev), S(nlev)
+       ! write(0,*) 'Temperature and salinity profiles assimilated at ', tmp_str
     end if
     !end without averaging
 
@@ -871,7 +889,24 @@ contains
 
   end function mld
 ! END Prospective assimilation module portion.
+
+  ! BEGIN Prospective event handling module.
+  subroutine sst_event(sst)
+    ! !DESCRIPTION:
+    ! This function detects sst turnaround, and write time and temperature to a file.
+    double precision :: sst
+    if (sign(1.0d0,sst-sst_save) * sign(1.0d0,d_sst) .eq. -1.0d0) then ! sign change in two immedaite time steps
+       call write_time_string(julianday,secondsofday,tmp_str)
+       write(0,*) "SST turnaround occurs at ", tmp_str, sst
+       write(unit_sst_event,*) tmp_str, sst
+    endif
+    
+    d_sst = sst - sst_save    
+    sst_save = sst
+    
+  end subroutine sst_event
   
+  ! END Prospective event handling module.
   !-----------------------------------------------------------------------
   !BOP
   !
