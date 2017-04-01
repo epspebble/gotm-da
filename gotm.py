@@ -221,8 +221,14 @@ def gotm(varsout = {}, run_folder = '.', verbose = False, logfn = 'gotm.log',
     fn = getval(loadcfg(verbose=False),'out_fn') + '.nc'
     with Dataset(os.path.join(dr,fn),'r') as results:
         #print('len of time in results = ',len(results['time'])>0)
-        if len(results['time']) == 0:
+        nrec = len(results['time'])
+        if nrec == 0:
             raise Exception("Invalid GOTM results! Time dimension is empty. GOTM failed?")
+        print('Printing diagnostic statistics...')
+        print('Mean SST: {:.4g}'.format(results['sst'][:].mean()))
+        print('Max SST: {:.4g}'.format(results['sst'][:].max()))
+        print('Min SST: {:.4g}\n'.format(results['sst'][:].min()))
+
         #dims = set()
         #varsout = set(varsout)
         #for var in varsout:
@@ -321,8 +327,6 @@ def updatecfg(path='.', inp_backup = False, verbose = True, **kwargs):
         if verbose:
             if inp_backup:
                 print('A backup set of namelists saved at ' + timestr)
-            print('GOTM config updated by patching.')
-            
     return 
 
 def getval(gotm_cfg, key):
@@ -450,6 +454,21 @@ def prepare_engine():
 
 
 ## Medsea parallel run toolbox
+def get_local_folder(lat,lon,run):
+    "Return the corresponding local folder for given given grid point for the given run code."
+    # Temporary hack, be forgiving if the provided lat, lon are actually indices of our medsea grid.
+    if isinstance(lat,int):
+        lat = medsea_lats[lat]
+    if isinstance(lon,int):
+        lon = medsea_lons[lon]
+        
+    latlong = print_lat_lon(lat,lon)
+    local_folder = os.path.join(base_folder,run,latlong)
+    if not(os.path.isdir(local_folder)):
+        raise IOError("The local folder {:s} is not found. Have you run local_dat()?".format(local_folder))
+    #     os.mkdir(local_folder)
+    return local_folder 
+
 def get_core_folder(year,month,lat,lon):
     """ Create folder structure initially or mid-way (if not yet done). 
         The innermost subfolder, which is called 'core_folder' is 
@@ -574,7 +593,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
 
     print('Done writing {}.\n'.format(fn))
 
-def mn_dat(m,n):
+def local_dat(m,n,run='default'):
     """
     Generate *.dat files from all available data. See core_dat() for other explanations.
     """
@@ -587,11 +606,11 @@ def mn_dat(m,n):
     lat = medsea_lats[m]
     lon = medsea_lons[n]
 
-    run_by_lat_lon_folder = os.path.join(run_folder,'by_lat_lon')
-    if not(os.path.isdir(run_by_lat_lon_folder)):
-        os.mkdir(run_by_lat_lon_folder)
+    run_folder = os.path.join(base_folder,run)
+    if not(os.path.isdir(run_folder)):
+        os.mkdir(run_folder)
 
-    local_folder = os.path.join(run_by_lat_lon_folder,print_lat_lon(lat,lon))
+    local_folder = os.path.join(run_folder,print_lat_lon(lat,lon))
     if not(os.path.isdir(local_folder)):
         os.mkdir(local_folder)
 
@@ -638,6 +657,55 @@ def core_dat(year,month,m,n,**nc_dict):
         # print(dat_fn)
         write_dat(m,n,dat_fn,nc,core_folder)
     return
+
+def prepare_run(start,stop,out_dir,out_fn='results',m=None,n=None,lat=None,lon=None, **gotm_user_args):
+    "Transfer config files and GOTM executable to the folder in which GOTM will be run."
+    import shutil
+    # Determine the grid point location.
+    if (m is None) and (n is None):
+        (m,n) = get_m_n(lat,lon)
+    if (lat is None) and (lon is None):
+        (lat,lon) = get_lat_lon(m,n)
+    latlong = print_lat_lon(lat,lon)        
+    run_name = 'medsea_GOTM, #(m,n)=({1:d},{2:d})'.format(latlong,m,n)    
+
+    # Set up GOTM arguments.
+    gotm_args = dict(name = run_name,
+                     start = str(start), stop = str(stop), 
+                     latitude = float(lat), longitude = float(lon), 
+                     out_dir = str(out_dir), out_fn = out_fn)
+    gotm_args.update(**gotm_user_args) 
+
+    # Copy over GOTM executable and config files, the latter to be updated when gotm() is called.
+    if not(os.path.exists(GOTM_executable)):
+        os.symlink(GOTM_executable,os.path.join(folder,'gotm'))    
+    for each in GOTM_nml_list:
+        # All config files are overwritten every time GOTM is run.
+        shutil.copyfile(os.path.join(GOTM_nml_path,each),os.path.join(out_dir,each))       
+    return updatecfg(path=out_dir, **gotm_args)
+
+def local_run(year,month,m,n,run,verbose=True,**gotm_user_args):
+    """ 
+    
+    Generate GOTM results for the (m,n)-th grid point with all data available. Only *.dat files are expected to be 
+    in the local folder. The config file, GOTM run time will be generated or copied over. 
+    
+    """
+    from datetime import datetime
+    lat, lon = get_lat_lon(m,n)
+    local_folder = get_local_folder(lat,lon,run)
+    start = datetime(year,month,1);
+    stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)
+    prepare_run(start,stop,local_folder,lat=lat,lon=lon,out_fn='results-{:d}{:02d}'.format(year,month),**gotm_user_args)
+    os.chdir(local_folder)
+    try:
+        tic()
+        print('GOTM running at ' + local_folder + '...')
+        logfn = 'GOTM_' + datetime.now().strftime("%Y%m%d_%H%M%S") + '.log'
+        gotm(verbose=verbose, logfn=logfn, run_folder = local_folder, varsout = {})
+        elapsed = toc()
+    except:
+        raise
 
 def core_run(year,month,m=None,n=None,lat=None,lon=None,verbose=False,**gotm_user_args):
     """ Generate GOTM results for the (m,n)-th grid point for a specified month in the 21x57 (lat,long) medsea grid. 
