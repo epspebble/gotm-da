@@ -7,6 +7,7 @@ except NameError:
 
 ### Global settings
 import os
+from datetime import datetime
 from numpy import pi, cos, sin
 
 ## For general GOTM setup
@@ -182,7 +183,7 @@ def run_command(cmd, output='PIPE'):
 def gotm(varsout = {}, run_folder = '.', verbose = False, logfn = 'gotm.log',
          GOTM_executable = GOTM_executable, GOTM_nml_templates_path = None, inp_backup = False, **gotm_args):
     """ Runs GOTM in with extra functions. """
-    import os, shutil
+    import os, shutil, time
     
     # Use default templates if not user-specified.
     if GOTM_nml_templates_path is None:
@@ -211,7 +212,6 @@ def gotm(varsout = {}, run_folder = '.', verbose = False, logfn = 'gotm.log',
     else:
         with open(logfn,'w') as logfile:
             run_command(GOTM_executable,output=logfile)
-    
     # Return to the original working directory.
     os.chdir(home)
     
@@ -224,11 +224,7 @@ def gotm(varsout = {}, run_folder = '.', verbose = False, logfn = 'gotm.log',
         nrec = len(results['time'])
         if nrec == 0:
             raise Exception("Invalid GOTM results! Time dimension is empty. GOTM failed?")
-        print('Printing diagnostic statistics...')
-        print('Mean SST: {:.4g}'.format(results['sst'][:].mean()))
-        print('Max SST: {:.4g}'.format(results['sst'][:].max()))
-        print('Min SST: {:.4g}\n'.format(results['sst'][:].min()))
-
+        
         #dims = set()
         #varsout = set(varsout)
         #for var in varsout:
@@ -270,7 +266,7 @@ def writecfg(gotm_cfg, path='.', inp_backup = False, verbose = True):
     from os.path import exists, join
     from os import rename
     from datetime import datetime
-    timestr = datetime.now().strftime("%Y%m%dT%H%M%S") 
+    timestr = print_ctime(sep='_')
     for eachnml in GOTM_nml_list:
         fullfile = join(path,eachnml)
         if exists(fullfile) and inp_backup:
@@ -317,7 +313,7 @@ def updatecfg(path='.', inp_backup = False, verbose = True, **kwargs):
     newcfg = recursively_update(loadcfg(path=path, verbose=False), **kwargs)
     for eachnml in GOTM_nml_list:
         inp = join(path,eachnml)
-        timestr = datetime.now().strftime("%Y%m%dT%H%M%S")
+        timestr = print_ctime(sep='_')
         inpbkp = inp[:-4] + '_' + timestr + '.inp'
         rename(inp,inpbkp) 
         f90nml.patch(inpbkp,newcfg[eachnml],inp)
@@ -383,6 +379,9 @@ def print_lat_lon(lat,lon,fmt_str='.2f'):
     lon_str = template.format(lon) + 'E' if lon>=0 else template.format(-lon) + 'W'
     #return lat_str + ' ' + lon_str
     return lat_str + lon_str
+
+def print_ctime(dt=datetime.now(),sep=' '):
+    return strftime('%Y%m%d' + sep + '%H%M%S')
 
 def get_m_n(lat,lon):
     "Return the grid index (m,n) given latlong."
@@ -682,9 +681,11 @@ def prepare_run(start,stop,out_dir,out_fn='results',m=None,n=None,lat=None,lon=N
     for each in GOTM_nml_list:
         # All config files are overwritten every time GOTM is run.
         shutil.copyfile(os.path.join(GOTM_nml_path,each),os.path.join(out_dir,each))       
-    return updatecfg(path=out_dir, **gotm_args)
+    
+    updatecfg(path=out_dir, **gotm_args)
+    return gotm_args
 
-def local_run(year,month,m,n,run,verbose=True,**gotm_user_args):
+def local_run(year,month,m,n,run,verbose=False,**gotm_user_args):
     """ 
     
     Generate GOTM results for the (m,n)-th grid point at the specified month. Only *.dat files are expected to be 
@@ -692,20 +693,46 @@ def local_run(year,month,m,n,run,verbose=True,**gotm_user_args):
     
     """
     from datetime import datetime
+    from netCDF4 import Dataset, num2date
     lat, lon = get_lat_lon(m,n)
     local_folder = get_local_folder(lat,lon,run)
     start = datetime(year,month,1);
     stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)
-    prepare_run(start,stop,local_folder,lat=lat,lon=lon,out_fn='results-{:d}{:02d}'.format(year,month),**gotm_user_args)
+    gotm_args = prepare_run(start,stop,local_folder,lat=lat,lon=lon,out_fn='results-{:d}{:02d}'.format(year,month),**gotm_user_args)
     os.chdir(local_folder)
+    stat = dict()
     try:
         tic()
         print('GOTM running at ' + local_folder + '...')
-        logfn = 'GOTM_' + datetime.now().strftime("%Y%m%d_%H%M%S") + '.log'
+        logfn = 'GOTM_' + print_ctime(sep='_') + '.log'
         gotm(verbose=verbose, logfn=logfn, run_folder = local_folder, varsout = {})
-        elapsed = toc()
+        stat['elapsed'] = toc()
+        statfn = 'stat-{:d}{:02d}.dat'.format(year,month)
+        with open(statfn,'a') as f:
+            print('Writing diagnostic statistics to {0}...'.format(statfn))
+            f.write('Run parameters:\n')
+            for key, val in gotm_args.items():
+                f.write('{:s} = {!s}'.format(key,val))
+            f.write('--------------------------------------------------------------')
+            f.write('Run statistics:\n')
+            f.write('Elapsed: {:.2f} s.'.format(stat['elapsed']))
+            f.write('--------------------------------------------------------------')
+            f.write('Data statisitics:\n')
+            with Dataset(os.path.join(local_folder,gotm_args['out_fn']+'.nc'),'r') as ds:
+                sst = ds['sst'][:]
+                time = ds['time']
+                stat.update(sst_mean = sst.mean(),
+                            sst_max = sst.max(),
+                            sst_time_max = num2date(time[sst.argmax()],time.units),
+                            sst_min = sst.min(),
+                            sst_time_min = num2date(time[sst.argmin()],time.units))
+                f.write('   SST:\n')
+                f.write('      Mean: {sst_mean:.4g}'.format(**stat))
+                f.write('      Max: {sst_max:.4g} at {sst_time_max:s}'.format(**stat))
+                f.write('      Min: {sst_min:.4g} at {sst_time_min:s}\n'.format(**stat))
     except:
         raise
+    return stat
 
 def core_run(year,month,m=None,n=None,lat=None,lon=None,verbose=False,**gotm_user_args):
     """ Generate GOTM results for the (m,n)-th grid point for a specified month in the 21x57 (lat,long) medsea grid. 
@@ -751,7 +778,7 @@ def core_run(year,month,m=None,n=None,lat=None,lon=None,verbose=False,**gotm_use
     os.chdir(core_folder)   
     try:
         print('GOTM run: ' + run_name + '...')
-        logfn = 'GOTM_' + datetime.now().strftime("%Y%m%d_%H%M%S") + '.log'
+        logfn = 'GOTM_' + print_ctime(sep='_') + '.log'
         gotm(verbose=verbose, logfn=logfn, run_folder = core_folder, varsout = {}, **gotm_args)
     except:
         os.chdir(base_folder)
