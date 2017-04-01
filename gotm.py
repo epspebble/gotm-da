@@ -687,7 +687,7 @@ def prepare_run(start,stop,out_dir,out_fn='results',m=None,n=None,lat=None,lon=N
 def local_run(year,month,m,n,run,verbose=True,**gotm_user_args):
     """ 
     
-    Generate GOTM results for the (m,n)-th grid point with all data available. Only *.dat files are expected to be 
+    Generate GOTM results for the (m,n)-th grid point at the specified month. Only *.dat files are expected to be 
     in the local folder. The config file, GOTM run time will be generated or copied over. 
     
     """
