@@ -438,7 +438,12 @@ contains
        call flux_from_meteo(jul,secs)     
     end if
 
-    call short_wave_radiation(jul,secs,alat,alon)  !SP placed comment here
+    !WT Need to output I_0_calc? otherwise it stays 0!
+    print *,'Before calling short_wave_radiation()...'
+    print *,'I_0_calc=',I_0_calc
+    call short_wave_radiation(jul,secs,alat,alon)
+    print *,'After...'
+    print *,'I_0_calc=',I_0_calc
 
     !Net shortwave radiation
     !  I_0=I_0_calc
@@ -448,6 +453,9 @@ contains
     case (CONSTVAL)
        heat=const_qout
     case (FROMFILE)
+       !WT 20170402 With the precomputation of cloud_factor, the "adjustment" column, which is
+       ! the ERA swrd values are not used at all, and they have been used when cloud_factor was
+       ! calculated.
        call read_heat_flux(jul,secs,adjustment,cloud_factor,qb_down)
     case default
     end select
@@ -1204,7 +1212,7 @@ contains
        integer                           :: ljul, lsecs !local time
        integer                           :: jul0, jul1 !temp vars
        double precision                  :: yrdays,days,hours !WT renamed hour to hours
-       
+
        double precision                  :: tjul
        double precision           ::alpha(1:480)
 
@@ -1235,7 +1243,7 @@ contains
        lon = alon / deg2rad
        lat = alat / deg2rad
 
-       !!! WT 20170316 The sundec formula below is defined from the UTC time zone.
+!!! WT 20170316 The sundec formula below is defined from the UTC time zone.
        !   The following effort to to find local values of date and times in hours,
        !   number of seconds since midnight etc... are no longer necessary.
        !
@@ -1269,7 +1277,7 @@ contains
        !
        ! !!! WT End of the previous calculations using local timezone.
 
-       !!! Calculation of true solar time to find clear sky value of solar SWR, I_0_calc
+!!! Calculation of true solar time to find clear sky value of solar SWR, I_0_calc
        !
        ! Sources:
        ! https://www.esrl.noaa.gov/gmd/grad/solcalc/solareqns.PDF
@@ -1287,16 +1295,16 @@ contains
        call julian_day(yyyy,1,1,jul0) ! jul0 = julian day number of the first day of year.
        days = jul - jul0 ! = day_of_year-1 = 0 for the first day yyyy:01-01
        hours = 1.*secs/3600. ! hours should be UTC decimal time
-       
+
        ! 3. The fractional solar year (\gamma) in solareqns.pdf, which begins noon on civil New Year Day. 
        gamma = (2.*pi/yrdays)*(days+((hours-12)/24))  
-      
+
        ! 4. Finding sun declination, the angle between the equator and sun ray.
        ! The Spencer formula (Spencer, 1971):
        decl = 0.006918 - 0.399912*cos(gamma)    + 0.070257*sin(gamma)        &
-                       - 0.006758*cos(2.*gamma) + 0.000907*sin(2.*gamma)     &
-                       - 0.002697*cos(3.*gamma) + 0.001480*sin(3.*gamma)  ! in radians
- 
+            - 0.006758*cos(2.*gamma) + 0.000907*sin(2.*gamma)     &
+            - 0.002697*cos(3.*gamma) + 0.001480*sin(3.*gamma)  ! in radians
+
        !th0 = (2.*pi/yrdays)*(days-1+((hour-12)/24))  ! hour should be UTC decimal time
        !! An alternative (crude)
        !!th0 = 2.*pi*days/yrdays
@@ -1315,7 +1323,7 @@ contains
        ! * the erroneous coefficient 0.000075 is reproduced in multiple documents, including the NOAA pdf quoted above.
        !eqtime = 229.18*(0.0000075+0.001868*cos(th0)-0.032077*sin(th0)-0.014615*cos(th02)-0.040849*sin(th02))  ! in minutes
        eqtime = 229.18*(0.0000075 + 0.001868*cos(gamma)    - 0.032077*sin(gamma) &
-                                  - 0.014615*cos(2.*gamma) - 0.040849*sin(2.*gamma))  ! in minutes
+            - 0.014615*cos(2.*gamma) - 0.040849*sin(2.*gamma))  ! in minutes
        ! An alternative
        !IF ((days.GE.1).AND.(days.LE.106)) THEN
        !    eqtime = -14.2*sin(pi*(days+7.)/111.)
@@ -1347,10 +1355,10 @@ contains
        ! else if (tst < 0 ) then
        !    tst = tst + 24*60
        ! end if
-       
+
        !print *, "lsecs,tst_offset,tst",lsecs,tst_offset,tst
        !print *,"tst,solar_time",tst,solar_time
-     
+
        !  sun hour angle :
        !   thsun = (hour-12.)*15.*deg2rad + alon
        !thsun = (hour-12.)*15.*deg2rad
@@ -1363,7 +1371,7 @@ contains
        ha = (tst/4-180)*deg2rad ! radians
        !print *,"thsun,ha,thsun-ha",thsun,ha,thsun-ha
        !PRINT*, thsun
-       
+
        ! 7. Cosine of the solar zenith angle
        !(Rosati(88) eq. 3.4 :
        !coszen =sin(alat)*sin(sundec)+cos(alat)*cos(sundec)*cos(thsun)
@@ -1373,7 +1381,7 @@ contains
        !We could also use NREL's solpos C code also if we know how to recompile everything in separate dynamic linkable
        !library files. 
 
-       
+
        if (coszen .le. 0.0) then
           coszen = 0.0           !SP-this is when sun is below horizon
           qatten = 0.0           !i.e between dusk and dawn
@@ -1444,480 +1452,480 @@ contains
 
        return
      end subroutine short_wave_radiation
-!EOC
+     !EOC
 
-!-----------------------------------------------------------------------
-!BOP
-!
-! !IROUTINE: Read meteo data, interpolate in time
-!
-! !INTERFACE:
-   subroutine flux_from_meteo(jul,secs)
-!
-! !DESCRIPTION:
-!  This routine reads meteo data from a file and calculates the 
-!  fluxes of heat and momentum, and the
-!  short--wave radiation, from these data as described in 
-!  \sect{sec:calcCoeff}, \sect{sec:calcFluxes}, and \sect{sec:swr}.
-!  Then, the results are interpolated in time.
+     !-----------------------------------------------------------------------
+     !BOP
+     !
+     ! !IROUTINE: Read meteo data, interpolate in time
+     !
+     ! !INTERFACE:
+     subroutine flux_from_meteo(jul,secs)
+       !
+       ! !DESCRIPTION:
+       !  This routine reads meteo data from a file and calculates the 
+       !  fluxes of heat and momentum, and the
+       !  short--wave radiation, from these data as described in 
+       !  \sect{sec:calcCoeff}, \sect{sec:calcFluxes}, and \sect{sec:swr}.
+       !  Then, the results are interpolated in time.
 
-!
-! !USES:
-   IMPLICIT NONE
-!
-! !INPUT PARAMETERS:
-   integer, intent(in)                 :: jul,secs
-!
-! !REVISION HISTORY:
-!  Original author(s): Karsten Bolding
-!
-!  See log for airsea module
-!
+       !
+       ! !USES:
+       IMPLICIT NONE
+       !
+       ! !INPUT PARAMETERS:
+       integer, intent(in)                 :: jul,secs
+       !
+       ! !REVISION HISTORY:
+       !  Original author(s): Karsten Bolding
+       !
+       !  See log for airsea module
+       !
 !!!!! SH - 11/08/2003 - removed calculated short wave from this routine - not needed
-! model calculated I_0 is better that linear interpolation
-! Probably was here for completeness but interferes with full range of flux permutations 
-!
+       ! model calculated I_0 is better that linear interpolation
+       ! Probably was here for completeness but interferes with full range of flux permutations 
+       !
 
-!EOP
-!
-! !LOCAL VARIABLES:
-   integer                   :: yy,mm,dd,hh,min,ss
-   double precision                  :: t
-   double precision, SAVE            :: dt
-   integer, save             :: meteo_jul1,meteo_secs1
-   integer, save             :: meteo_jul2=0,meteo_secs2=0
-   double precision, save            :: obs(6)
+       !EOP
+       !
+       ! !LOCAL VARIABLES:
+       integer                   :: yy,mm,dd,hh,min,ss
+       double precision                  :: t
+       double precision, SAVE            :: dt
+       integer, save             :: meteo_jul1,meteo_secs1
+       integer, save             :: meteo_jul2=0,meteo_secs2=0
+       double precision, save            :: obs(6)
 
-!HK: changed alpha(4) to alpha(6)
-   double precision, save            :: alpha(9)
+       !HK: changed alpha(4) to alpha(6)
+       double precision, save            :: alpha(9)
 
-!HK added :
-   double precision         :: wx1,wx2,wy1,wy2
-!SP added :
-   double precision,save         :: qb1,qb2=0.,qh1,qh2=0.,qe1,qe2=0.
-   integer, save                 :: count,count2
-   integer                       :: count3,ios
-   double precision              :: sst_obs
-   
-   double precision, save            :: I1,h1,tx1,ty1
-   double precision, save            :: I2=0.,h2=0.,tx2=0.,ty2=0.
-   logical, save             :: first=.true.
-   integer                   :: rc
-   integer             ::loop_counter=0
+       !HK added :
+       double precision         :: wx1,wx2,wy1,wy2
+       !SP added :
+       double precision,save         :: qb1,qb2=0.,qh1,qh2=0.,qe1,qe2=0.
+       integer, save                 :: count,count2
+       integer                       :: count3,ios
+       double precision              :: sst_obs
 
-!
+       double precision, save            :: I1,h1,tx1,ty1
+       double precision, save            :: I2=0.,h2=0.,tx2=0.,ty2=0.
+       logical, save             :: first=.true.
+       integer                   :: rc
+       integer             ::loop_counter=0
+
+       !
 
 
-!-----------------------------------------------------------------------
-!BOC
+       !-----------------------------------------------------------------------
+       !BOC
 
-!  This part initialises and reads in new values if necessary
-   if(time_diff(meteo_jul2,meteo_secs2,jul,secs) .lt. 0) then
-      do
-         meteo_jul1 = meteo_jul2
-         meteo_secs1 = meteo_secs2
-         call read_obs(meteo_unit,yy,mm,dd,hh,min,ss,6,obs,rc)
-         call julian_day(yy,mm,dd,meteo_jul2)
-         meteo_secs2 = hh*3600 + min*60 + ss
-         if(time_diff(meteo_jul2,meteo_secs2,jul,secs) .gt. 0) EXIT
-      end do
-   end if           !SP I added this so that the fluxes are calculated each time step with a new sst, if using must comment out end if below.
-      wx    = obs(1)
-      wy    = obs(2)
-      wx_obs=obs(1)
-      wy_obs=obs(2)
-      airp  = obs(3)*100. !kbk mbar/hPa --> Pa
-      airt  = obs(4)
-      spec_hum = obs(5)
-!      dew_pt = obs(5)
-!      rh    = obs(5)
-      cloud = obs(6)
+       !  This part initialises and reads in new values if necessary
+       if(time_diff(meteo_jul2,meteo_secs2,jul,secs) .lt. 0) then
+          do
+             meteo_jul1 = meteo_jul2
+             meteo_secs1 = meteo_secs2
+             call read_obs(meteo_unit,yy,mm,dd,hh,min,ss,6,obs,rc)
+             call julian_day(yy,mm,dd,meteo_jul2)
+             meteo_secs2 = hh*3600 + min*60 + ss
+             if(time_diff(meteo_jul2,meteo_secs2,jul,secs) .gt. 0) EXIT
+          end do
+       end if           !SP I added this so that the fluxes are calculated each time step with a new sst, if using must comment out end if below.
+       wx    = obs(1)
+       wy    = obs(2)
+       wx_obs=obs(1)
+       wy_obs=obs(2)
+       airp  = obs(3)*100. !kbk mbar/hPa --> Pa
+       airt  = obs(4)
+       spec_hum = obs(5)
+       !      dew_pt = obs(5)
+       !      rh    = obs(5)
+       cloud = obs(6)
 
-      call exchange_coefficients()
-!SP FEB05: cloud data assimilation scheme using skin sst obs
-!count=count+1
-!count2=count2+1 
-!if(count==96) then
-!   OPEN(UNIT=9,FILE="OBS/SUB/sst.dat",IOSTAT=ios)
-!		IF(ios/=0) THEN
-!			PRINT*,"Error during opening input file, stopping"; STOP
-!		END IF
-!	DO count3=1,count2+85               	
-!		READ (UNIT=9,FMT='(3X,E13.12)')  sst_obs
-!	END DO
-!   CLOSE (UNIT=9)
-   
-!   cloud=cloud+(skint-sst_obs)/0.1
-!   PRINT*,cloud
-!   count=0
-!   if (cloud.lt.0.0) then
-!            cloud=0.0
-!   else if (cloud.gt.1.0) then
-!            cloud=1.0
-!   end if
-!end if     
+       call exchange_coefficients()
+       !SP FEB05: cloud data assimilation scheme using skin sst obs
+       !count=count+1
+       !count2=count2+1 
+       !if(count==96) then
+       !   OPEN(UNIT=9,FILE="OBS/SUB/sst.dat",IOSTAT=ios)
+       !		IF(ios/=0) THEN
+       !			PRINT*,"Error during opening input file, stopping"; STOP
+       !		END IF
+       !	DO count3=1,count2+85               	
+       !		READ (UNIT=9,FMT='(3X,E13.12)')  sst_obs
+       !	END DO
+       !   CLOSE (UNIT=9)
 
-!HK add in code to get time interpolated u10 and v10 out
-!so they can be used in co2transfer.f90
+       !   cloud=cloud+(skint-sst_obs)/0.1
+       !   PRINT*,cloud
+       !   count=0
+       !   if (cloud.lt.0.0) then
+       !            cloud=0.0
+       !   else if (cloud.gt.1.0) then
+       !            cloud=1.0
+       !   end if
+       !end if     
 
-      if (first) then
-!         call do_calc_fluxes(heatf=h1,taux=tx1,tauy=ty1)
-         call do_calc_fluxes(qb1,qh1,qe1,taux=tx1,tauy=ty1)
-!         call short_wave_radiation(jul,secs,alat,alon,swr=I1)
-!         I2  = I1                
-!         h2  = h1
-         tx2 = tx1
-         ty2 = ty1
-         qb2 = qb1
-         qh2 = qh1
-         qe2 = qe1
-!HK added:
-       wx1=wx
-       wy1=wy        
-       wx2 = wx1
-       wy2 = wy1
-!end of added
+       !HK add in code to get time interpolated u10 and v10 out
+       !so they can be used in co2transfer.f90
 
-         first = .false.
-      else
-!         I1  = I2               
-!         h1  = h2
-         tx1 = tx2
-         ty1 = ty2
-         qb1 = qb2
-         qh1 = qh2
-         qe1 = qe2
-!         call do_calc_fluxes(heatf=h2,taux=tx2,tauy=ty2)
-         call do_calc_fluxes(qb2,qh2,qe2,taux=tx2,tauy=ty2)
-	 
-!         call short_wave_radiation(jul,secs,alat,alon,swr=I2) 
-!HK added:
-       wx1=wx2
-       wy1=wy2
-       wx2=wx
-       wy2=wy
-!end of added
+       if (first) then
+          !         call do_calc_fluxes(heatf=h1,taux=tx1,tauy=ty1)
+          call do_calc_fluxes(qb1,qh1,qe1,taux=tx1,tauy=ty1)
+          !         call short_wave_radiation(jul,secs,alat,alon,swr=I1)
+          !         I2  = I1                
+          !         h2  = h1
+          tx2 = tx1
+          ty2 = ty1
+          qb2 = qb1
+          qh2 = qh1
+          qe2 = qe1
+          !HK added:
+          wx1=wx
+          wy1=wy        
+          wx2 = wx1
+          wy2 = wy1
+          !end of added
 
-      end if
+          first = .false.
+       else
+          !         I1  = I2               
+          !         h1  = h2
+          tx1 = tx2
+          ty1 = ty2
+          qb1 = qb2
+          qh1 = qh2
+          qe1 = qe2
+          !         call do_calc_fluxes(heatf=h2,taux=tx2,tauy=ty2)
+          call do_calc_fluxes(qb2,qh2,qe2,taux=tx2,tauy=ty2)
 
-      dt = time_diff(meteo_jul2,meteo_secs2,meteo_jul1,meteo_secs1)
+          !         call short_wave_radiation(jul,secs,alat,alon,swr=I2) 
+          !HK added:
+          wx1=wx2
+          wy1=wy2
+          wx2=wx
+          wy2=wy
+          !end of added
 
-!      alpha(1) = (I2-I1)/dt
-!      alpha(2) = (h2-h1)/dt
-      alpha(3) = (tx2-tx1)/dt
-      alpha(4) = (ty2-ty1)/dt
-      alpha(7) = (qb2-qb1)/dt
-      alpha(8) = (qh2-qh1)/dt
-      alpha(9) = (qe2-qe1)/dt
-!HK added:
-      alpha(5) =  (wx2-wx1)/dt
-      alpha(6) =  (wy2-wy1)/dt
-!end of added
+       end if
 
-!      end if           ! SP - commented out as it placed earlier
+       dt = time_diff(meteo_jul2,meteo_secs2,meteo_jul1,meteo_secs1)
 
-!  Do the time interpolation
-   t  = time_diff(jul,secs,meteo_jul1,meteo_secs1)
-!   I_0  = I1  + t*alpha(1)    
-!   heat = h1  + t*alpha(2)
-   tx   = tx1 + t*alpha(3)
-   ty   = ty1 + t*alpha(4)
-   qb   = qb1 + t*alpha(7)
-   qh   = qh1 + t*alpha(8)
-   qe   = qe1 + t*alpha(9)
-   
-!HK added:
-   u10   = wx1 + t*alpha(5)
-   v10   = wy1 + t*alpha(6)
-!end of added
+       !      alpha(1) = (I2-I1)/dt
+       !      alpha(2) = (h2-h1)/dt
+       alpha(3) = (tx2-tx1)/dt
+       alpha(4) = (ty2-ty1)/dt
+       alpha(7) = (qb2-qb1)/dt
+       alpha(8) = (qh2-qh1)/dt
+       alpha(9) = (qe2-qe1)/dt
+       !HK added:
+       alpha(5) =  (wx2-wx1)/dt
+       alpha(6) =  (wy2-wy1)/dt
+       !end of added
 
-   return
-   end subroutine flux_from_meteo
-!EOC
+       !      end if           ! SP - commented out as it placed earlier
 
-!-----------------------------------------------------------------------
-!BOP
-!
-! !IROUTINE: Read heat flux data, interpolate in time
-!
-! !INTERFACE:
-   subroutine read_heat_flux(jul,secs,I_0,heat,qb)
-!
-! !DESCRIPTION:
-!  This routine reads heat fluxes from a file and interpolates them in
-!  time.
-!
-! !USES:
-   IMPLICIT NONE
-!
-! !INPUT PARAMETERS:
-   integer, intent(in)                 :: jul,secs
-!
-! !OUTPUT PARAMETERS:
-   double precision, intent(out)               :: I_0,heat,qb
-!
-! !REVISION HISTORY:
-!  Original author(s): Karsten Bolding
-!
-!  See log for airsea module
+       !  Do the time interpolation
+       t  = time_diff(jul,secs,meteo_jul1,meteo_secs1)
+       !   I_0  = I1  + t*alpha(1)    
+       !   heat = h1  + t*alpha(2)
+       tx   = tx1 + t*alpha(3)
+       ty   = ty1 + t*alpha(4)
+       qb   = qb1 + t*alpha(7)
+       qh   = qh1 + t*alpha(8)
+       qe   = qe1 + t*alpha(9)
 
-!
-!EOP
-!
-! !LOCAL VARIABLES:
-   integer                   :: yy,mm,dd,hh,min,ss
-   double precision                  :: t,alpha
-   double precision, SAVE            :: dt
-   integer, save             :: heat_jul1,heat_secs1
-   integer, save             :: heat_jul2=0,heat_secs2=0
-   double precision, save            :: obs1(3),obs2(3)=0.
-   integer                   :: rc
-!
-!-----------------------------------------------------------------------
-!BOC
-!  This part initialise and read in new values if necessary.
-   if(time_diff(heat_jul2,heat_secs2,jul,secs) .lt. 0) then
-      do
-         heat_jul1 = heat_jul2
-         heat_secs1 = heat_secs2
-         obs1 = obs2
-         call read_obs(heat_unit,yy,mm,dd,hh,min,ss,3,obs2,rc)
-         call julian_day(yy,mm,dd,heat_jul2)
-         heat_secs2 = hh*3600 + min*60 + ss
-         if(time_diff(heat_jul2,heat_secs2,jul,secs) .gt. 0) EXIT
-      end do
-      dt = time_diff(heat_jul2,heat_secs2,heat_jul1,heat_secs1)
-   end if
+       !HK added:
+       u10   = wx1 + t*alpha(5)
+       v10   = wy1 + t*alpha(6)
+       !end of added
 
-!  Do the time interpolation
-   t  = time_diff(jul,secs,heat_jul1,heat_secs1)
+       return
+     end subroutine flux_from_meteo
+     !EOC
 
-!**I'VE COMMENTED OUT INTERPOLATION**
-   alpha = (obs2(1)-obs1(1))/dt
-   I_0 = obs1(1) !+ t*alpha
-   alpha = (obs2(2)-obs1(2))/dt
-   heat = obs1(2) !+ t*alpha
-   alpha = (obs2(3)-obs1(3))/dt
-   qb = obs1(3) !+ t*alpha
+     !-----------------------------------------------------------------------
+     !BOP
+     !
+     ! !IROUTINE: Read heat flux data, interpolate in time
+     !
+     ! !INTERFACE:
+     subroutine read_heat_flux(jul,secs,I_0,heat,qb)
+       !
+       ! !DESCRIPTION:
+       !  This routine reads heat fluxes from a file and interpolates them in
+       !  time.
+       !
+       ! !USES:
+       IMPLICIT NONE
+       !
+       ! !INPUT PARAMETERS:
+       integer, intent(in)                 :: jul,secs
+       !
+       ! !OUTPUT PARAMETERS:
+       double precision, intent(out)               :: I_0,heat,qb
+       !
+       ! !REVISION HISTORY:
+       !  Original author(s): Karsten Bolding
+       !
+       !  See log for airsea module
 
-   end subroutine read_heat_flux
-!EOC
+       !
+       !EOP
+       !
+       ! !LOCAL VARIABLES:
+       integer                   :: yy,mm,dd,hh,min,ss
+       double precision                  :: t,alpha
+       double precision, SAVE            :: dt
+       integer, save             :: heat_jul1,heat_secs1
+       integer, save             :: heat_jul2=0,heat_secs2=0
+       double precision, save            :: obs1(3),obs2(3)=0.
+       integer                   :: rc
+       !
+       !-----------------------------------------------------------------------
+       !BOC
+       !  This part initialise and read in new values if necessary.
+       if(time_diff(heat_jul2,heat_secs2,jul,secs) .lt. 0) then
+          do
+             heat_jul1 = heat_jul2
+             heat_secs1 = heat_secs2
+             obs1 = obs2
+             call read_obs(heat_unit,yy,mm,dd,hh,min,ss,3,obs2,rc)
+             call julian_day(yy,mm,dd,heat_jul2)
+             heat_secs2 = hh*3600 + min*60 + ss
+             if(time_diff(heat_jul2,heat_secs2,jul,secs) .gt. 0) EXIT
+          end do
+          dt = time_diff(heat_jul2,heat_secs2,heat_jul1,heat_secs1)
+       end if
 
-!-----------------------------------------------------------------------
-!BOP
-!
-! !IROUTINE: Read momentum flux data, interpolate in time
-!
-! !INTERFACE:
-   subroutine read_momentum_flux(jul,secs,tx,ty)
-!
-! !DESCRIPTION:
-!  This routine reads momentum fluxes from a file and interpolates them in
-!  time.
-!
-! !USES:
-   IMPLICIT NONE
-!
-! !INPUT PARAMETERS:
-   integer,intent(in)                  :: jul,secs
-!
-! !OUTPUT PARAMETERS:
-   double precision,intent(out)                :: tx,ty
-!
-! !REVISION HISTORY:
-!  Original author(s): Karsten Bolding
-!
-!  See log for airsea module
-!
-! !LOCAL VARIABLES:
-   integer                   :: yy,mm,dd,hh,min,ss
-   double precision                  :: t,alpha
-   double precision, save            :: dt
-   integer, save             :: mom_jul1,mom_secs1
-   integer, save             :: mom_jul2=0,mom_secs2=0
-   double precision, save            :: obs1(2),obs2(2)=0.
-   integer                   :: rc
-!
-!EOP
-!-----------------------------------------------------------------------
-!BOC
+       !  Do the time interpolation
+       t  = time_diff(jul,secs,heat_jul1,heat_secs1)
 
-!  This part initialise and read in new values if necessary.
-   if(time_diff(mom_jul2,mom_secs2,jul,secs) .lt. 0) then
-      do
-         mom_jul1 = mom_jul2
-         mom_secs1 = mom_secs2
-         obs1 = obs2
-         call read_obs(momentum_unit,yy,mm,dd,hh,min,ss,2,obs2,rc)
-         call julian_day(yy,mm,dd,mom_jul2)
-         mom_secs2 = hh*3600 + min*60 + ss
-         if(time_diff(mom_jul2,mom_secs2,jul,secs) .gt. 0) EXIT
-      end do
-      dt = time_diff(mom_jul2,mom_secs2,mom_jul1,mom_secs1)
-   end if
+       !**I'VE COMMENTED OUT INTERPOLATION**
+       alpha = (obs2(1)-obs1(1))/dt
+       I_0 = obs1(1) !+ t*alpha
+       alpha = (obs2(2)-obs1(2))/dt
+       heat = obs1(2) !+ t*alpha
+       alpha = (obs2(3)-obs1(3))/dt
+       qb = obs1(3) !+ t*alpha
 
-!**I'VE COMMENTED OUT INTERPOLATION**
-!  Do the time interpolation
-   t  = time_diff(jul,secs,mom_jul1,mom_secs1)
-   alpha = (obs2(1)-obs1(1))/dt
-   tx = obs1(1) !+ t*alpha
-   alpha = (obs2(2)-obs1(2))/dt
-   ty = obs1(2) !+ t*alpha
+     end subroutine read_heat_flux
+     !EOC
 
-   return
-   end subroutine read_momentum_flux
-!EOC
+     !-----------------------------------------------------------------------
+     !BOP
+     !
+     ! !IROUTINE: Read momentum flux data, interpolate in time
+     !
+     ! !INTERFACE:
+     subroutine read_momentum_flux(jul,secs,tx,ty)
+       !
+       ! !DESCRIPTION:
+       !  This routine reads momentum fluxes from a file and interpolates them in
+       !  time.
+       !
+       ! !USES:
+       IMPLICIT NONE
+       !
+       ! !INPUT PARAMETERS:
+       integer,intent(in)                  :: jul,secs
+       !
+       ! !OUTPUT PARAMETERS:
+       double precision,intent(out)                :: tx,ty
+       !
+       ! !REVISION HISTORY:
+       !  Original author(s): Karsten Bolding
+       !
+       !  See log for airsea module
+       !
+       ! !LOCAL VARIABLES:
+       integer                   :: yy,mm,dd,hh,min,ss
+       double precision                  :: t,alpha
+       double precision, save            :: dt
+       integer, save             :: mom_jul1,mom_secs1
+       integer, save             :: mom_jul2=0,mom_secs2=0
+       double precision, save            :: obs1(2),obs2(2)=0.
+       integer                   :: rc
+       !
+       !EOP
+       !-----------------------------------------------------------------------
+       !BOC
 
-!-----------------------------------------------------------------------
-!BOP
-!
-! !IROUTINE: Read SST, interpolate in time
-!
-! !INTERFACE:
-   subroutine read_sst(jul,secs,sst)
-!
-! !DESCRIPTION:
-!  This routine reads sea surface temperature (SST) from a file 
-!  and interpolates in time.
-!
-! !USES:
-   use meanflow, only                : T,S,h
+       !  This part initialise and read in new values if necessary.
+       if(time_diff(mom_jul2,mom_secs2,jul,secs) .lt. 0) then
+          do
+             mom_jul1 = mom_jul2
+             mom_secs1 = mom_secs2
+             obs1 = obs2
+             call read_obs(momentum_unit,yy,mm,dd,hh,min,ss,2,obs2,rc)
+             call julian_day(yy,mm,dd,mom_jul2)
+             mom_secs2 = hh*3600 + min*60 + ss
+             if(time_diff(mom_jul2,mom_secs2,jul,secs) .gt. 0) EXIT
+          end do
+          dt = time_diff(mom_jul2,mom_secs2,mom_jul1,mom_secs1)
+       end if
 
-   IMPLICIT NONE
+       !**I'VE COMMENTED OUT INTERPOLATION**
+       !  Do the time interpolation
+       t  = time_diff(jul,secs,mom_jul1,mom_secs1)
+       alpha = (obs2(1)-obs1(1))/dt
+       tx = obs1(1) !+ t*alpha
+       alpha = (obs2(2)-obs1(2))/dt
+       ty = obs1(2) !+ t*alpha
 
-! !INPUT PARAMETERS:
-   integer, intent(in)                 :: jul,secs
-!
-! !OUTPUT PARAMETERS:
-   double precision,intent(out)                :: sst
-!
-! !REVISION HISTORY:
-!  Original author(s): Karsten Bolding
-!
-!  See log for airsea module
-!
-!EOP
-!
-! !LOCAL VARIABLES:
-   integer                   :: yy,mm,dd,hh,min,ss
-   integer                   :: yy2,mm2,dd2,hh2,min2,ss2
-   double precision                  :: time,alpha
-   double precision, save            :: dt
-   integer, save             :: sst_jul1,sst_secs1
-   integer, save             :: sst_jul2=0,sst_secs2=0
-   integer, save             :: sst2_jul1,sst2_secs1
-   integer, save             :: sst2_jul2=0,sst2_secs2=0
-   double precision, save            :: obs1(1),obs2(1)=0.,obs3(4),obs4(4)=0.
-   logical, save             :: first=.true.,first2=.true.
-   integer                   :: rc
-   !SP
-   double precision          :: delta
-!
-!-----------------------------------------------------------------------
-!BOC
-if(sst_method==2) then
-   !use sst observation to assimilate into mixed layer
-   if(time_diff(sst_jul2,sst_secs2,jul,secs) .lt. 0) then
-      do
-         sst_jul1 = sst_jul2
-         sst_secs1 = sst_secs2
-         obs1 = obs2
-         call read_obs(sst_unit,yy,mm,dd,hh,min,ss,1,obs2,rc)
-         call julian_day(yy,mm,dd,sst_jul2)
-         sst_secs2 = hh*3600 + min*60 + ss
-         if(time_diff(sst_jul2,sst_secs2,jul,secs) .gt. 0) EXIT
-      end do
-      dt = time_diff(sst_jul2,sst_secs2,sst_jul1,sst_secs1)
+       return
+     end subroutine read_momentum_flux
+     !EOC
 
-      if(first) then
-         first=.false.
-         !SP 21/03/06
-         !Assimilate SST observations at observation time
-           sst=obs1(1)     !sets observation to sst value
-           ostia=obs1(1)
-           !PRINT *,obs1(1),'OSTIA'
-           ostia_diff=ostia_diff+(T(150)-obs1(1))
-           ostia_sq_diff=ostia_sq_diff+(T(150)-obs1(1))**2
-           call assimilate_satellite_obs(sst,T(1:150),S(1:150),h(1:150))
-         !END SP
-      else
-      end if
+     !-----------------------------------------------------------------------
+     !BOP
+     !
+     ! !IROUTINE: Read SST, interpolate in time
+     !
+     ! !INTERFACE:
+     subroutine read_sst(jul,secs,sst)
+       !
+       ! !DESCRIPTION:
+       !  This routine reads sea surface temperature (SST) from a file 
+       !  and interpolates in time.
+       !
+       ! !USES:
+       use meanflow, only                : T,S,h
 
-      call write_time_string(jul,secs,assim_timestr)
-      print *,'SST values assimilated at ', assim_timestr
-      print *,'Value:',sst
-   end if
-end if
-if(sst_method2==2) then 
-   !use sst observation to calculate a cost function
-   if(time_diff(sst2_jul2,sst2_secs2,jul,secs) .lt. 0) then
-      do
-         sst2_jul1 = sst2_jul2
-         sst2_secs1 = sst2_secs2
-         obs3 = obs4
-         call read_obs(sst_unit2,yy2,mm2,dd2,hh2,min2,ss2,4,obs4,rc)
-         call julian_day(yy2,mm2,dd2,sst2_jul2)
-         sst2_secs2 = hh2*3600 + min2*60 + ss2
-         if(time_diff(sst2_jul2,sst2_secs2,jul,secs) .gt. 0) EXIT
-      end do
-      dt = time_diff(sst2_jul2,sst2_secs2,sst2_jul1,sst2_secs1)
+       IMPLICIT NONE
 
-      !SP 28/03/06
-      !use obs to calculate cost function
-      if(first2) then
-         seviri_diff=0.
-         amsre_diff=0.
-         tmi_diff=0.
-         ostia_seviri_diff=0.
-         ostia_amsre_diff=0.
-         ostia_tmi_diff=0.
-         seviri_sq_diff=0.
-         amsre_sq_diff=0.
-         tmi_sq_diff=0.
-         ostia_seviri_sq_diff=0.
-         ostia_amsre_sq_diff=0.
-         ostia_tmi_sq_diff=0.
-         seviri_obs=0.
-         amsre_obs=0.
-         tmi_obs=0.
-         first2=.false.
-      else
-         if(ABS(obs3(4)-2.0).LT.0.0001) then
-            PRINT*,obs3(1),'SEVIRI OBS'
-            seviri_diff=seviri_diff+(skint-obs3(1))
-            ostia_seviri_diff=ostia_seviri_diff+(ostia-obs3(1))
-            seviri_sq_diff=seviri_sq_diff+(skint-obs3(1))**2
-            ostia_seviri_sq_diff=ostia_seviri_sq_diff+(ostia-obs3(1))**2
-            seviri_obs=seviri_obs+1
-         else if(ABS(obs3(4)-1.0).LT.0.001) then
-            PRINT*,obs3(1),'AMSRE OBS'
-            amsre_diff=amsre_diff+(T(150)-obs3(1))
-            ostia_amsre_diff=ostia_amsre_diff+(ostia-obs3(1))
-            amsre_sq_diff=amsre_sq_diff+(T(150)-obs3(1))**2
-            ostia_amsre_sq_diff=ostia_amsre_sq_diff+(ostia-obs3(1))**2
-            amsre_obs=amsre_obs+1
-         else
-            PRINT*,obs3(1),'TMI OBS'
-            tmi_diff=tmi_diff+(T(150)-obs3(1))
-            ostia_tmi_diff=ostia_tmi_diff+(ostia-obs3(1))
-            tmi_sq_diff=tmi_sq_diff+(T(150)-obs3(1))**2
-            ostia_tmi_sq_diff=ostia_tmi_sq_diff+(ostia-obs3(1))**2
-            tmi_obs=tmi_obs+1
-         end if
-      end if
+       ! !INPUT PARAMETERS:
+       integer, intent(in)                 :: jul,secs
+       !
+       ! !OUTPUT PARAMETERS:
+       double precision,intent(out)                :: sst
+       !
+       ! !REVISION HISTORY:
+       !  Original author(s): Karsten Bolding
+       !
+       !  See log for airsea module
+       !
+       !EOP
+       !
+       ! !LOCAL VARIABLES:
+       integer                   :: yy,mm,dd,hh,min,ss
+       integer                   :: yy2,mm2,dd2,hh2,min2,ss2
+       double precision                  :: time,alpha
+       double precision, save            :: dt
+       integer, save             :: sst_jul1,sst_secs1
+       integer, save             :: sst_jul2=0,sst_secs2=0
+       integer, save             :: sst2_jul1,sst2_secs1
+       integer, save             :: sst2_jul2=0,sst2_secs2=0
+       double precision, save            :: obs1(1),obs2(1)=0.,obs3(4),obs4(4)=0.
+       logical, save             :: first=.true.,first2=.true.
+       integer                   :: rc
+       !SP
+       double precision          :: delta
+       !
+       !-----------------------------------------------------------------------
+       !BOC
+       if(sst_method==2) then
+          !use sst observation to assimilate into mixed layer
+          if(time_diff(sst_jul2,sst_secs2,jul,secs) .lt. 0) then
+             do
+                sst_jul1 = sst_jul2
+                sst_secs1 = sst_secs2
+                obs1 = obs2
+                call read_obs(sst_unit,yy,mm,dd,hh,min,ss,1,obs2,rc)
+                call julian_day(yy,mm,dd,sst_jul2)
+                sst_secs2 = hh*3600 + min*60 + ss
+                if(time_diff(sst_jul2,sst_secs2,jul,secs) .gt. 0) EXIT
+             end do
+             dt = time_diff(sst_jul2,sst_secs2,sst_jul1,sst_secs1)
 
-   end if
-end if
+             if(first) then
+                first=.false.
+                !SP 21/03/06
+                !Assimilate SST observations at observation time
+                sst=obs1(1)     !sets observation to sst value
+                ostia=obs1(1)
+                !PRINT *,obs1(1),'OSTIA'
+                ostia_diff=ostia_diff+(T(150)-obs1(1))
+                ostia_sq_diff=ostia_sq_diff+(T(150)-obs1(1))**2
+                call assimilate_satellite_obs(sst,T(1:150),S(1:150),h(1:150))
+                !END SP
+             else
+             end if
 
-!  Do the time interpolation
-!   time  = time_diff(jul,secs,sst_jul1,sst_secs1)
-!   alpha = (obs2(1)-obs1(1))/dt
-!   sst = obs1(1) + time*alpha
+             call write_time_string(jul,secs,assim_timestr)
+             print *,'SST values assimilated at ', assim_timestr
+             print *,'Value:',sst
+          end if
+       end if
+       if(sst_method2==2) then 
+          !use sst observation to calculate a cost function
+          if(time_diff(sst2_jul2,sst2_secs2,jul,secs) .lt. 0) then
+             do
+                sst2_jul1 = sst2_jul2
+                sst2_secs1 = sst2_secs2
+                obs3 = obs4
+                call read_obs(sst_unit2,yy2,mm2,dd2,hh2,min2,ss2,4,obs4,rc)
+                call julian_day(yy2,mm2,dd2,sst2_jul2)
+                sst2_secs2 = hh2*3600 + min2*60 + ss2
+                if(time_diff(sst2_jul2,sst2_secs2,jul,secs) .gt. 0) EXIT
+             end do
+             dt = time_diff(sst2_jul2,sst2_secs2,sst2_jul1,sst2_secs1)
 
-   return
-   end subroutine read_sst
-!EOC
-!-----------------------------------------------------------------------
+             !SP 28/03/06
+             !use obs to calculate cost function
+             if(first2) then
+                seviri_diff=0.
+                amsre_diff=0.
+                tmi_diff=0.
+                ostia_seviri_diff=0.
+                ostia_amsre_diff=0.
+                ostia_tmi_diff=0.
+                seviri_sq_diff=0.
+                amsre_sq_diff=0.
+                tmi_sq_diff=0.
+                ostia_seviri_sq_diff=0.
+                ostia_amsre_sq_diff=0.
+                ostia_tmi_sq_diff=0.
+                seviri_obs=0.
+                amsre_obs=0.
+                tmi_obs=0.
+                first2=.false.
+             else
+                if(ABS(obs3(4)-2.0).LT.0.0001) then
+                   PRINT*,obs3(1),'SEVIRI OBS'
+                   seviri_diff=seviri_diff+(skint-obs3(1))
+                   ostia_seviri_diff=ostia_seviri_diff+(ostia-obs3(1))
+                   seviri_sq_diff=seviri_sq_diff+(skint-obs3(1))**2
+                   ostia_seviri_sq_diff=ostia_seviri_sq_diff+(ostia-obs3(1))**2
+                   seviri_obs=seviri_obs+1
+                else if(ABS(obs3(4)-1.0).LT.0.001) then
+                   PRINT*,obs3(1),'AMSRE OBS'
+                   amsre_diff=amsre_diff+(T(150)-obs3(1))
+                   ostia_amsre_diff=ostia_amsre_diff+(ostia-obs3(1))
+                   amsre_sq_diff=amsre_sq_diff+(T(150)-obs3(1))**2
+                   ostia_amsre_sq_diff=ostia_amsre_sq_diff+(ostia-obs3(1))**2
+                   amsre_obs=amsre_obs+1
+                else
+                   PRINT*,obs3(1),'TMI OBS'
+                   tmi_diff=tmi_diff+(T(150)-obs3(1))
+                   ostia_tmi_diff=ostia_tmi_diff+(ostia-obs3(1))
+                   tmi_sq_diff=tmi_sq_diff+(T(150)-obs3(1))**2
+                   ostia_tmi_sq_diff=ostia_tmi_sq_diff+(ostia-obs3(1))**2
+                   tmi_obs=tmi_obs+1
+                end if
+             end if
+
+          end if
+       end if
+
+       !  Do the time interpolation
+       !   time  = time_diff(jul,secs,sst_jul1,sst_secs1)
+       !   alpha = (obs2(1)-obs1(1))/dt
+       !   sst = obs1(1) + time*alpha
+
+       return
+     end subroutine read_sst
+     !EOC
+     !-----------------------------------------------------------------------
      subroutine assimilate_satellite_obs(sst,T,S,h)
 
        use eqstate, only: unesco
@@ -1929,61 +1937,61 @@ end if
 
        double precision  :: delta,assim_depth,z,density,change
        integer           :: i,count,tendepth,ml_level
-     
-!-----------------------------------------------------------------------
-!method used from june 2006
-!find mixed layer level using definition from Kara, 2000, JGR
-tendepth=83
-z=0.0
-do i=1,tendepth
-   z=z+h(i)
-end do
-density=unesco(S(tendepth),T(tendepth),z/10.,.true.)
-change=unesco(S(tendepth),T(tendepth)+0.8,z/10.,.true.)-density
 
-do i=tendepth-1,1,-1
-   z=z-h(i)
-   if(unesco(S(i),T(i),z/10.,.true.).LE.(density+change)) then
-      ml_level=i
-      exit
-   end if
-   if(unesco(S(i),T(i),z/10.,.true.).GE.(density-change)) then
-      ml_level=i
-      exit
-   end if
-   if(i==1) then
-      ml_level=i
-   end if
-end do
-!adjust mixed layer
-PRINT*,'ASSIMILATE SST'
+       !-----------------------------------------------------------------------
+       !method used from june 2006
+       !find mixed layer level using definition from Kara, 2000, JGR
+       tendepth=83
+       z=0.0
+       do i=1,tendepth
+          z=z+h(i)
+       end do
+       density=unesco(S(tendepth),T(tendepth),z/10.,.true.)
+       change=unesco(S(tendepth),T(tendepth)+0.8,z/10.,.true.)-density
 
-delta=sst-T(150)
-do i=ml_level,150
-   T(i)=T(i)+delta
-end do
+       do i=tendepth-1,1,-1
+          z=z-h(i)
+          if(unesco(S(i),T(i),z/10.,.true.).LE.(density+change)) then
+             ml_level=i
+             exit
+          end if
+          if(unesco(S(i),T(i),z/10.,.true.).GE.(density-change)) then
+             ml_level=i
+             exit
+          end if
+          if(i==1) then
+             ml_level=i
+          end if
+       end do
+       !adjust mixed layer
+       PRINT*,'ASSIMILATE SST'
+
+       delta=sst-T(150)
+       do i=ml_level,150
+          T(i)=T(i)+delta
+       end do
 
 
-!old method 
-!Assimilate SST into mixed layer
-!         delta=sst-T(150)
-!         assim_depth=mld(T(1:150))
-!         if(sst.LT.T(nint(assim_depth))) then
-!            do i=1,150
-!               assim_depth=assim_depth-1
-!               if((T(nint(assim_depth)).LE.sst).OR.(assim_depth.LT.1.1)) then
-!                  exit
-!               end if
-!            end do
-!         end if
-!         PRINT*,'assimilate'
-!         DO i=nint(assim_depth),150
-!            T(i)=T(i)+delta
-!         END DO
+       !old method 
+       !Assimilate SST into mixed layer
+       !         delta=sst-T(150)
+       !         assim_depth=mld(T(1:150))
+       !         if(sst.LT.T(nint(assim_depth))) then
+       !            do i=1,150
+       !               assim_depth=assim_depth-1
+       !               if((T(nint(assim_depth)).LE.sst).OR.(assim_depth.LT.1.1)) then
+       !                  exit
+       !               end if
+       !            end do
+       !         end if
+       !         PRINT*,'assimilate'
+       !         DO i=nint(assim_depth),150
+       !            T(i)=T(i)+delta
+       !         END DO
 
      end subroutine assimilate_satellite_obs
-!-----------------------------------------------------------------------
-!-----------------------------------------------------------------------
+     !-----------------------------------------------------------------------
+     !-----------------------------------------------------------------------
      function mld(T)
        double precision, intent(in):: T(1:150)
        integer                     :: twenty_level, max_T_level
@@ -1992,98 +2000,98 @@ end do
        max_T_level=150
        twenty_level=66
 
-!Find the grid level of the maximum temperature in the top 20m
-         DO i=150-1,twenty_level,-1
-            if (T(max_T_level).lt.T(i)) then
-               max_T_level=i
-            end if
-         END DO
-!end fine the grid level of the max temp in top 20m
+       !Find the grid level of the maximum temperature in the top 20m
+       DO i=150-1,twenty_level,-1
+          if (T(max_T_level).lt.T(i)) then
+             max_T_level=i
+          end if
+       END DO
+       !end fine the grid level of the max temp in top 20m
 
-!find the grid level of the mixed layer depth            
-         Do count=max_T_level-1,1,-1
-            if ((T(max_T_level)-T(count)).GE.0.1) then
-                  exit
-            end if
-         end do
-         mld=count
-         if(mld==0) then
-            mld=1
-         end if
-!end find the grid level of the mixed layer depth
+       !find the grid level of the mixed layer depth            
+       Do count=max_T_level-1,1,-1
+          if ((T(max_T_level)-T(count)).GE.0.1) then
+             exit
+          end if
+       end do
+       mld=count
+       if(mld==0) then
+          mld=1
+       end if
+       !end find the grid level of the mixed layer depth
 
      end function mld
-!-----------------------------------------------------------------------
-!-----------------------------------------------------------------------
-!BOP
-!
-! !IROUTINE: Integrate short--wave and sea surface fluxes
-!
-! !INTERFACE:
-   subroutine integrated_fluxes(dt,int_cs)
-!
-! !DESCRIPTION:
-!  This utility routine integrates the short--wave radiation 
-!  and heat--fluxes over time.
-!
-! !USES:
-   IMPLICIT NONE
-!
-! !INPUT PARAMETERS:
-   double precision, intent(in)                :: dt
-   double precision, intent(inout)             :: int_cs
-!
-! !REVISION HISTORY:
-!  Original author(s): Karsten Bolding
-!
-!  See log for airsea module
-!
-!EOP
-!-----------------------------------------------------------------------
-!BOC
-   int_sw = int_sw + dt*I_0
-   int_cs = int_cs + dt*I_0_cs      !SP, integrated clear sky swr
-   int_hf = int_hf + dt*heat
-   int_total = int_sw + int_hf
-   return
-   end subroutine integrated_fluxes
-!EOC
+     !-----------------------------------------------------------------------
+     !-----------------------------------------------------------------------
+     !BOP
+     !
+     ! !IROUTINE: Integrate short--wave and sea surface fluxes
+     !
+     ! !INTERFACE:
+     subroutine integrated_fluxes(dt,int_cs)
+       !
+       ! !DESCRIPTION:
+       !  This utility routine integrates the short--wave radiation 
+       !  and heat--fluxes over time.
+       !
+       ! !USES:
+       IMPLICIT NONE
+       !
+       ! !INPUT PARAMETERS:
+       double precision, intent(in)                :: dt
+       double precision, intent(inout)             :: int_cs
+       !
+       ! !REVISION HISTORY:
+       !  Original author(s): Karsten Bolding
+       !
+       !  See log for airsea module
+       !
+       !EOP
+       !-----------------------------------------------------------------------
+       !BOC
+       int_sw = int_sw + dt*I_0
+       int_cs = int_cs + dt*I_0_cs      !SP, integrated clear sky swr
+       int_hf = int_hf + dt*heat
+       int_total = int_sw + int_hf
+       return
+     end subroutine integrated_fluxes
+     !EOC
 
-!-----------------------------------------------------------------------
-!BOP
-!
-! !IROUTINE: Set the SST to be used from model.
-!
-! !INTERFACE:
-   subroutine set_sst(temp)
-!
-! !DESCRIPTION:
-!  This routine sets the sea surface temperature (SST) to be used for 
-!  the surface flux calculations.
-!
-! !USES:
-   IMPLICIT NONE
-!
-! !INPUT PARAMETERS:
-   double precision, intent(in)                :: temp
-!
-! !REVISION HISTORY:
-!  Original author(s): Karsten Bolding
-!
-!  See log for airsea module
-!
-!EOP
-!-----------------------------------------------------------------------
-!BOC
-   sst = temp
-   return
-   end subroutine set_sst
-!EOC
+     !-----------------------------------------------------------------------
+     !BOP
+     !
+     ! !IROUTINE: Set the SST to be used from model.
+     !
+     ! !INTERFACE:
+     subroutine set_sst(temp)
+       !
+       ! !DESCRIPTION:
+       !  This routine sets the sea surface temperature (SST) to be used for 
+       !  the surface flux calculations.
+       !
+       ! !USES:
+       IMPLICIT NONE
+       !
+       ! !INPUT PARAMETERS:
+       double precision, intent(in)                :: temp
+       !
+       ! !REVISION HISTORY:
+       !  Original author(s): Karsten Bolding
+       !
+       !  See log for airsea module
+       !
+       !EOP
+       !-----------------------------------------------------------------------
+       !BOC
+       sst = temp
+       return
+     end subroutine set_sst
+     !EOC
 
-!-----------------------------------------------------------------------
+     !-----------------------------------------------------------------------
 
    end module airsea
 
-!-----------------------------------------------------------------------
-! Copyright by the GOTM-team under the GNU Public License - www.gnu.org
-!----------------------------------------------------------------------- 
+   !-----------------------------------------------------------------------
+   ! Copyright by the GOTM-team under the GNU Public License - www.gnu.org
+   !----------------------------------------------------------------------- 
