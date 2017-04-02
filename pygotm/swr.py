@@ -1,3 +1,5 @@
+from .config import *
+
 ### For SWRD Calcluations
 
 # Temporary global variable

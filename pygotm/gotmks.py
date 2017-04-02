@@ -1,3 +1,5 @@
+from .config import *
+
 ### General GOTM wrappers
 
 # Running GOTM console through a subprocess as if we were in a linux terminal.

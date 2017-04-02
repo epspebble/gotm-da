@@ -1,9 +1,9 @@
 ### Common settings
 import sys, os
-#from gotmks import *
-#from medsea import *
+from .config import *
+from .gotmks import *
 
-# project_folder = os.path.join(home,'medsea_GOTM')
+## These global settings should now in pygotm.config, imported above.
 
 # ### Global settings
 # data_folder = os.path.join('/global/scratch',os.getenv('USER'))
@@ -33,6 +33,17 @@ heat_alias = ['var175','var169']
 
 ERA_names = met_names + heat_names
 ERA_alias = met_alias + heat_alias
+
+
+def get_ERA_yearly_data(folder,year,name,alias,lat_indices,lon_indices):
+    from netCDF4 import Dataset
+    fn = 'MEDSEA_ERA-INT_' + name + '_y' + str(year) + '.nc'
+    with Dataset(os.path.join(folder,fn),'r') as nc:
+        # First, confirm every time that the indices for lat and lon are correct.
+        assert all(nc['lat'][ERA_lat_ind] == medsea_lats)
+        assert all(nc['lon'][ERA_lon_ind] == medsea_lons)
+        # Then return the data unpacked from the netCDF object.
+        return nc[alias][:,lat_indices,lon_indices]
 
 def timings(month,epoch):
     from datetime import datetime,timedelta
