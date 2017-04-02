@@ -1,5 +1,5 @@
 from .config import *
-
+from datetime import datetime
 ### General GOTM wrappers
 
 # Running GOTM console through a subprocess as if we were in a linux terminal.
@@ -227,6 +227,10 @@ def toc():
         return elapsed 
     except NameError:
         print("Have you run tic()?")
+
+def print_ctime(dt=datetime.now(),sep=' '):
+    return dt.strftime('%Y%m%d' + sep + '%H%M%S')
+
 def tz(lon):
     if lon > 0:
         return int((lon+7.5)/15)

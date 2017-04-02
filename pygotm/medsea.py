@@ -38,9 +38,6 @@ def print_lat_lon(lat,lon,fmt_str='.2f'):
     #return lat_str + ' ' + lon_str
     return lat_str + lon_str
 
-def print_ctime(dt=datetime.now(),sep=' '):
-    return dt.strftime('%Y%m%d' + sep + '%H%M%S')
-
 def get_m_n(lat,lon):
     "Return the grid index (m,n) given latlong."
     return int((lat-medsea_lats[0])/0.75), int((lon-medsea_lons[0])/0.75)
