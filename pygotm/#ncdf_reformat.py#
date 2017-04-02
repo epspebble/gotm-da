@@ -180,7 +180,7 @@ def rea_reformat(year,month,varname,fn_keyword):
         ncvar[:] = temp[:,:,rea_lat_ind,rea_lon_ind] # Now random-access in RAM to copy over.
         ncvar.units = REA_data[varname].units
         print('Done copying over {} values of one month.'.format(varname))
-            
+          ]'''
 ### STOPPED HERE.
         # Also copy over the data for the first day of the next month.
         if month == 12:
