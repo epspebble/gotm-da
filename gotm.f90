@@ -184,7 +184,7 @@ contains
 
     ! WT 20170331
     ! Open the extra files to store daily assimilation and SST events.
-    print *, 'Writing events to ',trim(assim_event_fn), ' and ', trim(sst_event_fn), '... '
+    !print *, 'Writing events to ',trim(assim_event_fn), ' and ', trim(sst_event_fn), '... '
     open(unit=unit_assim_event,file=assim_event_fn,status='replace')
     open(unit=unit_sst_event,file=sst_event_fn,status='replace')
 
@@ -404,6 +404,7 @@ contains
        day_cycle = day_cycle + 2880
     endif
     mark = 0
+    first = .true.
 
     write(0,*) '   ', 'time_loop'
     do n=MinN,MaxN
@@ -482,6 +483,7 @@ contains
                 !WT 2016/09/13 "sunrise" means the first moment after
                 ! 00:00:00 in tprof.dat that I_0 is found to be nonzero.
                 if (I_0.gt.1) then
+                   ! print *,I_0
                    call assimilation(T(1:nlev),S(1:nlev),tprof(1:nlev),sprof(1:nlev),cloud,advect,int_cs)
                    mark = 1
                 endif
@@ -491,20 +493,24 @@ contains
           endif
 
           ! restart day_cycle
-          if ((day_cycle.eq.2880) .and. (.not.(first))) then
-      
-             if (mark.ne.1) then
-                stop "Assimilation not performed in one full cycle. STOP"
-             endif
+          if (day_cycle .eq.2880) then
+             if (first) then 
+                first = .false.
+                day_cycle = 0
+                cycle
+             else
 
-             ! Look for assimilation failures beginning after the first local midnight.
-             first = .false.
-             
-             ! Reset counters at local midnight.
-             day_cycle = 0
-             mark = 0
+                ! Check whether the assimilation was done or not.
+                if (mark.ne.1) then
+                   stop "Assimilation not performed in one full cycle. STOP"
+                endif
+
+                ! Reset counters at local midnight.
+                day_cycle = 0
+                mark = 0
+             endif
           endif
-          
+
        endif
        
        

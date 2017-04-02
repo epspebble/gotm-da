@@ -345,8 +345,8 @@ def local_run(year,month,m,n,run,verbose=False,**gotm_user_args):
     stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)
     gotm_args = prepare_run(start,stop,local_folder,lat=lat,lon=lon,
                             out_fn='results-{:d}{:02d}'.format(year,month),
-                            assim_event_fn='assim_event-{:d}{:02d}'.format(year,month),
-                            sst_event_fn='sst_event-{:d}{:02d}'.format(year,month),
+                            assim_event_fn='assim_event-{:d}{:02d}.dat'.format(year,month),
+                            sst_event_fn='sst_event-{:d}{:02d}.dat'.format(year,month),
                             **gotm_user_args)
     os.chdir(local_folder)
     stat = dict()

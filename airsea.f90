@@ -439,11 +439,11 @@ contains
     end if
 
     !WT Need to output I_0_calc? otherwise it stays 0!
-    print *,'Before calling short_wave_radiation()...'
-    print *,'I_0_calc=',I_0_calc
-    call short_wave_radiation(jul,secs,alat,alon)
-    print *,'After...'
-    print *,'I_0_calc=',I_0_calc
+    ! print *,'Before calling short_wave_radiation()...'
+    ! print *,'I_0_calc=',I_0_calc
+    call short_wave_radiation(jul,secs,alat,alon,I_0_calc)
+    ! print *,'After...'
+    ! print *,'I_0_calc=',I_0_calc
 
     !Net shortwave radiation
     !  I_0=I_0_calc
@@ -1380,7 +1380,7 @@ contains
        ! at sunrise or sunset, compare the SST turnaround times with solar sunrise and sunset...)
        !We could also use NREL's solpos C code also if we know how to recompile everything in separate dynamic linkable
        !library files. 
-
+       
 
        if (coszen .le. 0.0) then
           coszen = 0.0           !SP-this is when sun is below horizon
@@ -1441,6 +1441,7 @@ contains
        !   else !170301 consider removing this case... over the top?
        !      qshort  = qtot*(1.-.62*cloud + .0019*sunbet)*(1.-albedo)
        !   end if
+       ! print *, 'qtot, qshort, albedo', qtot, qshort, albedo
        qshort=qtot*(1.-albedo)
 
        if (present(swr)) then
