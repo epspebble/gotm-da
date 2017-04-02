@@ -1,6 +1,7 @@
 ### Common settings
 import sys, os
-from gotm import *
+#from gotmks import *
+#from medsea import *
 
 # project_folder = os.path.join(home,'medsea_GOTM')
 
