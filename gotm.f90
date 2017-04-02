@@ -897,7 +897,7 @@ contains
     double precision :: sst
     if (sign(1.0d0,sst-sst_save) * sign(1.0d0,d_sst) .eq. -1.0d0) then ! sign change in two immedaite time steps
        call write_time_string(julianday,secondsofday,tmp_str)
-       write(0,*) "SST turnaround occurs at ", tmp_str, sst
+       ! write(0,*) "SST turnaround occurs at ", tmp_str, sst
        write(unit_sst_event,*) tmp_str, sst
     endif
     
