@@ -483,7 +483,7 @@ contains
                 !WT 2016/09/13 "sunrise" means the first moment after
                 ! 00:00:00 in tprof.dat that I_0 is found to be nonzero.
                 if (I_0.gt.1) then
-                   ! print *,I_0
+                   print *,I_0
                    call assimilation(T(1:nlev),S(1:nlev),tprof(1:nlev),sprof(1:nlev),cloud,advect,int_cs)
                    mark = 1
                 endif
@@ -499,12 +499,11 @@ contains
                 day_cycle = 0
                 cycle
              else
-
                 ! Check whether the assimilation was done or not.
                 if (mark.ne.1) then
                    stop "Assimilation not performed in one full cycle. STOP"
                 endif
-
+                
                 ! Reset counters at local midnight.
                 day_cycle = 0
                 mark = 0
@@ -858,7 +857,7 @@ contains
        !WT 2016-09-24
        call write_time_string(julianday,secondsofday,tmp_str)
        write(unit_assim_event,*) tmp_str, T(nlev), S(nlev)
-       ! write(0,*) 'Temperature and salinity profiles assimilated at ', tmp_str
+       write(0,*) 'Temperature and salinity profiles assimilated at ', tmp_str
     end if
     !end without averaging
 

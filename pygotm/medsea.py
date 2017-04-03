@@ -357,7 +357,7 @@ def local_run(year,month,m,n,run,verbose=False,**gotm_user_args):
         gotm(verbose=verbose, logfn=logfn, run_folder = local_folder, varsout = {})
         stat['elapsed'] = toc()
         statfn = 'stat_{:d}{:02d}.dat'.format(year,month)
-        with open(statfn,'a') as f:
+        with open(statfn,'w') as f:
             print('Writing diagnostic statistics to {0}...\n'.format(statfn))
             f.write('--------------------------------------------------------------\n')
             f.write('Run parameters:\n')
