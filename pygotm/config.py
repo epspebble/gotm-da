@@ -10,6 +10,9 @@ import os
 from datetime import datetime
 from numpy import pi, cos, sin
 
+# For our netCDF4 files
+epoch = datetime(1981,1,1)
+
 ## For general GOTM setup
 
 # Set the default GOTM executable and namelist locations.

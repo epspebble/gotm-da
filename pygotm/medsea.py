@@ -46,7 +46,7 @@ def get_lat_lon(m,n):
     "Return the latlong given the grid index (m,n)."
     return medsea_lats[m],medsea_lons[n]
 
-def create_dimensions(nc, epoch, lat=medsea_lats, lon=medsea_lons):
+def create_dimensions(nc, lat=medsea_lats, lon=medsea_lons):
     " Declaring dimensions and creating the coordinate variables for each dimension."
     # Dimensions
     nc.createDimension('time') # unlimited
@@ -55,7 +55,7 @@ def create_dimensions(nc, epoch, lat=medsea_lats, lon=medsea_lons):
     
     # Dimension variables.
     nctime = nc.createVariable('time','i4',dimensions=('time',))
-    nctime.units = 'hours since ' + str(epoch)
+    nctime.units = 'hours since ' + str(epoch) # epoch is to be set in global config, and loaded by importing .config
     nclat = nc.createVariable('lat','f4',dimensions=('lat',))
     nclat.units = 'degrees north'
     nclon = nc.createVariable('lon','f4',dimensions=('lon',))
@@ -436,6 +436,86 @@ def core_run(year,month,m=None,n=None,lat=None,lon=None,verbose=False,**gotm_use
         raise # Maybe we should define some sort of exception if GOTM fails.
         
     os.chdir(base_folder)
+
+def combine_run(year = 2014, month = 1,
+                var3dnames = ['sst','skint','swr','lwr','sens','latent'],
+                var4dnames = ['temp'], run = 'ASM0',
+                data_model = 'NETCDF3_CLASSIC',
+                cleanup = False):
+    " Combine GOTM results nc files from each grid point into a single monthly nc file. "
+    from netCDF4 import Dataset
+    from numpy.ma import masked_array
+    
+    print('Combining GOTM results for {0:d}{1:02d} ...'.format(year,month))
+    outfn = os.path.join(base_folder,run,'medsea_GOTM_{0:d}{1:02d}.nc'.format(year,month))
+
+    print('Writing dimensions and metadata...')
+    elapsed = 0
+    tic()
+    with Dataset(outfn,'w',data_model=data_model) as nc:
+
+        # From a certain place is this default setting.
+        nctime, nclat, nclon = create_dimensions(nc)
+        nz = 150 # Could use a global setting when we refactor next time.
+        nc.createDimension('depth', size = nz)
+        ncvar3d = {name: create_variable(nc,name,'f8', dimensions=('time','lat','lon')) for name in var3dnames}
+        nvvar4d = {name: create_variable(nc,name,'f8',dimensions=('time','depth','lat','lon')) for name in var4dnames}
+        
+        # We actually know all our sea locations, and (30.75N,18.75E) is the first point in our medsea grid.
+        fn = os.path.join(base_folder,print_latlon(*sea_locations[0]),'results-{0:d}{1:02d}.nc'.format(year,month))
+        
+        # Transfer units and dimensions.
+        with Dataset(fn,'r') as first:
+            nclat.units = first['lat'].units
+            nclon.units = first['lon'].units
+            nctime.units = first['time'].units
+            ncdepth.units = first['z'].units
+            for name in var3dnames:
+                ncvar3d[name].units = first[name].units
+            for name in var4dnames:
+                ncvar4d[name].units = first[name].units
+            nc_time[:] = first['time'][:]
+            nc_depth[:] = -first['z'][::-1] # reverse order and sign
+        
+        elasped += toc()
+        
+        print('Begin reading data into memory...')
+        tic()
+
+        # Initialize temp arrays to store data.
+        var3d_tmp = dict()
+        var4d_tmp = dict()
+        if month == 12:
+            num_hr = (datetime(year+1,1,1)-datetime(year,month,1)).days*24;
+        else:
+            num_hr = (datetime(year,month+1,1)-datetime(year,month,1)).days*24;
+        for name in var3dnames:
+            var3d_tmp[name] = masked_array(zeros((num_hr,21,57)),mask=True)
+        for name in var4dnames:
+            var4d_tmp[name] = masked_array(zeros((num_hr,nz,21,57)),mask=True)
+            
+        # Now proceed to read from each GOTM result nc file.
+        for i in sea_i:
+            m, n = sea_mn[i]
+            fn = join(base_folder,print_latlon(*sea_locations[i]),'results-{0:d}{1:02d}.nc'.format(year,month))
+            with Dataset(fn,'r') as each:
+                for name in var3dnames:
+                    var3d_tmp[name][:,m,n] = each[name][:,0,0]
+                for name in var4dnames:
+                    # Make sure the depth axis is reversed.
+                    var4d_tmp[name][:,::-1,m,n] = each[name][:,:,0,0] 
+            if cleanup:
+                os.remove(fn)        
+        elasped += toc()
+
+        print('Begin writing to {}'.format(outfn))
+        tic()
+        for name in var3dnames:
+            nc_var3d[name][:] = var3d_tmp[name]
+        for name in var4dnames:
+            nc_var4d[name][:] = var4d_tmp[name]
+        elapsed += toc()
+        print('Finished combining GOTM results after {0:.0f}s'.format(elapsed)
 
 ### Medsea results visualization toolbox
 
