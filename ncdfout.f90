@@ -1374,7 +1374,7 @@
    integer                   :: time_len=NF_UNLIMITED
 !  variable ids
    integer, private          :: lon_id,lat_id,z_id,z1_id,time_id,zeta_id
-   integer, private          :: border_id,swr_error_id,wind_error_id
+   !integer, private          :: border_id,swr_error_id,wind_error_id
    ! integer, private          :: seviri_diff_id,seviri_sq_diff_id,seviri_obs_id
    ! integer, private          :: amsre_diff_id,amsre_sq_diff_id,amsre_obs_id
    ! integer, private          :: tmi_diff_id,tmi_sq_diff_id,tmi_obs_id
@@ -1457,10 +1457,10 @@
    call check_err(iret)
    iret = nf_def_dim(ncid, 'z', nlev, z_dim)
    call check_err(iret)
-   if( .not. GrADS ) then
-      iret = nf_def_dim(ncid, 'z1', nlev, z1_dim)
-      call check_err(iret)
-   end if
+!   if( .not. GrADS ) then
+!      iret = nf_def_dim(ncid, 'z1', nlev, z1_dim)
+!      call check_err(iret)
+!   end if
    iret = nf_def_dim(ncid, 'time', NF_UNLIMITED, time_dim)
    call check_err(iret)
 
@@ -1472,13 +1472,13 @@
    iret = nf_def_var(ncid,'lat',NF_REAL,1,dims,lat_id)
    call check_err(iret)
    dims(1) = z_dim
-   iret = nf_def_var(ncid,'z',NF_REAL,1,dims,z_id)
+   iret = nf_def_var(ncid,'depth',NF_REAL,1,dims,z_id)
    call check_err(iret)
-   if( .not. GrADS ) then
-      dims(1) = z1_dim
-      iret = nf_def_var(ncid,'z1',NF_REAL,1,dims,z1_id)
-      call check_err(iret)
-   end if
+ !  if( .not. GrADS ) then
+ !     dims(1) = z1_dim
+ !     iret = nf_def_var(ncid,'z1',NF_REAL,1,dims,z1_id)
+ !     call check_err(iret)
+ !  end if
    dims(1) = time_dim
    iret = nf_def_var(ncid,'time',NF_INT,1,dims,time_id)
    call check_err(iret)
@@ -1489,8 +1489,8 @@
    dims(1) = lon_dim
    dims(2) = lat_dim
    dims(3) = time_dim
-   iret = nf_def_var(ncid,'zeta',NF_REAL,3,dims, zeta_id)
-   call check_err(iret)
+   !iret = nf_def_var(ncid,'zeta',NF_REAL,3,dims, zeta_id)
+   !call check_err(iret)
    iret = nf_def_var(ncid,'sst',NF_REAL,3,dims, sst_id)
    call check_err(iret)
    iret = nf_def_var(ncid,'skint',NF_REAL,3,dims, skint_id)
@@ -1536,104 +1536,105 @@
 !   iret = nf_def_var(ncid,'ostia_tmi_diff',NF_REAL,3,dims, ostia_tmi_diff_id)
 !   call check_err(iret)
 !   iret = nf_def_var(ncid,'ostia_tmi_sq_diff',NF_REAL,3,dims, ostia_tmi_sq_diff_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'sss',NF_REAL,3,dims, sss_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'x-taus',NF_REAL,3,dims, x_taus_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'y-taus',NF_REAL,3,dims, y_taus_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'swr',NF_REAL,3,dims, swr_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'heat',NF_REAL,3,dims, heat_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'total',NF_REAL,3,dims, total_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'lwr',NF_REAL,3,dims, lwr_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'sens',NF_REAL,3,dims, sens_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'latent',NF_REAL,3,dims, latent_id)
-   call check_err(iret)
 
-   iret = nf_def_var(ncid,'int_sw',NF_REAL,3,dims, int_sw_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'int_hf',NF_REAL,3,dims, int_hf_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'int_total',NF_REAL,3,dims, int_total_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'int_cs',NF_REAL,3,dims, int_cs_id)
-   call check_err(iret)
+!   call check_err(iret)
+!   iret = nf_def_var(ncid,'sss',NF_REAL,3,dims, sss_id)
+!   call check_err(iret)
+!   iret = nf_def_var(ncid,'x-taus',NF_REAL,3,dims, x_taus_id)
+!   call check_err(iret)
+!   iret = nf_def_var(ncid,'y-taus',NF_REAL,3,dims, y_taus_id)
+!   call check_err(iret)
+!   iret = nf_def_var(ncid,'swr',NF_REAL,3,dims, swr_id)
+!   call check_err(iret)
+!   iret = nf_def_var(ncid,'heat',NF_REAL,3,dims, heat_id)
+!   call check_err(iret)
+!   iret = nf_def_var(ncid,'total',NF_REAL,3,dims, total_id)
+!   call check_err(iret)
+!   iret = nf_def_var(ncid,'lwr',NF_REAL,3,dims, lwr_id)
+!   call check_err(iret)
+!   iret = nf_def_var(ncid,'sens',NF_REAL,3,dims, sens_id)
+!   call check_err(iret)
+!   iret = nf_def_var(ncid,'latent',NF_REAL,3,dims, latent_id)
+!   call check_err(iret)
 
-   iret = nf_def_var(ncid,'u_taus',NF_REAL,3,dims, u_taus_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'u_taub',NF_REAL,3,dims, u_taub_id)
-   call check_err(iret)
+!   iret = nf_def_var(ncid,'int_sw',NF_REAL,3,dims, int_sw_id)
+!   call check_err(iret)
+!   iret = nf_def_var(ncid,'int_hf',NF_REAL,3,dims, int_hf_id)
+!   call check_err(iret)
+!   iret = nf_def_var(ncid,'int_total',NF_REAL,3,dims, int_total_id)
+!   call check_err(iret)
+!   iret = nf_def_var(ncid,'int_cs',NF_REAL,3,dims, int_cs_id)
+!   call check_err(iret)
+
+!   iret = nf_def_var(ncid,'u_taus',NF_REAL,3,dims, u_taus_id)
+!   call check_err(iret)
+!   iret = nf_def_var(ncid,'u_taub',NF_REAL,3,dims, u_taub_id)
+!   call check_err(iret)
 
 !  x,y,z,t
    dims(1) = lon_dim
    dims(2) = lat_dim
    dims(3) = z_dim
    dims(4) = time_dim
-   iret = nf_def_var(ncid,'h',NF_REAL,4,dims,h_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'u',NF_REAL,4,dims,u_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'u_obs',NF_REAL,4,dims,u_obs_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'v',NF_REAL,4,dims,v_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'v_obs',NF_REAL,4,dims,v_obs_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'salt',NF_REAL,4,dims,salt_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'salt_obs',NF_REAL,4,dims,salt_obs_id)
-   call check_err(iret)
+ !  iret = nf_def_var(ncid,'h',NF_REAL,4,dims,h_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'u',NF_REAL,4,dims,u_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'u_obs',NF_REAL,4,dims,u_obs_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'v',NF_REAL,4,dims,v_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'v_obs',NF_REAL,4,dims,v_obs_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'salt',NF_REAL,4,dims,salt_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'salt_obs',NF_REAL,4,dims,salt_obs_id)
+ !  call check_err(iret)
    iret = nf_def_var(ncid,'temp',NF_REAL,4,dims,temp_id)
    call check_err(iret)
-   iret = nf_def_var(ncid,'temp_obs',NF_REAL,4,dims,temp_obs_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'SS',NF_REAL,4,dims,SS_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'SS_obs',NF_REAL,4,dims,SS_obs_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'NN',NF_REAL,4,dims,NN_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'NN_obs',NF_REAL,4,dims,NN_obs_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'sigma_t',NF_REAL,4,dims,sigma_t_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'sigma_t_obs',NF_REAL,4,dims,sigma_t_obs_id)
-   call check_err(iret)
-   if( .not. GrADS ) then
-      dims(3) = z1_dim
-   end if
-   iret = nf_def_var(ncid,'num',NF_REAL,4,dims,num_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'nuh',NF_REAL,4,dims,nuh_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'tke',NF_REAL,4,dims,tke_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'tmls',NF_REAL,4,dims,tmls_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'tked',NF_REAL,4,dims,tked_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'tked_obs',NF_REAL,4,dims,tked_obs_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'prod_shear',NF_REAL,4,dims,prod_shear_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'prod_buoy',NF_REAL,4,dims,prod_buoy_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'uu',NF_REAL,4,dims,uu_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'vv',NF_REAL,4,dims,vv_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'ww',NF_REAL,4,dims,ww_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'tt',NF_REAL,4,dims,tt_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'chi',NF_REAL,4,dims,chi_id)
-   call check_err(iret)
+ !  iret = nf_def_var(ncid,'temp_obs',NF_REAL,4,dims,temp_obs_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'SS',NF_REAL,4,dims,SS_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'SS_obs',NF_REAL,4,dims,SS_obs_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'NN',NF_REAL,4,dims,NN_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'NN_obs',NF_REAL,4,dims,NN_obs_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'sigma_t',NF_REAL,4,dims,sigma_t_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'sigma_t_obs',NF_REAL,4,dims,sigma_t_obs_id)
+ !  call check_err(iret)
+ !  if( .not. GrADS ) then
+ !     dims(3) = z1_dim
+ !  end if
+ !  iret = nf_def_var(ncid,'num',NF_REAL,4,dims,num_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'nuh',NF_REAL,4,dims,nuh_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'tke',NF_REAL,4,dims,tke_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'tmls',NF_REAL,4,dims,tmls_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'tked',NF_REAL,4,dims,tked_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'tked_obs',NF_REAL,4,dims,tked_obs_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'prod_shear',NF_REAL,4,dims,prod_shear_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'prod_buoy',NF_REAL,4,dims,prod_buoy_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'uu',NF_REAL,4,dims,uu_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'vv',NF_REAL,4,dims,vv_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'ww',NF_REAL,4,dims,ww_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'tt',NF_REAL,4,dims,tt_id)
+ !  call check_err(iret)
+ !  iret = nf_def_var(ncid,'chi',NF_REAL,4,dims,chi_id)
+ !  call check_err(iret)
 
 !  assign attributes
 
@@ -1641,7 +1642,7 @@
    iret = set_attributes(ncid,lon_id,units='degrees_east')
    iret = set_attributes(ncid,lat_id,units='degrees_north')
    iret = set_attributes(ncid,z_id,units='meters')
-   iret = set_attributes(ncid,z1_id,units='meters')
+!   iret = set_attributes(ncid,z1_id,units='meters')
 !   iret = set_attributes(ncid,swr_error_id,units='no units')
 !   iret = set_attributes(ncid,wind_error_id,units='no units')
 !   iret = set_attributes(ncid,border_id,units='no units')
@@ -1661,7 +1662,7 @@
    iret = set_attributes(ncid,time_id,units=trim(ncdf_time_str))
 
 !  x,y,t
-   iret = set_attributes(ncid,zeta_id,units='m',long_name='sea surface elevation')
+!   iret = set_attributes(ncid,zeta_id,units='m',long_name='sea surface elevation')
    iret = set_attributes(ncid,sst_id,units='celsius',long_name='sea surface temperature')
    iret = set_attributes(ncid,skint_id,units='celsius',long_name='skin sea surface temperature')
 !   iret = set_attributes(ncid,seviri_diff_id,units='celsius',long_name='sum of seviri differences')
@@ -1682,54 +1683,55 @@
 !   iret = set_attributes(ncid,ostia_tmi_diff_id,units='celsius',long_name='sum of ostia-tmi differences')
 !   iret = set_attributes(ncid,ostia_tmi_sq_diff_id,units='celsius',long_name='sum of ostia-tmi squared differences')
 !   iret = set_attributes(ncid,cloud_id,units='tenths',long_name='total fractional cloud cover')
-   iret = set_attributes(ncid,sss_id,units='psu',long_name='sea surface salinity')
-   iret = set_attributes(ncid,x_taus_id,units='N/m2',long_name='x-wind stress')
-   iret = set_attributes(ncid,y_taus_id,units='N/m2',long_name='y-wind stress')
-   iret = set_attributes(ncid,swr_id,units='W/m2',long_name='short wave radiation')
-   iret = set_attributes(ncid,heat_id,units='W/m2',long_name='surface heat flux')
-   iret = set_attributes(ncid,total_id,units='W/m2',long_name='total surface heat exchange')
-   iret = set_attributes(ncid,lwr_id,units='W/m2',long_name='long wave radiation')
-   iret = set_attributes(ncid,sens_id,units='W/m2',long_name='sensible heat flux')
-   iret = set_attributes(ncid,latent_id,units='W/m2',long_name='latent heat flux')
-   iret = set_attributes(ncid,int_sw_id,units='J/m2',long_name='integrated short wave radiation')
-   iret = set_attributes(ncid,int_hf_id,units='J/m2',long_name='integrated surface heat flux')
-   iret = set_attributes(ncid,int_total_id,units='J/m2',long_name='integrated total surface heat exchange')
-   iret = set_attributes(ncid,int_cs_id,units='J/m2',long_name='integrated clear sky short wave radiation')
-   iret = set_attributes(ncid,u_taus_id,units='m/s',long_name='surface friction velocity')
-   iret = set_attributes(ncid,u_taub_id,units='m/s',long_name='bottom friction velocity')
+
+!   iret = set_attributes(ncid,sss_id,units='psu',long_name='sea surface salinity')
+!   iret = set_attributes(ncid,x_taus_id,units='N/m2',long_name='x-wind stress')
+!   iret = set_attributes(ncid,y_taus_id,units='N/m2',long_name='y-wind stress')
+!   iret = set_attributes(ncid,swr_id,units='W/m2',long_name='short wave radiation')
+!   iret = set_attributes(ncid,heat_id,units='W/m2',long_name='surface heat flux')
+!   iret = set_attributes(ncid,total_id,units='W/m2',long_name='total surface heat exchange')
+!   iret = set_attributes(ncid,lwr_id,units='W/m2',long_name='long wave radiation')
+!   iret = set_attributes(ncid,sens_id,units='W/m2',long_name='sensible heat flux')
+!   iret = set_attributes(ncid,latent_id,units='W/m2',long_name='latent heat flux')
+!   iret = set_attributes(ncid,int_sw_id,units='J/m2',long_name='integrated short wave radiation')
+!   iret = set_attributes(ncid,int_hf_id,units='J/m2',long_name='integrated surface heat flux')
+!   iret = set_attributes(ncid,int_total_id,units='J/m2',long_name='integrated total surface heat exchange')
+!   iret = set_attributes(ncid,int_cs_id,units='J/m2',long_name='integrated clear sky short wave radiation')
+!   iret = set_attributes(ncid,u_taus_id,units='m/s',long_name='surface friction velocity')
+!   iret = set_attributes(ncid,u_taub_id,units='m/s',long_name='bottom friction velocity')
 
 !  x,y,z,t
-   iret = set_attributes(ncid,h_id,units='meters',long_name='layer thickness')
-   iret = set_attributes(ncid,u_id,units='m/s',long_name='x-velocity')
-   iret = set_attributes(ncid,u_obs_id,units='m/s',long_name='obs. x-velocity')
-   iret = set_attributes(ncid,v_id,units='m/s',long_name='y-velocity')
-   iret = set_attributes(ncid,v_obs_id,units='m/s',long_name='obs. y-velocity')
-   iret = set_attributes(ncid,salt_id,units='ppt',long_name='salinity')
-   iret = set_attributes(ncid,salt_obs_id,units='ppt',long_name='obs. salinity')
+ !  iret = set_attributes(ncid,h_id,units='meters',long_name='layer thickness')
+ !  iret = set_attributes(ncid,u_id,units='m/s',long_name='x-velocity')
+ !  iret = set_attributes(ncid,u_obs_id,units='m/s',long_name='obs. x-velocity')
+ !  iret = set_attributes(ncid,v_id,units='m/s',long_name='y-velocity')
+ !  iret = set_attributes(ncid,v_obs_id,units='m/s',long_name='obs. y-velocity')
+ !  iret = set_attributes(ncid,salt_id,units='ppt',long_name='salinity')
+ !  iret = set_attributes(ncid,salt_obs_id,units='ppt',long_name='obs. salinity')
    iret = set_attributes(ncid,temp_id,units='celsius',long_name='temperature')
-   iret = set_attributes(ncid,temp_obs_id,units='celcius',long_name='obs. temperature')
-   iret = set_attributes(ncid,SS_id,units='s-1',long_name='shear frequency')
-   iret = set_attributes(ncid,NN_id,units='s-1',long_name='buoyancy frequency')
-   iret = set_attributes(ncid,sigma_t_id,units='s-1',long_name='sigma_t')
-   iret = set_attributes(ncid,SS_obs_id,units='s-1',long_name='observed shear frequency')
-   iret = set_attributes(ncid,NN_obs_id,units='s-1',long_name='observed buoyancy frequency')
-   iret = set_attributes(ncid,sigma_t_obs_id,units='s-1',long_name='observed sigma_t')
+  ! iret = set_attributes(ncid,temp_obs_id,units='celcius',long_name='obs. temperature')
+  ! iret = set_attributes(ncid,SS_id,units='s-1',long_name='shear frequency')
+  ! iret = set_attributes(ncid,NN_id,units='s-1',long_name='buoyancy frequency')
+  ! iret = set_attributes(ncid,sigma_t_id,units='s-1',long_name='sigma_t')
+  ! iret = set_attributes(ncid,SS_obs_id,units='s-1',long_name='observed shear frequency')
+  ! iret = set_attributes(ncid,NN_obs_id,units='s-1',long_name='observed buoyancy frequency')
+  ! iret = set_attributes(ncid,sigma_t_obs_id,units='s-1',long_name='observed sigma_t')
 
 !  x,y,z1,t
-   iret = set_attributes(ncid,num_id,units='m2/s',long_name='viscosity')
-   iret = set_attributes(ncid,nuh_id,units='m2/s',long_name='diffusivity')
-   iret = set_attributes(ncid,tke_id,units='m2/s2',long_name='turbulent kinetic energy')
-   iret = set_attributes(ncid,tmls_id,units='meters',long_name='turbulent macro length scale')
-   iret = set_attributes(ncid,tked_id,units='m2/s3',long_name='turbulent kinetic energy dissipation')
-   iret = set_attributes(ncid,tked_obs_id,units='m2/s3',long_name='obs. dissipation')
-   iret = set_attributes(ncid,prod_shear_id,units='m2/s3',long_name='shear production')
-   iret = set_attributes(ncid,prod_buoy_id,units='m2/s3',long_name='buoyancy production')
+!   iret = set_attributes(ncid,num_id,units='m2/s',long_name='viscosity')
+!   iret = set_attributes(ncid,nuh_id,units='m2/s',long_name='diffusivity')
+!   iret = set_attributes(ncid,tke_id,units='m2/s2',long_name='turbulent kinetic energy')
+!   iret = set_attributes(ncid,tmls_id,units='meters',long_name='turbulent macro length scale')
+!   iret = set_attributes(ncid,tked_id,units='m2/s3',long_name='turbulent kinetic energy dissipation')
+!   iret = set_attributes(ncid,tked_obs_id,units='m2/s3',long_name='obs. dissipation')
+!   iret = set_attributes(ncid,prod_shear_id,units='m2/s3',long_name='shear production')
+!   iret = set_attributes(ncid,prod_buoy_id,units='m2/s3',long_name='buoyancy production')
 
-   iret = set_attributes(ncid,uu_id,units='(m/s)2',long_name='Reynolds stress (u)')
-   iret = set_attributes(ncid,vv_id,units='(m/s)2',long_name='Reynolds stress (v)')
-   iret = set_attributes(ncid,ww_id,units='(m/s)2',long_name='Reynolds stress (w)')
-   iret = set_attributes(ncid,tt_id,units='K2',long_name='temperature variance')
-   iret = set_attributes(ncid,chi_id,units='K2/s',long_name='temperature dissipation')
+!   iret = set_attributes(ncid,uu_id,units='(m/s)2',long_name='Reynolds stress (u)')
+!   iret = set_attributes(ncid,vv_id,units='(m/s)2',long_name='Reynolds stress (v)')
+!   iret = set_attributes(ncid,ww_id,units='(m/s)2',long_name='Reynolds stress (w)')
+!   iret = set_attributes(ncid,tt_id,units='K2',long_name='temperature variance')
+!   iret = set_attributes(ncid,chi_id,units='K2/s',long_name='temperature dissipation')
 
 !  global attributes
    iret = nf_put_att_text(ncid,NF_GLOBAL,'Title',LEN_TRIM(title),title)
@@ -1804,13 +1806,13 @@
 !-------------------------------------------------------------------------
 !BOC
    if ( first ) then
-      iret = store_data(ncid,z_id,1,nlev,array=z)
+      iret = store_data(ncid,z_id,1,nlev,array=-z(nlev+1:1:-1)) !iret = store_data(ncid,z_id,1,nlev,array=z)
       if( .not. GrADS ) then
          dum(1) = -depth0 + h(1)
          do i=2,nlev
             dum(i)=dum(i-1)+h(i)
          end do
-         iret = store_data(ncid,z1_id,1,nlev,array=dum)
+        ! iret = store_data(ncid,z1_id,1,nlev,array=dum)
       end if
       first = .false.
    end if
@@ -1829,7 +1831,7 @@
    iret = store_data(ncid,time_id,2,1,iscalar=time)
 
 !  Time varying data : x,y,t 
-   iret = store_data(ncid,zeta_id,4,1,scalar=zeta)
+!   iret = store_data(ncid,zeta_id,4,1,scalar=zeta)
    iret = store_data(ncid,sst_id,4,1,scalar=sst)
    iret = store_data(ncid,skint_id,4,1,scalar=skint)
    !iret = store_data(ncid,swr_error_id,4,1,scalar=swr_error)
@@ -1853,79 +1855,79 @@
    !iret = store_data(ncid,ostia_seviri_diff_id,4,1,scalar=ostia_seviri_diff)
    !iret = store_data(ncid,ostia_seviri_sq_diff_id,4,1,scalar=ostia_seviri_sq_diff)
    !iret = store_data(ncid,cloud_id,4,1,scalar=cloud)
-   iret = store_data(ncid,sss_id,4,1,scalar=sss)
-   iret = store_data(ncid,x_taus_id,4,1,scalar=tx)
-   iret = store_data(ncid,y_taus_id,4,1,scalar=ty)
-   iret = store_data(ncid,swr_id,4,1,scalar=I_0)
-   iret = store_data(ncid,heat_id,4,1,scalar=heat)
-   iret = store_data(ncid,total_id,4,1,scalar=heat+I_0)
-   iret = store_data(ncid,lwr_id,4,1,scalar=-qb)
-   iret = store_data(ncid,sens_id,4,1,scalar=-qh)
-   iret = store_data(ncid,latent_id,4,1,scalar=-qe)
-   iret = store_data(ncid,int_sw_id,4,1,scalar=int_sw)
-   iret = store_data(ncid,int_hf_id,4,1,scalar=int_hf)
-   iret = store_data(ncid,int_total_id,4,1,scalar=int_total)
-   iret = store_data(ncid,int_cs_id,4,1,scalar=int_cs)
-   iret = store_data(ncid,u_taub_id,4,1,scalar=u_taub)
-   iret = store_data(ncid,u_taus_id,4,1,scalar=u_taus)
+!   iret = store_data(ncid,sss_id,4,1,scalar=sss)
+!   iret = store_data(ncid,x_taus_id,4,1,scalar=tx)
+!   iret = store_data(ncid,y_taus_id,4,1,scalar=ty)
+!   iret = store_data(ncid,swr_id,4,1,scalar=I_0)
+!   iret = store_data(ncid,heat_id,4,1,scalar=heat)
+!   iret = store_data(ncid,total_id,4,1,scalar=heat+I_0)
+!   iret = store_data(ncid,lwr_id,4,1,scalar=-qb)
+!   iret = store_data(ncid,sens_id,4,1,scalar=-qh)
+!   iret = store_data(ncid,latent_id,4,1,scalar=-qe)
+!   iret = store_data(ncid,int_sw_id,4,1,scalar=int_sw)
+!   iret = store_data(ncid,int_hf_id,4,1,scalar=int_hf)
+!   iret = store_data(ncid,int_total_id,4,1,scalar=int_total)
+!   iret = store_data(ncid,int_cs_id,4,1,scalar=int_cs)
+!   iret = store_data(ncid,u_taub_id,4,1,scalar=u_taub)
+!   iret = store_data(ncid,u_taus_id,4,1,scalar=u_taus)
 
 !  Time varying profile data : x,y,z,t
-   iret = store_data(ncid,h_id,5,nlev,array=h)
-   iret = store_data(ncid,u_id,5,nlev,array=u)
-   iret = store_data(ncid,u_obs_id,5,nlev,array=uprof)
-   iret = store_data(ncid,v_id,5,nlev,array=v)
-   iret = store_data(ncid,v_obs_id,5,nlev,array=vprof)
-   iret = store_data(ncid,salt_id,5,nlev,array=S)
-   iret = store_data(ncid,salt_obs_id,5,nlev,array=sprof)
+ !  iret = store_data(ncid,h_id,5,nlev,array=h)
+ !  iret = store_data(ncid,u_id,5,nlev,array=u)
+ !  iret = store_data(ncid,u_obs_id,5,nlev,array=uprof)
+ !  iret = store_data(ncid,v_id,5,nlev,array=v)
+ !  iret = store_data(ncid,v_obs_id,5,nlev,array=vprof)
+ !  iret = store_data(ncid,salt_id,5,nlev,array=S)
+ !  iret = store_data(ncid,salt_obs_id,5,nlev,array=sprof)
    iret = store_data(ncid,temp_id,5,nlev,array=T)
-   iret = store_data(ncid,temp_obs_id,5,nlev,array=tprof)
-   iret = store_data(ncid,SS_id,5,nlev,array=SS)
-   iret = store_data(ncid,NN_id,5,nlev,array=NN)
+ !  iret = store_data(ncid,temp_obs_id,5,nlev,array=tprof)
+ !  iret = store_data(ncid,SS_id,5,nlev,array=SS)
+ !  iret = store_data(ncid,NN_id,5,nlev,array=NN)
 
-   dum(1:nlev)=-buoy(1:nlev)*rho_0/gravity+rho_0-1000.
-   iret = store_data(ncid,sigma_t_id,5,nlev,array=dum)
+ !  dum(1:nlev)=-buoy(1:nlev)*rho_0/gravity+rho_0-1000.
+ !  iret = store_data(ncid,sigma_t_id,5,nlev,array=dum)
 
-   do i=1,nlev-1
-     dum(i)=((uprof(i+1)-uprof(i))/(0.5*(h(i+1)+h(i))))**2 +  &
-            ((vprof(i+1)-vprof(i))/(0.5*(h(i+1)+h(i))))**2
-   end do 
-   dum(nlev)=dum(nlev-1)
-   iret = store_data(ncid,SS_obs_id,5,nlev,array=dum)
+ !  do i=1,nlev-1
+ !    dum(i)=((uprof(i+1)-uprof(i))/(0.5*(h(i+1)+h(i))))**2 +  &
+ !           ((vprof(i+1)-vprof(i))/(0.5*(h(i+1)+h(i))))**2
+ !  end do
+ !  dum(nlev)=dum(nlev-1)
+ !  iret = store_data(ncid,SS_obs_id,5,nlev,array=dum)
 
-   zz = 0.0d0
-   do i=nlev-1,1,-1
-      zz=zz+h(i+1)
-      dz=0.5*(h(i)+h(i+1))
-      buoyp=eqstate1(sprof(i+1),tprof(i+1),zz/10.,gravity,rho_0)
-      buoym=eqstate1(sprof(i  ),tprof(i  ),zz/10.,gravity,rho_0)
-      dum(i)=(buoyp-buoym)/dz
-   end do
-   iret = store_data(ncid,NN_obs_id,5,nlev,array=dum)
+ !  zz = 0.0d0
+ !  do i=nlev-1,1,-1
+ !     zz=zz+h(i+1)
+ !     dz=0.5*(h(i)+h(i+1))
+ !     buoyp=eqstate1(sprof(i+1),tprof(i+1),zz/10.,gravity,rho_0)
+ !     buoym=eqstate1(sprof(i  ),tprof(i  ),zz/10.,gravity,rho_0)
+ !     dum(i)=(buoyp-buoym)/dz
+ !  end do
+ !  iret = store_data(ncid,NN_obs_id,5,nlev,array=dum)
 
-   dum(1:nlev)=-buoy(1:nlev)*rho_0/gravity+rho_0-1000.
-   zz = 0.0d0
-   do i=nlev,1,-1
-      zz=zz+0.5*h(i)
-      dum(i)=eqstate1(sprof(i),tprof(i),zz/10.,gravity,rho_0)
-      zz=zz+0.5*h(i)
-   end do 
-   dum(1:nlev)=-dum(1:nlev)*rho_0/gravity+rho_0-1000.
-   iret = store_data(ncid,sigma_t_obs_id,5,nlev,array=dum)
+ !  dum(1:nlev)=-buoy(1:nlev)*rho_0/gravity+rho_0-1000.
+ !  zz = 0.0d0
+ !  do i=nlev,1,-1
+ !     zz=zz+0.5*h(i)
+ !     dum(i)=eqstate1(sprof(i),tprof(i),zz/10.,gravity,rho_0)
+ !     zz=zz+0.5*h(i)
+ !  end do
+ !  dum(1:nlev)=-dum(1:nlev)*rho_0/gravity+rho_0-1000.
+ !  iret = store_data(ncid,sigma_t_obs_id,5,nlev,array=dum)
 
 !  Time varying profile data : x,y,z1,t
-   iret = store_data(ncid,num_id,5,nlev,array=num)
-   iret = store_data(ncid,nuh_id,5,nlev,array=nuh)
-   iret = store_data(ncid,tke_id,5,nlev,array=tke)
-   iret = store_data(ncid,tked_id,5,nlev,array=eps)
-   iret = store_data(ncid,tmls_id,5,nlev,array=L)
-   iret = store_data(ncid,tked_obs_id,5,nlev,array=epsprof)
-   iret = store_data(ncid,prod_shear_id,5,nlev,array=P)
-   iret = store_data(ncid,prod_buoy_id,5,nlev,array=B)
-   iret = store_data(ncid,uu_id,5,nlev,array=uu)
-   iret = store_data(ncid,vv_id,5,nlev,array=vv)
-   iret = store_data(ncid,ww_id,5,nlev,array=ww)
-   iret = store_data(ncid,tt_id,5,nlev,array=tt)
-   iret = store_data(ncid,chi_id,5,nlev,array=chi)
+!   iret = store_data(ncid,num_id,5,nlev,array=num)
+!   iret = store_data(ncid,nuh_id,5,nlev,array=nuh)
+!   iret = store_data(ncid,tke_id,5,nlev,array=tke)
+!   iret = store_data(ncid,tked_id,5,nlev,array=eps)
+!   iret = store_data(ncid,tmls_id,5,nlev,array=L)
+!   iret = store_data(ncid,tked_obs_id,5,nlev,array=epsprof)
+!   iret = store_data(ncid,prod_shear_id,5,nlev,array=P)
+!   iret = store_data(ncid,prod_buoy_id,5,nlev,array=B)
+!   iret = store_data(ncid,uu_id,5,nlev,array=uu)
+!   iret = store_data(ncid,vv_id,5,nlev,array=vv)
+!   iret = store_data(ncid,ww_id,5,nlev,array=ww)
+!   iret = store_data(ncid,tt_id,5,nlev,array=tt)
+!   iret = store_data(ncid,chi_id,5,nlev,array=chi)
 
    set = set + 1
 
