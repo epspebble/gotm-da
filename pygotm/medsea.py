@@ -48,6 +48,7 @@ def get_lat_lon(m,n):
 
 def create_dimensions(nc, lat=medsea_lats, lon=medsea_lons):
     " Declaring dimensions and creating the coordinate variables for each dimension."
+
     # Dimensions
     nc.createDimension('time') # unlimited
     nc.createDimension('lat', size = len(lat))
@@ -437,14 +438,14 @@ def core_run(year,month,m=None,n=None,lat=None,lon=None,verbose=False,**gotm_use
         
     os.chdir(base_folder)
 
-def combine_run(year = 2014, month = 1,
-                var3dnames = ['sst','skint','swr','lwr','sens','latent'],
-                var4dnames = ['temp'], run = 'ASM0',
-                data_model = 'NETCDF3_CLASSIC',
+def combine_run(year, month, run,
+                var3dnames = ['sst','skint'],
+                var4dnames = ['temp'], 
+                format = 'NETCDF3_CLASSIC',
                 cleanup = False):
     " Combine GOTM results nc files from each grid point into a single monthly nc file. "
     from netCDF4 import Dataset
-    from numpy.ma import masked_array
+    from numpy.ma import masked_array, zeros
     
     print('Combining GOTM results for {0:d}{1:02d} ...'.format(year,month))
     outfn = os.path.join(base_folder,run,'medsea_GOTM_{0:d}{1:02d}.nc'.format(year,month))
@@ -452,18 +453,23 @@ def combine_run(year = 2014, month = 1,
     print('Writing dimensions and metadata...')
     elapsed = 0
     tic()
-    with Dataset(outfn,'w',data_model=data_model) as nc:
 
-        # From a certain place is this default setting.
+    with Dataset(outfn,'w',format=format) as nc:
+        # Default dimensions for medsea.
         nctime, nclat, nclon = create_dimensions(nc)
+
+        # Also create the depth dimension.
         nz = 150 # Could use a global setting when we refactor next time.
         nc.createDimension('depth', size = nz)
+        ncdepth = nc.createVariable('depth','f4',dimensions=('depth',))
+        
+        # Create nc variables for each GOTM output variable specified.
         ncvar3d = {name: create_variable(nc,name,'f8', dimensions=('time','lat','lon')) for name in var3dnames}
-        nvvar4d = {name: create_variable(nc,name,'f8',dimensions=('time','depth','lat','lon')) for name in var4dnames}
+        ncvar4d = {name: create_variable(nc,name,'f8',dimensions=('time','depth','lat','lon')) for name in var4dnames}
         
         # We actually know all our sea locations, and (30.75N,18.75E) is the first point in our medsea grid.
-        fn = os.path.join(base_folder,print_latlon(*sea_locations[0]),'results-{0:d}{1:02d}.nc'.format(year,month))
-        
+        fn = os.path.join(base_folder,run,print_lat_lon(*sea_locations[0]),'results-{0:d}{1:02d}.nc'.format(year,month))
+
         # Transfer units and dimensions.
         with Dataset(fn,'r') as first:
             nclat.units = first['lat'].units
@@ -474,10 +480,10 @@ def combine_run(year = 2014, month = 1,
                 ncvar3d[name].units = first[name].units
             for name in var4dnames:
                 ncvar4d[name].units = first[name].units
-            nc_time[:] = first['time'][:]
-            nc_depth[:] = -first['z'][::-1] # reverse order and sign
+            nctime[:] = first['time'][:]
+            ncdepth[:] = -first['z'][::-1] # reverse order and sign
         
-        elasped += toc()
+        elapsed += toc()
         
         print('Begin reading data into memory...')
         tic()
@@ -495,9 +501,8 @@ def combine_run(year = 2014, month = 1,
             var4d_tmp[name] = masked_array(zeros((num_hr,nz,21,57)),mask=True)
             
         # Now proceed to read from each GOTM result nc file.
-        for i in sea_i:
-            m, n = sea_mn[i]
-            fn = join(base_folder,print_latlon(*sea_locations[i]),'results-{0:d}{1:02d}.nc'.format(year,month))
+        for m, n in sea_mn:
+            fn = os.path.join(base_folder,run,print_lat_lon(*get_lat_lon(m,n)),'results-{0:d}{1:02d}.nc'.format(year,month))
             with Dataset(fn,'r') as each:
                 for name in var3dnames:
                     var3d_tmp[name][:,m,n] = each[name][:,0,0]
@@ -506,16 +511,17 @@ def combine_run(year = 2014, month = 1,
                     var4d_tmp[name][:,::-1,m,n] = each[name][:,:,0,0] 
             if cleanup:
                 os.remove(fn)        
-        elasped += toc()
+        elapsed += toc()
 
         print('Begin writing to {}'.format(outfn))
         tic()
         for name in var3dnames:
-            nc_var3d[name][:] = var3d_tmp[name]
+            ncvar3d[name][:] = var3d_tmp[name]
         for name in var4dnames:
-            nc_var4d[name][:] = var4d_tmp[name]
+            ncvar4d[name][:] = var4d_tmp[name]
         elapsed += toc()
-        print('Finished combining GOTM results after {0:.0f}s'.format(elapsed)
+
+        print('Finished combining GOTM results after {0:.0f}s'.format(elapsed))
 
 ### Medsea results visualization toolbox
 
