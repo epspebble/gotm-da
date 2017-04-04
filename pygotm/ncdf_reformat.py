@@ -45,7 +45,7 @@ def get_ERA_yearly_data(folder,year,name,alias,lat_indices,lon_indices):
         # Then return the data unpacked from the netCDF object.
         return nc[alias][:,lat_indices,lon_indices]
 
-def timings(month,epoch):
+def timings(month):
     from datetime import datetime,timedelta
     ### MAIN WORK: calculating various date and time offsets.
     
@@ -122,11 +122,12 @@ def ERA_reformat(year):
     from netCDF4 import Dataset
     from datetime import datetime, timedelta
     
+    ## 'epoch' moved to global config, load it by import .config
     # The ERA yearly dataset has epoch at the start of that year... 
     # We unify them to 1981-01-01 00:00:00, which seems to be the convention used in UKMO and
     # Copernicus analysed SST products.
-    epoch = datetime(1981,1,1,0,0,0)
-    #data = {name: get_ERA_yearly_data(ERA_folder,year,name,alias) \
+    # epoch = datetime(1981,1,1,0,0,0)
+    # data = {name: get_ERA_yearly_data(ERA_folder,year,name,alias) \
     #        for name,alias in zip(ERA_names,ERA_alias)}
 
     # Create the monthly files first with the basic dimensions.
