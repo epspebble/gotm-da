@@ -8,6 +8,7 @@ except NameError:
 ### Global settings
 import os
 from datetime import datetime
+from netCDF4 import Dataset
 from numpy import pi, cos, sin
 
 # For our netCDF4 files
