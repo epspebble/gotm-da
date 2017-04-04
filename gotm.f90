@@ -857,7 +857,7 @@ contains
        end do
        !WT 2016-09-24
        call write_time_string(julianday,secondsofday,tmp_str)
-       write(unit_assim_event,*) tmp_str, T(nlev), S(nlev)
+       write(unit_assim_event,*) tmp_str, T(nlev)
        write(0,*) 'Temperature and salinity profiles assimilated at ', tmp_str
     end if
     !end without averaging

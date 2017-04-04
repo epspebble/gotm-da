@@ -1472,7 +1472,7 @@
    iret = nf_def_var(ncid,'lat',NF_REAL,1,dims,lat_id)
    call check_err(iret)
    dims(1) = z_dim
-   iret = nf_def_var(ncid,'depth',NF_REAL,1,dims,z_id)
+   iret = nf_def_var(ncid,'z',NF_REAL,1,dims,z_id)
    call check_err(iret)
  !  if( .not. GrADS ) then
  !     dims(1) = z1_dim
@@ -1806,7 +1806,8 @@
 !-------------------------------------------------------------------------
 !BOC
    if ( first ) then
-      iret = store_data(ncid,z_id,1,nlev,array=-z(nlev+1:1:-1)) !iret = store_data(ncid,z_id,1,nlev,array=z)
+      !iret = store_data(ncid,z_id,1,nlev,array=-z(nlev+1:1:-1)) 
+      iret = store_data(ncid,z_id,1,nlev,array=z)
       if( .not. GrADS ) then
          dum(1) = -depth0 + h(1)
          do i=2,nlev
