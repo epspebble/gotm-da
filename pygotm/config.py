@@ -51,30 +51,60 @@ ERA_folder = os.path.join(p_sossta_folder,'medsea_ERA-INTERIM','3-hourly')
 rea_folder = os.path.join(p_sossta_folder,'medsea_rea')
 
 # GOTM dat files' netCDF reformatted dataset sources.
-def data_sources(year, month, mode = 'r', dat = ['heat','met','tprof','sprof']):
-    from netCDF4 import Dataset
+def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','sprof']):
+    """ 
+    Return the netCDF4 Dataset (or MFDataset) handles for the data source. 
+    Calling data_sources() returns MFDataset of all available data for dat = ['heat','met','tprof','sprof']
+    by default in read-only mode.
+    
+    """
+    from netCDF4 import Dataset, MFDataset
     import os
+
+    if (year is None) or (month is None):
+        MF = True 
+        # Need to use MFDataset
+        NCDataset = MFDataset
+    else:
+        NCDataset = Dataset
 
     if isinstance(dat,str):
         dat = [dat] # So that list comprehension still works.
 
-    fn_dict = {'heat' : os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_{:d}{:02d}.nc'.format(year,month)),
-               'met'  : os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_{:d}{:02d}.nc'.format(year,month)),
-               'tprof': os.path.join(data_folder,'medsea_rea','medsea_rea_votemper_{:d}{:02d}.nc'.format(year,month)),
-               'sprof': os.path.join(data_folder,'medsea_rea','medsea_rea_vosaline_{:d}{:02d}.nc'.format(year,month)),
-               'sst'  : os.path.join(data_folder,'medsea_OSTIA','medsea_OSTIA_sst_{:d}{:02d}.nc'.format(year,month)),
-               'chlo' : os.path.join(data_folder,'medsea_MODIS','medsea_MODIS_chlor_a_{:d}{:02d}.nc'.format(year,month))}
-    assert all([each in fn_dict.keys() for each in dat])
+    # nc_dict = dict(heat = MFDataset(os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_*.nc')), 
+    #                met = MFDataset(os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_*.nc')), 
+    #                tprof = MFDataset(os.path.join(data_folder,'medsea_rea','medsea_rea_votemper_*.nc')), 
+    #                sprof = MFDataset(os.path.join(data_folder,'medsea_rea','medsea_rea_vosaline_*.nc')))
+
+    suffix = '_'
+    if (year is not None):
+        suffix += '{:d}'.format(year)
+    else:
+        suffix += '*'
+    if (month is not None):
+        suffix += '{:02d}'.format(month)
+    else:
+        suffix += '*'
+    suffix += '.nc'
+
+    # print(suffix) # debug
+    fn_dict = {'heat' : os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_heat' + suffix),
+               'met'  : os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_met' + suffix),
+               'tprof': os.path.join(data_folder,'medsea_rea','medsea_rea_votemper' + suffix),
+               'sprof': os.path.join(data_folder,'medsea_rea','medsea_rea_vosaline' + suffix),
+               'sst'  : os.path.join(data_folder,'medsea_OSTIA','medsea_OSTIA_sst' + suffix),
+               'chlo' : os.path.join(data_folder,'medsea_MODIS','medsea_MODIS_chlor_a' + suffix)}
+
+    assert all([each in fn_dict.keys() for each in dat]) # Check that the function is called correctly.
 
     for each in fn_dict.keys():
         try:
-            ds_dict = {each : Dataset(fn_dict[each],mode) for each in dat}
+            ds_dict = {each : NCDataset(fn_dict[each],mode) for each in dat}
         except OSError:
             print('Error accessing {:s}.'.format(fn_dict[each]))
             raise
         except:
             raise
-
 
     if len(ds_dict.keys()) == 1:
         # If only one dataset requested, return the netcdf dataset unwrapped from the dict. 

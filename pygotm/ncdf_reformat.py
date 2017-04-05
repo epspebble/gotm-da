@@ -31,15 +31,13 @@ rea_lon_ind = slice(0,673,12)
 ndepth = 24
 rea_depth_ind = slice(0,ndepth)
 
-
 met_names = ['u10m','v10m','sp','t2m','q2m','precip','snow']
 met_alias = ['u10m','v10m','sp','t2m','q2m','var144','var228']
 heat_names = ['lwrd','swrd']
 heat_alias = ['var175','var169']
 
-ERA_names = met_names + heat_names
-ERA_alias = met_alias + heat_alias
-
+# ERA_names = met_names + heat_names
+# ERA_alias = met_alias + heat_alias
 
 def get_ERA_yearly_data(folder,year,name,alias,lat_indices,lon_indices):
     from netCDF4 import Dataset
@@ -143,40 +141,47 @@ def ERA_reformat(year):
     #    fullfile = os.path.join(data_folder,'medsea_ERA-INTERIM',outfn)
             
     # Iterate through the variables and append the data.
-    for i,(name,alias) in enumerate(zip(ERA_names,ERA_alias)):
-        # Fetch the yearly data in one go.
-        tic()
-        print("Reading in {:d}'s ERA-INTERIM data for {:s}...".format(year,name))
-        data = get_ERA_yearly_data(ERA_folder,year,name,alias,ERA_lat_ind,ERA_lon_ind)
-        toc()
-        
-        # Output monthly and yearly files.
-        for month in range(1,13):
+    def write_ERA(ERA_names, ERA_alias, subtype):
+        for i,(name,alias) in enumerate(zip(ERA_names,ERA_alias)):
+            # Fetch the yearly data in one go.
             tic()
-            print("Writing data for the month #{:d}...".format(month))
-            # Output filename and full path.
-            outfn = 'medsea_ERA_{0:d}{1:02d}.nc'.format(year,month)
-            fullfile = os.path.join(data_folder,'medsea_ERA-INTERIM',outfn)
-            # Interpretation of ERA data timings CRITICAL here to get these indices correct.
-            start_hour, end_hour, start_ind, end_ind = timings(year,month)
-
-            if i == 0: # Creating the first variable.
-                # Start the nc file with the basic dimensions, overwriting existing file.
-                with Dataset(fullfile,'w',format="NETCDF3_CLASSIC") as nc:
-                    # Routine stuff delegated to a helper funciton.
-                    nctime, nclat, nclon = create_dimensions(nc)
-                    # Write the time values to the nc file.
-                    nctime[:] = [hour for hour in range(start_hour, end_hour+3,3)]
-                    #print(fullfile + ' with time({}), lat({}), lon({}) set up.'.format(len(nctime),len(nclat),len(nclon)))
-                
-            # Append the new variable.
-            with Dataset(fullfile,"a") as nc:
-                ncvar = create_variable(nc,name,'f8')
-                ncvar[:] = data[start_ind:end_ind,:,:]
+            print("Reading in {:d}'s ERA-INTERIM data for {:s}...".format(year,name))
+            data = get_ERA_yearly_data(ERA_folder,year,name,alias,ERA_lat_ind,ERA_lon_ind)
             toc()
+        
+            # Output monthly and yearly files.
+            elapsed = 0
+            for month in range(1,13):
+                tic()
+                print("Writing {1:s} data for the month #{0:d}...".format(month,name))
+                # Output filename and full path.
+                outfn = 'medsea_ERA_{2:s}_{0:d}{1:02d}.nc'.format(year,month,subtype)
+                fullfile = os.path.join(data_folder,'medsea_ERA-INTERIM',outfn)
+                # Interpretation of ERA data timings CRITICAL here to get these indices correct.
+                start_hour, end_hour, start_ind, end_ind = timings(year,month)
+
+                # Once: open nc file and create dimensions.
+                if i == 0: # At the first variable only.
+                    # Start the nc file with the basic dimensions, overwriting existing file.
+                    with Dataset(fullfile,'w',format="NETCDF3_CLASSIC") as nc:
+                        # Routine stuff delegated to a helper funciton.
+                        nctime, nclat, nclon = create_dimensions(nc)
+                        # Write the time values to the nc file.
+                        nctime[:] = [hour for hour in range(start_hour, end_hour+3,3)]
+                        #print(fullfile + ' with time({}), lat({}), lon({}) set up.'.format(len(nctime),len(nclat),len(nclon)))
+                
+                # Create each variable and append values.
+                with Dataset(fullfile,"a") as nc:
+                    ncvar = create_variable(nc,name,'f8')
+                    ncvar[:] = data[start_ind:end_ind,:,:]
+                elapsed += toc()
+            print("Total time for writing {:s}: {:2f}s".format(name,elapsed))
+
+    write_ERA(heat_names, heat_alias,'heat')
+    write_ERA(met_names, met_alias,'met')
 
 def rea_reformat(year,month,varname,fn_keyword):
-    from netCDF4 import Dataset, MFDataset
+    from netCDF4 import Dataset, MFDataset, num2date, date2num
     from numpy import linspace
     from os.path import isfile
     output_folder = os.path.join(data_folder,'medsea_rea')
@@ -192,7 +197,12 @@ def rea_reformat(year,month,varname,fn_keyword):
         # Create the variable in question.
         infn = "{0:d}{1:02d}??_{2}_re-fv6.nc".format(year,month,fn_keyword)
         with MFDataset(os.path.join(rea_folder,str(year),infn),'r') as REA_data:
+            # Copy over the depths up to the truncation level.
+            ncdepth[:] = REA_data['depth'][0:ndepth]
             ncdepth.units = REA_data['depth'].units
+            # Write in the time values, convert to our epoch and units.
+            nctime[:] = date2num(num2date(REA_data['time'][:],REA_data['time'].units),'hours since '+str(epoch))
+            # Copy over variable data.
             temp = REA_data[varname][:,rea_depth_ind,rea_lat_ind,rea_lon_ind]
             ncvar[:] = temp # Now random-access in RAM to copy over.
             ncvar.units = REA_data[varname].units
@@ -213,7 +223,7 @@ def rea_reformat(year,month,varname,fn_keyword):
                 print('Before appending first day value of the next month, {0}, has dimensions {1},'.format(varname,ncvar[:].shape))
                 print('whereas time has length {}'.format(len(nc['time'][:])))
                 last = len(nc['time'])
-                nc['time'][last] = REA_data['time'][0]
+                nc['time'][last] = date2num(num2date(REA_data['time'][0],REA_data['time'].units),'hours since '+str(epoch))
                 ncvar[last,:,:,:] = REA_data[varname][0,rea_depth_ind,rea_lat_ind,rea_lon_ind]
                 print('After appending, the dimensions of {0} become {1},'.format(varname,ncvar[:].shape))
                 print('whereas time has length {}'.format(len(nc['time'][:])))

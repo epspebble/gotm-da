@@ -11,7 +11,8 @@ def timestr(nctime,i):
         ts = datetime.strftime(num2date(nctime[i],nctime.units),'%Y-%m-%d %H:%M:%S')
     except:
         print("Converting datetime to string failed!")
-        print(i,nctime[i],len(nctime))
+        print('i,len(nctime),nctime[i],nctime.units')
+        print(i,len(nctime),nctime[i],nctime.units)
         raise
     return ts
 
@@ -39,6 +40,13 @@ def print_lat_lon(lat,lon,fmt_str='.2f'):
     lon_str = template.format(lon) + 'E' if lon>=0 else template.format(-lon) + 'W'
     #return lat_str + ' ' + lon_str
     return lat_str + lon_str
+
+def chunk(c,k,fun,*args,**kwargs):
+    """
+    calls fun() for the c-th chunk with k grid points (c-1)*10, (c-1)*10+1, ... (c-1)*10+9. 
+    This partitions the 390 grid points on sea into 30 chunks.
+    """
+
 
 def get_m_n(lat,lon):
     "Return the grid index (m,n) given latlong."
@@ -156,14 +164,14 @@ def write_dat(m,n,dat_fn,nc,outdir):
         if dat_fn == 'tprof':
             for i in range(len(time)):
                 ndepth = nc['depth']
-                f.write(timestr(time,i) + ' {0:d} 2\n'.format(len(ndepth)) # Always two columns.
+                f.write(timestr(time,i) + ' {0:d} 2\n'.format(len(ndepth))) # Always two columns.
                 for j in range(len(ndepth)):
                     line = ('{0:g} {1:g}\n').format(-nc['depth'][j],nc['votemper'][i,j,m,n])
                     f.write(line)
         elif dat_fn == 'sprof':
             for i in range(len(time)):
                 ndepth = nc['depth']
-                f.write(timestr(time,i) + ' {0:d} 2\n'.format(len(ndepth)) # Always two columns.
+                f.write(timestr(time,i) + ' {0:d} 2\n'.format(len(ndepth))) # Always two columns.
                 for j in range(len(ndepth)):
                     line = ('{0:g} {1:g}\n').format(-nc['depth'][j],nc['vosaline'][i,j,m,n])
                     f.write(line)
@@ -242,7 +250,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
 
     print('Done writing {}.\n'.format(fn))
 
-def local_dat(m,n,run='default'):
+def local_dat(m,n,run='default',dat=['heat','met','tprof','sprof']):
     """
     Generate *.dat files from all available data. See core_dat() for other explanations.
     """
@@ -251,6 +259,9 @@ def local_dat(m,n,run='default'):
     from tempfile import mkdtemp
     from shutil import copyfile
     from glob import glob
+    
+    if isinstance(dat,str):
+        dat = [dat]
 
     lat = medsea_lats[m]
     lon = medsea_lons[n]
@@ -269,16 +280,10 @@ def local_dat(m,n,run='default'):
     # ERA_tempfiles = [copyfile(fn,os.path.join(temp_folder,os.path.basename(fn))) for fn in ERA_files]
     # rea_tempfiles = [copyfile(fn,os.path.join(temp_folder,os.path.basename(fn))) for fn in rea_files]
 
-    # nc_dict = dict(heat = MFDataset(os.path.join(temp_folder,'medsea_ERA_*.nc')), 
-    #                met = MFDataset(os.path.join(temp_folder,'medsea_ERA_*.nc')), 
-    #                tprof = MFDataset(os.path.join(temp_folder,'medsea_rea_votemper_*.nc')), 
-    #                sprof = MFDataset(os.path.join(temp_folder,'medsea_rea_vosaline_*.nc')))
-
     print("Using nc files in " + data_folder + "...")
-    nc_dict = dict(heat = MFDataset(os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_*.nc')), 
-                   met = MFDataset(os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_*.nc')), 
-                   tprof = MFDataset(os.path.join(data_folder,'medsea_rea','medsea_rea_votemper_*.nc')), 
-                   sprof = MFDataset(os.path.join(data_folder,'medsea_rea','medsea_rea_vosaline_*.nc')))
+    nc_dict = data_sources(dat=dat)
+    if not(isinstance(nc_dict, dict)):
+        nc_dict = {dat[0]: nc_dict} 
 
     for dat_fn, nc in nc_dict.items():
         write_dat(m,n,dat_fn,nc,local_folder)
