@@ -104,6 +104,7 @@ def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','spr
             print('Error accessing {:s}.'.format(fn_dict[each]))
             raise
         except:
+            print('Error accessing {:s}.'.format(fn_dict[each]))
             raise
 
     if len(ds_dict.keys()) == 1:
