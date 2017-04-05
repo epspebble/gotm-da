@@ -31,6 +31,7 @@ for nml in GOTM_nml_list:
 
 # GOTM namelist values
 timestep = 30
+max_depth = 150
             
 ## For medsea simulations
 
@@ -110,11 +111,11 @@ with data_sources(2014,1,dat='tprof') as rea_ds:
     is_land = list(None for i in range(21*57))
     for i in range(21*57):
         # Since fill value is 1e20, and sea water should not be boiling...
-        is_sea[i] = (votemper[0,-1,mm[i],nn[i]]<100) # deepest location in our data should be about 100m.
-        is_land[i] = (votemper[0,0,mm[i],nn[i]]>100) # shallowest data
+        is_sea[i] = (votemper[0,-1,mm[i],nn[i]]<max_depth) # deepest location in our data should be about 100m.
+        is_land[i] = (votemper[0,0,mm[i],nn[i]]>max_depth) # shallowest data
         is_shallow[i] = \
-            (votemper[0,0,mm[i],nn[i]]<100) and \
-            (votemper[0,-1,mm[i],nn[i]]>100)
+            (votemper[0,0,mm[i],nn[i]]<max_depth) and \
+            (votemper[0,-1,mm[i],nn[i]]>max_depth)
 
 # Check that there are no logical loopholes.
 assert sum(is_sea) + sum(is_land) + sum(is_shallow) == 21*57

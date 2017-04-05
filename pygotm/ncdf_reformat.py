@@ -2,6 +2,7 @@
 import sys, os
 from .config import *
 from .gotmks import *
+from .medsea import *
 
 ## These global settings should now in pygotm.config, imported above.
 
@@ -23,7 +24,12 @@ ERA_lon_ind = slice(12,-18,1)
 # The corresponding index ranges in medsea_rea datasets.
 rea_lat_ind = slice(9,250,12)
 rea_lon_ind = slice(0,673,12)
-rea_depth_ind = slice(0,18)
+# In CMCC ocean reanalysis data:
+# depth[24] = 176.82929993, we want up to 150m only.
+# We used depth[18] = 101.78025055, when our max_depth was 100m.
+#ndepth = 18
+ndepth = 24
+rea_depth_ind = slice(0,ndepth)
 
 
 met_names = ['u10m','v10m','sp','t2m','q2m','precip','snow']
@@ -45,7 +51,7 @@ def get_ERA_yearly_data(folder,year,name,alias,lat_indices,lon_indices):
         # Then return the data unpacked from the netCDF object.
         return nc[alias][:,lat_indices,lon_indices]
 
-def timings(month):
+def timings(year,month):
     from datetime import datetime,timedelta
     ### MAIN WORK: calculating various date and time offsets.
     
@@ -152,13 +158,13 @@ def ERA_reformat(year):
             outfn = 'medsea_ERA_{0:d}{1:02d}.nc'.format(year,month)
             fullfile = os.path.join(data_folder,'medsea_ERA-INTERIM',outfn)
             # Interpretation of ERA data timings CRITICAL here to get these indices correct.
-            start_hour, end_hour, start_ind, end_ind = timings(month,epoch)
+            start_hour, end_hour, start_ind, end_ind = timings(year,month)
 
             if i == 0: # Creating the first variable.
                 # Start the nc file with the basic dimensions, overwriting existing file.
                 with Dataset(fullfile,'w',format="NETCDF3_CLASSIC") as nc:
                     # Routine stuff delegated to a helper funciton.
-                    nctime, nclat, nclon = create_dimensions(nc,epoch)
+                    nctime, nclat, nclon = create_dimensions(nc)
                     # Write the time values to the nc file.
                     nctime[:] = [hour for hour in range(start_hour, end_hour+3,3)]
                     #print(fullfile + ' with time({}), lat({}), lon({}) set up.'.format(len(nctime),len(nclat),len(nclon)))
@@ -173,51 +179,46 @@ def rea_reformat(year,month,varname,fn_keyword):
     from netCDF4 import Dataset, MFDataset
     from numpy import linspace
     from os.path import isfile
-    output_folder = os.path.join(data_folder,medsea_rea)
- 
+    output_folder = os.path.join(data_folder,'medsea_rea')
     outfn = os.path.join(output_folder,'medsea_rea_{2}_{0:d}{1:02d}.nc'.format(year,month,varname,output_folder))
-                         
-    with Dataset(outfn,"w",data_model='NETCDF3_CLASSIC') as nc:
-        nctime, nclat, nclon = create_dimensions(nc,epoch)
-        nc.createDimension('depth', size = 18) # 18 was found manually to get just over 100m.
-        ncdepth = new.createVariable('depth','f4',dimensions=('depth',))
-    print('Done creating dimensions.')
-                
-    with MFDataset(os.path.join(rea_folder,"{0:d}{1:02d}??_{2}_re-fv6.nc".format(year,month,fn_keyword)),'r') as REA_data:
-        ncdepth.units = REA_data['depth'].units
-        rea_lat_ind = slice(9,250,12)
-        rea_lon_ind = slice(0,673,12)
-        rea_depth_ind = slice(0,18)
-    
-        temp = REA_data[varname][:,0:18,:,:] # Read continguously first.
-        ncvar[:] = temp[:,:,rea_lat_ind,rea_lon_ind] # Now random-access in RAM to copy over.
-        ncvar.units = REA_data[varname].units
-        print('Done copying over {} values of one month.'.format(varname))
+                       
+    with Dataset(outfn,"w",format='NETCDF3_CLASSIC') as nc:
+        nctime, nclat, nclon = create_dimensions(nc)
+        nc.createDimension('depth', size = ndepth) 
+        ncdepth = nc.createVariable('depth','f4',dimensions=('depth',))
+        ncvar = create_variable(nc,varname,'f8',dimensions=('time','depth','lat','lon'))
+        print('Done initializing dimensions and variables.')
+
+        # Create the variable in question.
+        infn = "{0:d}{1:02d}??_{2}_re-fv6.nc".format(year,month,fn_keyword)
+        with MFDataset(os.path.join(rea_folder,str(year),infn),'r') as REA_data:
+            ncdepth.units = REA_data['depth'].units
+            temp = REA_data[varname][:,rea_depth_ind,rea_lat_ind,rea_lon_ind]
+            ncvar[:] = temp # Now random-access in RAM to copy over.
+            ncvar.units = REA_data[varname].units
+            print('Done copying over {} values of one month.'.format(varname))
+
+    # Also copy over the data for the first day of the next month.
+    if not((year == 2014) and (month == 12)): # Cannot do 2014-12 without data for 2015-01
+        with Dataset(outfn,"a") as nc:
+            if month == 12:
+                year_new = year+1
+                month_new = 1
+            else:
+                year_new = year
+                month_new = month+1
+            ncvar = nc[varname]
+            infn = "{0:d}{1:02d}01_{2}_re-fv6.nc".format(year_new,month_new,fn_keyword)
+            with Dataset(os.path.join(rea_folder,str(year_new),infn),'r') as REA_data:
+                print('Before appending first day value of the next month, {0}, has dimensions {1},'.format(varname,ncvar[:].shape))
+                print('whereas time has length {}'.format(len(nc['time'][:])))
+                last = len(nc['time'])
+                nc['time'][last] = REA_data['time'][0]
+                ncvar[last,:,:,:] = REA_data[varname][0,rea_depth_ind,rea_lat_ind,rea_lon_ind]
+                print('After appending, the dimensions of {0} become {1},'.format(varname,ncvar[:].shape))
+                print('whereas time has length {}'.format(len(nc['time'][:])))
             
-### STOPPED HERE.
-        # Also copy over the data for the first day of the next month.
-        if month == 12:
-            year_new = year+1
-            month_new = 1
-        else:
-            year_new = year
-            month_new = month+1
-        
-        # Cannot do 2014-12 without data for 2015-01
-        if (year == 2014) and (month == 12):
-            return
-        
-        with Dataset("{3}/{0:d}{1:02d}01_{2}_re-fv6.nc".format(year_new,month_new,fn_keyword,REA_folder),'r') as REA_data:
-            print('Before appending first day value of the next month, {0} has dimensions {1}'.format(varname,shape(nc_var)))
-            print('Meanwhile, time has length {}'.format(len(new['time'][:])))
-            last = len(new['time'])
-            new['time'][last] = REA_data['time'][:]
-            temp = REA_data[varname][:,0:18,:,:]
-            nc_var[last,:,:,:] = temp[:,:,9:250:12,0:673:12]
-            print('After appending, the dimensions of {0} become {1}'.format(varname,shape(nc_var)))
-            print('Meanwhile, time has length {}'.format(len(new['time'][:])))
-            
-    print("Done creating {}".format(newfn))
+    print("Done creating {}".format(outfn))
 
         
 if __name__ == '__main__':
@@ -227,3 +228,6 @@ if __name__ == '__main__':
         years = [int(sys.argv[i+1]) for i in range(len(argv)-1)]
     for year in years:
         ERA_reformat(year)
+        for i in range(24):
+            rea_reformat(2013+int(i/12),1+i%12,'votemper','TEMP')
+            rea_reformat(2013+int(i/12),1+i%12,'vosaline','PSAL')

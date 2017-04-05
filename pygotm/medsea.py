@@ -10,7 +10,9 @@ def timestr(nctime,i):
     try:
         ts = datetime.strftime(num2date(nctime[i],nctime.units),'%Y-%m-%d %H:%M:%S')
     except:
+        print("Converting datetime to string failed!")
         print(i,nctime[i],len(nctime))
+        raise
     return ts
 
 def change_base(new_base_folder):
@@ -153,15 +155,17 @@ def write_dat(m,n,dat_fn,nc,outdir):
         print(fn) # Print the filename for debug.
         if dat_fn == 'tprof':
             for i in range(len(time)):
-                f.write(timestr(time,i) + ' 18 2\n') # Always 18 readings and two columns.
-                for j in range(18):
-                    line = ('{:g} {:g}\n').format(-nc['depth'][j],nc['votemper'][i,j,m,n])
+                ndepth = nc['depth']
+                f.write(timestr(time,i) + ' {0:d} 2\n'.format(len(ndepth)) # Always two columns.
+                for j in range(len(ndepth)):
+                    line = ('{0:g} {1:g}\n').format(-nc['depth'][j],nc['votemper'][i,j,m,n])
                     f.write(line)
         elif dat_fn == 'sprof':
             for i in range(len(time)):
-                f.write(timestr(time,i) + ' 18 2\n') # Always 18 readings and two columns.
-                for j in range(18):
-                    line = ('{:g} {:g}\n').format(-nc['depth'][j],nc['vosaline'][i,j,m,n])
+                ndepth = nc['depth']
+                f.write(timestr(time,i) + ' {0:d} 2\n'.format(len(ndepth)) # Always two columns.
+                for j in range(len(ndepth)):
+                    line = ('{0:g} {1:g}\n').format(-nc['depth'][j],nc['vosaline'][i,j,m,n])
                     f.write(line)
         elif dat_fn == 'heat':
             col = [None for i in range(4)]
@@ -831,39 +835,34 @@ def buoy_comparisons_full_year(year=2014,station='61277',showfig=True,fig_folder
     if not(showfig):
         close(fig)
 
-def SST_ASM_comparisons(year=2013,month=2,m=7,n=42,ax=None,pretty=True,output_data=True):
+def SST_monthly_comparisons(year=2013,month=2,m=7,n=42,runs=['ASM0','ASM2'],colors=None,
+                            ax=None,pretty=True,output_data=True,fig_fn=None):
+    from netCDF4 import Dataset, num2date
+    import matplotlib.cm as cm
+    from matplotlib.pyplot import subplots
+    from numpy import linspace
+
     if ax is None:
-        fig, ax = subplots()
-
+        fig, ax = subplots(figsize=(16,4))
+        
+    if colors is None:
+        cfun = cm.rainbow
+        ax.set_prop_cycle('color',[cfun(x) for x in linspace(0,1,len(runs))]) # Extra "run" for rea data
+        colors = [cfun(i/len(runs)) for i in range(len(runs))]
+        
     data = list()
-    # GOTM - ASM0
-    result_subfolder = 'results/p_sossta/no_assim'
-    with Dataset(os.path.join(base_folder,result_subfolder,'medsea_GOTM_{:d}{:02d}.nc'.format(year,month)),'r') as medsea_data:
-        medsea_lat = medsea_data['lat'][:]
-        medsea_lon = medsea_data['lon'][:]
-        lat = medsea_lat[m]
-        lon = medsea_lon[n]
-        time_GOTM = medsea_data['time']
-        date_GOTM = num2date(time_GOTM[:],time_GOTM.units)
-        sst_GOTM = medsea_data['sst'][:,m,n]
-        ax.plot(date_GOTM, sst_GOTM,'gray', label='ASM0')
-        if output_data:
-            data.append((date_GOTM,sst_GOTM))
-
-    # GOTM - ASM2
-    result_subfolder = 'results/p_sossta/assim_sunrise'
-    with Dataset(os.path.join(base_folder,result_subfolder,'medsea_GOTM_{:d}{:02d}.nc'.format(year,month)),'r') as medsea_data:
-        assert(lat == medsea_data['lat'][m])
-        assert(lon == medsea_data['lon'][n])
-        time_GOTM = medsea_data['time']
-        date_GOTM = num2date(time_GOTM[:],time_GOTM.units)
-        sst_GOTM = medsea_data['sst'][:,m,n]
-        ax.plot(date_GOTM, sst_GOTM,'blue', label='ASM2')
-        if output_data:
-            data.append((date_GOTM,sst_GOTM))
+    # GOTM runs
+    for i, run in enumerate(runs):
+        with Dataset(os.path.join(base_folder,run,'medsea_GOTM_{:d}{:02d}.nc'.format(year,month)),'r') as medsea_data:
+            time_GOTM = medsea_data['time']
+            date_GOTM = num2date(time_GOTM[:],time_GOTM.units)
+            sst_GOTM = medsea_data['sst'][:,m,n]
+            ax.plot(date_GOTM, sst_GOTM, color=colors[i], label=run)
+            if output_data:
+                data.append({run: (date_GOTM,sst_GOTM)})
 
     # REA
-    with Dataset(os.path.join(base_folder,'profiles','medsea_rea_votemper_{:d}{:02d}.nc'.format(year,month)),'r') as rea_data:
+    with Dataset(os.path.join(data_folder,'medsea_rea','medsea_rea_votemper_{:d}{:02d}.nc'.format(year,month)),'r') as rea_data:
         votemper = rea_data['votemper']
         time_rea = rea_data['time']
         date_rea = num2date(time_rea[:],time_rea.units)
@@ -875,34 +874,45 @@ def SST_ASM_comparisons(year=2013,month=2,m=7,n=42,ax=None,pretty=True,output_da
             print('Possible shallow water location!')
 
         depth_REA = rea_data['depth'][0]
-        ax.plot(date_rea,temp_REA,'green', label='REA'.format(depth_REA))
+        ax.plot(date_rea,temp_REA,color='black',linewidth=2,label='REA'.format(depth_REA))
+        ax.set_xlim(left=date_rea[0],right=date_rea[-1])
+        ax.set_xticks(date_rea,minor=False) 
+        ax.set_xticklabels([date.day for date in date_rea])
         if output_data:
-            data.append((date_rea,temp_REA))
+            data.append({'rea': (date_rea,temp_REA)})
+
     fig = ax.get_figure()
     if pretty:
-        fig.autofmt_xdate()
-        ax.set_title('SST comparisons at {} for {:d}-{:02d}'.format(print_lat_lon(lat,lon),year,month))
+        # fig.autofmt_xdate()            
+        ax.set_title('SST comparisons at {} for {:d}-{:02d}'.format(print_lat_lon(*get_lat_lon(m,n)),year,month))
+        ax.grid('on')
         ax.legend()
     if output_data:
         return fig, ax, data 
     else:
         return fig, ax
 
-def SST_ASM_comparisons_full_year(year=2014,m=7,n=24,showfig=True,
-                                  fig_folder = 'fig/spotchk'):
+def SST_yearly_comparisons(year,m,n,runs=['ASM0','ASM2'],showfig=True,
+                           fig_subfolder = 'fig/spotchk'):
+    from matplotlib.pyplot import subplots, suptitle, legend, close
+
     fig, axes = subplots(ncols=1,nrows=12,figsize=(17,22),sharex=False)
     for i,ax in enumerate(axes):
-        SST_ASM_comparisons(year=year,month=i+1,m=m,n=n,ax=ax,pretty=False,output_data=False)
+        SST_monthly_comparisons(year=year,month=i+1,m=m,n=n,runs=['ASM0','ASM2'],ax=ax,pretty=False,output_data=False)
+        ax.grid('on')
         ax.set_xticklabels([])
-    
-    with Dataset(os.path.join(base_folder,'profiles/medsea_rea_votemper_201301.nc'),'r') as nc:
-        ms_lat = nc['lat'][:]
-        ms_lon = nc['lon'][:]
+        if i == 0:
+            ax.legend()
+            lines = ax.get_lines()
+
+    latlon = print_lat_lon(*get_lat_lon(m,n))
     # 1.4721m is the shallowest depth in REA data
-    latlon = print_lat_lon(ms_lat[m],ms_lon[n])
-    suptitle('SST comparisons, GOTM-ASM0 (gray), GOTM-ASM2 (blue) vs REA at 1.4721m(green) at ' + latlon,
+    suptitle('SST comparisons for the year {:d} at {:s}'.format(year, latlon),
              fontsize=16,y=0.92)
-    fig_fn = os.path.join(base_folder,fig_folder,'SST_{}_GOTM_ASM0_vs_ASM2_vs_REA_{:d}.png'.format(latlon, year))
+    labels = (*runs, 'REA at 1.4721m')
+    # legend(lines, labels, loc = 'lower center', bbox_to_anchor = (0,-0.1,1,1),
+    #        bbox_transform = fig.transFigure )
+    fig_fn = os.path.join(base_folder,fig_subfolder,'SST_{}_GOTM_ASM0_vs_ASM2_vs_REA_{:d}.png'.format(latlon, year))
     print('Saving ' + fig_fn + '...')
     fig.savefig(fig_fn)
     if not(showfig):
