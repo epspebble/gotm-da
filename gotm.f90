@@ -71,7 +71,7 @@ module gotm
   integer, parameter                  :: unit_seagrass=62
 
   ! WT 20170331
-  integer, parameter                  :: unit_assim_event=71
+  integer, parameter                  :: unit_daily_stat=71
   integer, parameter                  :: unit_sst_event=72
   !
   ! !REVISION HISTORY:
@@ -115,7 +115,13 @@ module gotm
 
   !WT 20170331 temporary variables
   character(len=19) :: tmp_str
-  integer :: jul0, jul1, yyyy,mm,dd, daynum
+  integer :: jul0,jul1,yyyy,mm,dd 
+
+  !WT 20170406 daily stat output variables
+  integer :: day_number
+  double precision :: daily_SST_max = -1.0e20, daily_SST_min = 1.0e20, daily_SST_mean = 0.
+  integer :: lsecs_assim_time, lsecs_solar_noon, lsecs_SST_max, lsecs_SST_min
+  
   logical :: first
   double precision            :: sst_save=0., d_sst=0.
   
@@ -158,7 +164,7 @@ contains
     namelist /output/      out_fmt,out_dir,out_fn,nsave,variances, &
          diagnostics,mld_method,diff_k,Ri_crit,rad_corr, &
          assimilation_type,cloud_gradient,sst_obs,profile_obs,obs_level,assim_window, &    !SP
-         assim_event_fn, sst_event_fn !WT 20170331
+         daily_stat_fn, sst_event_fn !WT 2017046
     !   integer                ::count,ios
     !
     !-----------------------------------------------------------------------
@@ -185,8 +191,8 @@ contains
 
     ! WT 20170331
     ! Open the extra files to store daily assimilation and SST events.
-    !print *, 'Writing events to ',trim(assim_event_fn), ' and ', trim(sst_event_fn), '... '
-    open(unit=unit_assim_event,file=assim_event_fn,status='replace')
+    !print *, 'Writing events to ',trim(daily_stat_fn), ' and ', trim(sst_event_fn), '... '
+    open(unit=unit_daily_stat,file=daily_stat_fn,status='replace')
     open(unit=unit_sst_event,file=sst_event_fn,status='replace')
 
     write(0,*) '       ', 'initializing modules....'
@@ -400,9 +406,9 @@ contains
     !SP 03/04/06 end print out initial state
 
     ! Initialize by theoretical timezone.
-    day_cycle = tz(longitude)*120 ! Assume timestep = 30 seconds
+    day_cycle = tz(longitude)*3600/timestep 
     if (day_cycle < 0) then
-       day_cycle = day_cycle + 2880
+       day_cycle = day_cycle + 86400/timestep !86400/timestep=2880 if timestep=30 
     endif
     mark = 0
     first = .true.
@@ -410,6 +416,8 @@ contains
     write(0,*) '   ', 'time_loop'
     do n=MinN,MaxN
 512    continue     
+
+       call update_time(n)
 
        !SP 24/10/05 assimilate midnight
        ! if (assimilation_type.ne.0) then
@@ -462,7 +470,7 @@ contains
           ! Advance the counter whenever time_loop is called.
           day_cycle = day_cycle + 1
 
-          ! `mark` == 0 means assimilation not yet done in this cycle.
+          ! 'mark' == 0 means assimilation not yet done in this cycle.
           if (mark.eq.0) then
              !WT We assume simulation begins at 00:00:00.
 
@@ -475,7 +483,7 @@ contains
                 ! TODO: Assume for now that the local midnight equals the
                 ! GMT midnight, won't work for locations far away
                 ! from England.
-                if (day_cycle.eq.2880) then
+                if (day_cycle .eq. 86400/timestep) then
                    call assimilation(T(1:nlev),S(1:nlev),tprof(1:nlev),sprof(1:nlev),cloud,advect,int_cs)
                    mark = 1
                 endif
@@ -485,6 +493,8 @@ contains
                 ! 00:00:00 in tprof.dat that I_0 is found to be nonzero.
                 if (I_0.gt.1) then
                    ! print *,I_0 
+                   ! save the assim time here
+                   lsecs_assim_time = secondsofday + tz(longitude)*3600
                    call assimilation(T(1:nlev),S(1:nlev),tprof(1:nlev),sprof(1:nlev),cloud,advect,int_cs)
                    mark = 1
                 endif
@@ -493,32 +503,64 @@ contains
 
           endif
 
+          !! Aggregate 
+
+          !! find daily SST max / mins
+
+          ! local time 11:00 - 21:00, same as HCMR criterion when checking SEVIRI data, assumes timestep=30
+          if ((day_cycle .ge. 11*3600/timestep) .and. (day_cycle .le. 21*3600/timestep)) then
+             if (T(nlev) > daily_SST_max) then
+                daily_SST_max = T(nlev)
+                lsecs_SST_max = secondsofday + tz(longitude)*3600
+             end if
+          end if
+          ! local time 1:00 - 11:00, same as HCMR criterion when checking SEVIRI data, assumes timestep=30
+          if ((day_cycle .ge. 1*3600/timestep) .and. (day_cycle .le. 11*3600/timestep)) then
+             if (T(nlev) < daily_SST_min) then
+                daily_SST_min = T(nlev)
+                lsecs_SST_min = secondsofday + tz(longitude)*3600
+             end if
+          end if
+
           ! restart day_cycle
-          if (day_cycle .eq.2880) then
-             if (first) then 
+          if (day_cycle .eq. 86400/timestep) then
+            
+             ! All these variables should have been updated by now: 
+             !       solar_noon, daily_SST_max, lsecs_SST_max, daily_SST_min, lsecs_SST_min
+
+             ! the summing of SST values have been done from day_cycle=0, ... day_cycle=86400/timestep-1, so we find average now.
+             daily_SST_mean = daily_SST_mean*86400/timestep
+             call write_time_string(julianday,secondsofday,tmp_str)
+             write(unit_daily_stat,*) dayofyear, daily_SST_mean,
+                  lsecs_SST_max, daily_SST_max, &
+                  lsecs_SST_min, daily_SST_min, &
+                  lsecs_assim_time, lsecs_solar_noon
+            
+             ! Reset counters at local midnight every day.
+             if (first) then ! Do not yell error if it's the first day.
                 first = .false.
                 day_cycle = 0
+                daily_SST_mean = 0
              else
-                ! Check whether the assimilation was done or not.
+                ! Check whether the assimilation was done or not every day.
                 if (mark.ne.1) then
                    stop "Assimilation not performed in one full cycle. STOP"
-                endif
-                
-                ! Reset counters at local midnight.
+                endif                
+                ! Resetting both the day cycle number and the marker for daily assimilation.
                 day_cycle = 0
                 mark = 0
+                ! also reset aggregator variable
+                daily_SST_mean = 0 
              endif
+
           endif
 
        endif
        
-       
-
        !SP 17/10/05 evaluate cost function
 
        !SP 17/10/05 end evaluate cost function
 
-       call update_time(n)
        call prepare_output(n)
 
        !     all observations/data
@@ -854,14 +896,17 @@ contains
           T(i)=tprof(i)
           S(i)=sprof(i)
        end do
-       !WT 2016-09-24
-       call write_time_string(julianday,secondsofday,tmp_str)
+
        !WT 2017-04-05
        call calendar_date(julianday,yyyy,mm,dd)
        call julian_day(yyyy-1,12,31,jul0)
-       daynum = julianday - jul0 ! = day_of_year-1 = 0 for the first day yyyy:01-01
+       day_number = julianday - jul0 ! = day_number = 1 for the first day yyyy-01-01
 
-       write(unit_assim_event,*) tmp_str, daynum, secondsofday, T(nlev)
+       !! Organize under day_cycle loop, and print several information.
+       ! write(unit_daily_stat,*) tmp_str, day_number, secondsofday, T(nlev)
+
+       !WT 2016-09-24
+       ! call write_time_string(julianday,secondsofday,tmp_str)
        ! write(0,*) 'Temperature and salinity profiles assimilated at ', tmp_str
     end if
     !end without averaging
@@ -910,14 +955,19 @@ contains
        ! write(0,*) "SST turnaround occurs at ", tmp_str, sst
        call calendar_date(julianday,yyyy,mm,dd)
        call julian_day(yyyy-1,12,31,jul0)
-       daynum = julianday - jul0 ! = day_of_year-1 = 0 for the first day yyyy:01-01       
-       write(unit_sst_event,*) tmp_str, daynum, secondsofday, sst
+       day_number = julianday - jul0 ! = day_of_year-1 = 0 for the first day yyyy:01-01       
+       write(unit_sst_event,*) tmp_str, day_number, secondsofday, sst
     endif
     
     d_sst = sst - sst_save    
     sst_save = sst
     
   end subroutine sst_event
+  
+  subroutine print_daily_stat()
+    ! Prints global variables from daily runs.
+    
+    write *, 
   
   ! END Prospective event handling module.
   !-----------------------------------------------------------------------
@@ -935,7 +985,7 @@ contains
     !
     ! !USES:
     IMPLICIT NONE
-    !
+v    !
     ! !REVISION HISTORY:
     !  Original author(s): Karsten Bolding & Hans Burchard
     !

@@ -34,6 +34,7 @@ MODULE time
   double precision,          public           :: timestep
   double precision,          public           :: fsecs,simtime
   integer,           public           :: julianday,secondsofday
+  integer,           public           :: dayofyear !WT
   integer,           public           :: timefmt
   integer,           public           :: MinN,MaxN
   !
@@ -290,13 +291,18 @@ contains
     !
     ! !LOCAL VARIABLES:
     integer                   :: nsecs
+    integer :: jul_tmp ! WT
     !
     !-----------------------------------------------------------------------
     !BOC
     nsecs = nint(n*timestep) + secs0
     fsecs = n*timestep + secs0
-    julianday    = jul0 + nsecs/86400
+    julianday = jul0 + nsecs/86400
     secondsofday = mod(nsecs,86400)
+
+    call calendar_date(julianday,yyyy,mm,dd)
+    call julian_day(yyyy-1,12,31,jul_tmp)
+    dayofyear = julianday - jul_tmp 
 
     return
   end subroutine update_time
@@ -330,13 +336,13 @@ contains
     !
     ! !LOCAL VARIABLES:
     character                 :: c1,c2,c3,c4
-    integer                   :: yy,mm,dd,hh,min,ss
+    integer                   :: yyyy,mm,dd,hh,min,ss
     !
     !-----------------------------------------------------------------------
     !BOC
     read(timestr,'(i4,a1,i2,a1,i2,1x,i2,a1,i2,a1,i2)')  &
-         yy,c1,mm,c2,dd,hh,c3,min,c4,ss
-    call julian_day(yy,mm,dd,jul)
+         yyyy,c1,mm,c2,dd,hh,c3,min,c4,ss
+    call julian_day(yyyy,mm,dd,jul)
     secs = 3600*hh + 60*min + ss
 
     return

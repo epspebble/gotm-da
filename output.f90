@@ -27,7 +27,7 @@
    integer                             :: out_fmt=1
    character(len=255)             :: out_dir='.'
    character(len=255)             :: out_fn='gotm'
-   character(len=255)             :: assim_event_fn='assim_event.dat', sst_event_fn='sst_event.dat'
+   character(len=255)             :: daily_stat_fn='daily_stat.dat', sst_event_fn='sst_event.dat'
    integer                             :: nsave=1
    logical                             :: variances=.false.
    logical                             :: diagnostics=.false.
