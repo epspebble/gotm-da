@@ -115,6 +115,7 @@ module gotm
 
   !WT 20170331 temporary variables
   character(len=19) :: tmp_str
+  integer :: jul0, jul1, yyyy,mm,dd, daynum
   logical :: first
   double precision            :: sst_save=0., d_sst=0.
   
@@ -855,7 +856,12 @@ contains
        end do
        !WT 2016-09-24
        call write_time_string(julianday,secondsofday,tmp_str)
-       write(unit_assim_event,*) tmp_str, T(nlev)
+       !WT 2017-04-05
+       call calendar_date(julianday,yyyy,mm,dd)
+       call julian_day(yyyy-1,12,31,jul0)
+       daynum = julianday - jul0 ! = day_of_year-1 = 0 for the first day yyyy:01-01
+
+       write(unit_assim_event,*) tmp_str, daynum, secondsofday, T(nlev)
        ! write(0,*) 'Temperature and salinity profiles assimilated at ', tmp_str
     end if
     !end without averaging
@@ -902,7 +908,10 @@ contains
     if (sign(1.0d0,sst-sst_save) * sign(1.0d0,d_sst) .eq. -1.0d0) then ! sign change in two immedaite time steps
        call write_time_string(julianday,secondsofday,tmp_str)
        ! write(0,*) "SST turnaround occurs at ", tmp_str, sst
-       write(unit_sst_event,*) tmp_str, sst
+       call calendar_date(julianday,yyyy,mm,dd)
+       call julian_day(yyyy-1,12,31,jul0)
+       daynum = julianday - jul0 ! = day_of_year-1 = 0 for the first day yyyy:01-01       
+       write(unit_sst_event,*) tmp_str, daynum, secondsofday, sst
     endif
     
     d_sst = sst - sst_save    

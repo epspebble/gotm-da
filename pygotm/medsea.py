@@ -3,6 +3,11 @@ from .gotmks import *
 
 ### Medsea run functions
 
+run_profiles = {'ASM0': dict(assimilation_type=0, extinct_method=9),
+                'ASM1': dict(assimilation_type=0, extinct_method=12),
+                'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9),
+                'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12)}                
+                    
 ## Helper functions
 def timestr(nctime,i):
     " Return a formatted time string from a nc time variable at index i."
@@ -364,11 +369,22 @@ def local_run(year,month,m,n,run,verbose=False,**gotm_user_args):
     local_folder = get_local_folder(lat,lon,run)
     start = datetime(year,month,1);
     stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)
-    gotm_args = prepare_run(start,stop,local_folder,lat=lat,lon=lon,
-                            out_fn='results-{:d}{:02d}'.format(year,month),
-                            assim_event_fn='assim_event-{:d}{:02d}.dat'.format(year,month),
-                            sst_event_fn='sst_event-{:d}{:02d}.dat'.format(year,month),
-                            **gotm_user_args)
+    if run in run_profiles.keys():
+        # Should subclass an Exception to tell people what happened.
+        if gotm_user_args != {}:
+            print(('{:s} = {!s}' * len(gotm_user_args)).format(*(gotm_user_args.items())))
+            raise Exception("A recorded run profile {:s} is specified, rejecting all user arguments for GOTM.\n")
+        gotm_args = prepare_run(start,stop,local_folder,lat=lat,lon=lon,
+                                out_fn='results-{:d}{:02d}'.format(year,month),
+                                assim_event_fn='assim_event-{:d}{:02d}.dat'.format(year,month),
+                                sst_event_fn='sst_event-{:d}{:02d}.dat'.format(year,month),
+                                **run_profiles[run])
+    else:
+        gotm_args = prepare_run(start,stop,local_folder,lat=lat,lon=lon,
+                                out_fn='results-{:d}{:02d}'.format(year,month),
+                                assim_event_fn='assim_event-{:d}{:02d}.dat'.format(year,month),
+                                sst_event_fn='sst_event-{:d}{:02d}.dat'.format(year,month),
+                                **gotm_user_args)
     os.chdir(local_folder)
     stat = dict()
     try:
