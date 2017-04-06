@@ -147,6 +147,7 @@ def get_core_folder(year,month,lat,lon):
 def write_dat(m,n,dat_fn,nc,outdir):
     " Write dat files for each lat/lon in medsea_lats/medsea_lons from a given netCDF Dataset or MFDataset."
 
+    from numpy.ma import is_masked
     from netCDF4 import Dataset, MFDataset
     if isinstance(nc,Dataset) or isinstance(nc,MFDataset):
         time = nc['time']
@@ -242,9 +243,19 @@ def write_dat(m,n,dat_fn,nc,outdir):
                 line = '{:s} {:g}\n'.format(timestr(time,i),nc['analysed_sst'][i,m,n])
                 f.write(line)
         elif dat_fn == 'chlo':
+            count = 0
             for i in range(len(time)):
+                if is_masked(nc['chlor_a'][i,m,n]):
+                    print('i,m,n')
+                    print(i,m,n)
+                    print('time[i]')
+                    print(timestr(time,i))
+                    count +=1
+                    continue
                 line = '{:s} {:g}\n'.format(timestr(time,i),nc['chlor_a'][i,m,n])
                 f.write(line)
+            if count == 3:
+                raise Exception("3 consecutive nan values.")
         else:
             raise Exception("Requested {}.dat has no recipes defined in core_dat()".format(dat_fn))
 
@@ -514,6 +525,8 @@ def combine_run(year, month, run,
             fn = os.path.join(base_folder,run,print_lat_lon(*get_lat_lon(m,n)),'results-{0:d}{1:02d}.nc'.format(year,month))
             with Dataset(fn,'r') as each:
                 for name in var3dnames:
+                    # print(each[name][:,0,0].shape)
+                    # print(var3d_tmp[name][:,m,n].shape)
                     var3d_tmp[name][:,m,n] = each[name][:,0,0]
                 for name in var4dnames:
                     # Make sure the depth axis is reversed.
