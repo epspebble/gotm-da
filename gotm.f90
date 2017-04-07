@@ -193,7 +193,7 @@ contains
     ! Open the extra files to store daily assimilation and SST events.
     !print *, 'Writing events to ',trim(daily_stat_fn), ' and ', trim(sst_event_fn), '... '
     open(unit=unit_daily_stat,file=daily_stat_fn,status='replace')
-    open(unit=unit_sst_event,file=sst_event_fn,status='replace')
+!    open(unit=unit_sst_event,file=sst_event_fn,status='replace')
 
     write(0,*) '       ', 'initializing modules....'
     call init_time(MinN,MaxN)
@@ -659,7 +659,7 @@ contains
        !      T=tprof
        !end SP
 
-       call sst_event(T(nlev))
+       !call sst_event(T(nlev))
 
        call integrated_fluxes(dt,int_cs)       !SP previously below do_output 18/05/05
 
