@@ -291,7 +291,7 @@ contains
     !
     ! !LOCAL VARIABLES:
     integer                   :: nsecs
-    integer :: jul_tmp ! WT
+    integer :: jul_tmp,yyyy,mm,dd ! WT
     !
     !-----------------------------------------------------------------------
     !BOC

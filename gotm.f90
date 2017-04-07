@@ -118,9 +118,9 @@ module gotm
   integer :: jul0,jul1,yyyy,mm,dd 
 
   !WT 20170406 daily stat output variables
-  integer :: day_number
-  double precision :: daily_SST_max = -1.0e20, daily_SST_min = 1.0e20, daily_SST_mean = 0.
-  integer :: lsecs_assim_time, lsecs_solar_noon, lsecs_SST_max, lsecs_SST_min
+!  integer :: day_number
+  double precision :: daily_SST_max = -99, daily_SST_min_day = 99, daily_SST_min_night = 99, daily_SST_mean = 0.
+  integer :: lsecs_assim_time, lsecs_solar_noon, lsecs_SST_max, lsecs_SST_min_day, lsecs_SST_min_night
   
   logical :: first
   double precision            :: sst_save=0., d_sst=0.
@@ -416,7 +416,14 @@ contains
     write(0,*) '   ', 'time_loop'
     do n=MinN,MaxN
 512    continue     
-
+       
+       ! This is the final step for something below... 
+       if (n .eq. MaxN) then
+          ! Print the last set of stat.
+          write(unit_daily_stat,714) dayofyear, lsecs_assim_time, & !This result is for the current incomplete assim cycle
+               lsecs_SST_min_day, daily_SST_min_day, lsecs_SST_max, daily_SST_max, lsecs_SST_min_night, daily_SST_min_night
+       endif
+       
        call update_time(n)
 
        !SP 24/10/05 assimilate midnight
@@ -467,8 +474,46 @@ contains
        !   4. This code will fail to run the historical buoy site, say, at ARABIAN.
 
        if (assimilation_type.ne.0) then
+
           ! Advance the counter whenever time_loop is called.
           day_cycle = day_cycle + 1
+
+          ! find daily SST max / mins
+
+          ! search SST min in local time 1:00 - 11:00, same as HCMR criterion when checking SEVIRI data
+          if ((day_cycle .ge. 1*3600/timestep) .and. (day_cycle .le. 11*3600/timestep)) then
+             ! Will only be run if assimilation does not occur at midnight, (assim_window .ne. 1), 
+             ! because mark is reset to 0 after briefly setting to 1. Note the order of statements below.
+             if (mark .eq. 1) then ! After sunrise if assimilating at sunrise
+                if (T(nlev) < daily_SST_min_day) then
+                   daily_SST_min_day = T(nlev)
+                   lsecs_SST_min_day = secondsofday + tz(longitude)*3600
+                end if
+             else if (mark .eq. 0) then ! After local midnight, before sunrise if assimilating at sunrise
+                if (T(nlev) < daily_SST_min_night) then
+                   daily_SST_min_night = T(nlev)
+                   lsecs_SST_min_night = secondsofday + tz(longitude)*3600
+                end if
+             end if
+          end if
+          
+          ! search SST max local time 11:00 - 21:00, same as HCMR criterion when checking SEVIRI data
+          if ((day_cycle .ge. 11*3600/timestep) .and. (day_cycle .le. 21*3600/timestep)) then
+             if (T(nlev) > daily_SST_max) then
+                daily_SST_max = T(nlev)
+                lsecs_SST_max = secondsofday + tz(longitude)*3600
+             end if
+          end if
+
+          ! Aggregate SST over an assimilation / day cycle. 
+          ! if (count .eq. 0) then
+          !    print *, daily_SST_mean
+          ! end if
+          daily_SST_mean = daily_SST_mean + T(nlev)
+          count = count + 1
+          ! if (T(nlev) .lt. 20) then
+          !    print *, T(nlev)
+          ! end if
 
           ! 'mark' == 0 means assimilation not yet done in this cycle.
           if (mark.eq.0) then
@@ -479,48 +524,55 @@ contains
              case (0) ! assimilate at "midnight"
                 !WT 2016/09/13 "midnight" means 00:00:00 in tprof.dat,
                 ! which could be in GMT or local time.
-                !
-                ! TODO: Assume for now that the local midnight equals the
-                ! GMT midnight, won't work for locations far away
-                ! from England.
                 if (day_cycle .eq. 86400/timestep) then
+                   !!! The daily stats is not outputted for this assim_window. Not implemented.
                    call assimilation(T(1:nlev),S(1:nlev),tprof(1:nlev),sprof(1:nlev),cloud,advect,int_cs)
-                   mark = 1
+                   lsecs_assim_time = secondsofday + tz(longitude)*3600
+                   mark = 1 
                 endif
 
              case (1) ! assimiluate at "sunrise"
                 !WT 2016/09/13 "sunrise" means the first moment after
                 ! 00:00:00 in tprof.dat that I_0 is found to be nonzero.
                 if (I_0.gt.1) then
-                   ! print *,I_0 
-                   ! save the assim time here
-                   lsecs_assim_time = secondsofday + tz(longitude)*3600
+                   ! The previous assimilation cycle has just completed. Write down the daily stats now.
+
+                   !! Something wrong with doing a daily SST mean over an assimilation cycle, giving up for now
+                   ! print *, 'count = ', count
+                   ! daily_SST_mean = daily_SST_mean / count
+
+                   !! Something wrong with the mean temperature over 
+                   ! write(unit_daily_stat,713) dayofyear, lsecs_assim_time, daily_SST_mean, &
+                   !      lsecs_SST_min_day, daily_SST_min_day, lsecs_SST_max, daily_SST_max, lsecs_SST_min_night, daily_SST_min_night
+
+                   if (first) then
+                      ! This result is for the part of the day before the first assimilation event.
+                      write(unit_daily_stat,714) dayofyear, lsecs_assim_time, & 
+                           lsecs_SST_min_day, daily_SST_min_day, lsecs_SST_max, daily_SST_max, lsecs_SST_min_night, daily_SST_min_night
+                   else ! Expects daily_SST_min_day and daily_SST_max to be unset, i.e. 99 and -99 repectively.
+                      ! These result is for the assim cycle that is just completed, i.e. the previous day.
+                      write(unit_daily_stat,714) dayofyear-1, lsecs_assim_time, & 
+                           lsecs_SST_min_day, daily_SST_min_day, lsecs_SST_max, daily_SST_max, lsecs_SST_min_night, daily_SST_min_night
+                      ! The last partial assim cycle will not be treated here, but put at the begining of loop when n reaches MaxN.
+                   end if
+713                format(I3,4(1x,I5,1x,F10.6))
+714                format(I3,1x,I5,3(1x,I5,1x,F10.6))
+
+                   ! Also reset aggregator variables
+                   count = 0
+                   daily_SST_mean = 0 
+                   daily_SST_max = -99
+                   daily_SST_min_day = 99
+                   daily_SST_min_night = 99
+
                    call assimilation(T(1:nlev),S(1:nlev),tprof(1:nlev),sprof(1:nlev),cloud,advect,int_cs)
+                   ! Here the new assimilation cycle really begins. Record the time.
+                   lsecs_assim_time = secondsofday + tz(longitude)*3600
                    mark = 1
                 endif
                 
              end select
-
           endif
-
-          !! Aggregate 
-
-          !! find daily SST max / mins
-
-          ! local time 11:00 - 21:00, same as HCMR criterion when checking SEVIRI data, assumes timestep=30
-          if ((day_cycle .ge. 11*3600/timestep) .and. (day_cycle .le. 21*3600/timestep)) then
-             if (T(nlev) > daily_SST_max) then
-                daily_SST_max = T(nlev)
-                lsecs_SST_max = secondsofday + tz(longitude)*3600
-             end if
-          end if
-          ! local time 1:00 - 11:00, same as HCMR criterion when checking SEVIRI data, assumes timestep=30
-          if ((day_cycle .ge. 1*3600/timestep) .and. (day_cycle .le. 11*3600/timestep)) then
-             if (T(nlev) < daily_SST_min) then
-                daily_SST_min = T(nlev)
-                lsecs_SST_min = secondsofday + tz(longitude)*3600
-             end if
-          end if
 
           ! restart day_cycle
           if (day_cycle .eq. 86400/timestep) then
@@ -529,30 +581,27 @@ contains
              !       solar_noon, daily_SST_max, lsecs_SST_max, daily_SST_min, lsecs_SST_min
 
              ! the summing of SST values have been done from day_cycle=0, ... day_cycle=86400/timestep-1, so we find average now.
-             daily_SST_mean = daily_SST_mean*86400/timestep
-             call write_time_string(julianday,secondsofday,tmp_str)
-             write(unit_daily_stat,*) dayofyear, daily_SST_mean,
-                  lsecs_SST_max, daily_SST_max, &
-                  lsecs_SST_min, daily_SST_min, &
-                  lsecs_assim_time, lsecs_solar_noon
-            
+
+             if (first) then
+                daily_SST_mean = daily_SST_mean/(86400-tz(longitude)*3600)*timestep 
+             else
+                daily_SST_mean = daily_SST_mean/86400*timestep
+             end if
+
              ! Reset counters at local midnight every day.
              if (first) then ! Do not yell error if it's the first day.
                 first = .false.
                 day_cycle = 0
-                daily_SST_mean = 0
              else
                 ! Check whether the assimilation was done or not every day.
                 if (mark.ne.1) then
                    stop "Assimilation not performed in one full cycle. STOP"
-                endif                
+                endif
+
                 ! Resetting both the day cycle number and the marker for daily assimilation.
                 day_cycle = 0
                 mark = 0
-                ! also reset aggregator variable
-                daily_SST_mean = 0 
              endif
-
           endif
 
        endif
@@ -678,6 +727,7 @@ contains
     integer                 :: k,i,n,assim_depth,z_depth
 
     !-----------------------------------------------------------------------   
+
     select case (assimilation_type)
 
     case(1)
@@ -897,17 +947,12 @@ contains
           S(i)=sprof(i)
        end do
 
-       !WT 2017-04-05
-       call calendar_date(julianday,yyyy,mm,dd)
-       call julian_day(yyyy-1,12,31,jul0)
-       day_number = julianday - jul0 ! = day_number = 1 for the first day yyyy-01-01
-
        !! Organize under day_cycle loop, and print several information.
        ! write(unit_daily_stat,*) tmp_str, day_number, secondsofday, T(nlev)
 
        !WT 2016-09-24
-       ! call write_time_string(julianday,secondsofday,tmp_str)
-       ! write(0,*) 'Temperature and salinity profiles assimilated at ', tmp_str
+       call write_time_string(julianday,secondsofday,tmp_str)
+       write(0,*) 'Temperature and salinity profiles assimilated at ', tmp_str, dayofyear,secondsofday
     end if
     !end without averaging
 
@@ -953,22 +998,14 @@ contains
     if (sign(1.0d0,sst-sst_save) * sign(1.0d0,d_sst) .eq. -1.0d0) then ! sign change in two immedaite time steps
        call write_time_string(julianday,secondsofday,tmp_str)
        ! write(0,*) "SST turnaround occurs at ", tmp_str, sst
-       call calendar_date(julianday,yyyy,mm,dd)
-       call julian_day(yyyy-1,12,31,jul0)
-       day_number = julianday - jul0 ! = day_of_year-1 = 0 for the first day yyyy:01-01       
-       write(unit_sst_event,*) tmp_str, day_number, secondsofday, sst
+       write(unit_sst_event,*) tmp_str, dayofyear, secondsofday, sst
     endif
     
     d_sst = sst - sst_save    
     sst_save = sst
     
   end subroutine sst_event
-  
-  subroutine print_daily_stat()
-    ! Prints global variables from daily runs.
     
-    write *, 
-  
   ! END Prospective event handling module.
   !-----------------------------------------------------------------------
   !BOP
@@ -985,7 +1022,7 @@ contains
     !
     ! !USES:
     IMPLICIT NONE
-v    !
+    !
     ! !REVISION HISTORY:
     !  Original author(s): Karsten Bolding & Hans Burchard
     !
