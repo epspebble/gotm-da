@@ -376,12 +376,14 @@ def local_run(year,month,m,n,run,verbose=False,**gotm_user_args):
             raise Exception("A recorded run profile {:s} is specified, rejecting all user arguments for GOTM.\n")
         gotm_args = prepare_run(start,stop,local_folder,lat=lat,lon=lon,
                                 out_fn='results-{:d}{:02d}'.format(year,month),
-                                # assim_event_fn='assim_event-{:d}{:02d}.dat'.format(year,month), # 
+                                daily_stat_fn='daily_stat-{:d}{:02d}.dat'.format(year,month),
+                                # assim_event_fn='assim_event-{:d}{:02d}.dat'.format(year,month),
                                 # sst_event_fn='sst_event-{:d}{:02d}.dat'.format(year,month),
                                 **run_profiles[run])
     else:
         gotm_args = prepare_run(start,stop,local_folder,lat=lat,lon=lon,
                                 out_fn='results-{:d}{:02d}'.format(year,month),
+                                daily_stat_fn='daily_stat-{:d}{:02d}.dat'.format(year,month),
                                 # assim_event_fn='assim_event-{:d}{:02d}.dat'.format(year,month),
                                 # sst_event_fn='sst_event-{:d}{:02d}.dat'.format(year,month),
                                 **gotm_user_args)
@@ -393,8 +395,9 @@ def local_run(year,month,m,n,run,verbose=False,**gotm_user_args):
         logfn = 'GOTM_' + print_ctime(sep='_') + '.log'
         gotm(verbose=verbose, logfn=logfn, run_folder = local_folder, varsout = {})
         stat['elapsed'] = toc()
-        statfn = 'stat_{:d}{:02d}.dat'.format(year,month)
-        with open(statfn,'w') as f:
+        # statfn = 'stat_{:d}{:02d}.dat'.format(year,month)
+        statfn = 'run_stat.dat'
+        with open(statfn,'a') as f:
             print('Writing diagnostic statistics to {0}...\n'.format(statfn))
             f.write('--------------------------------------------------------------\n')
             f.write('Run parameters:\n')
@@ -560,6 +563,74 @@ def combine_run(year, month, run,
         elapsed += toc()
 
         print('Finished combining GOTM results after {0:.0f}s'.format(elapsed))
+
+def combine_stat(run,year,month,format='NETCDF3_CLASSIC'):
+
+    from numpy import loadtxt
+    from numpy import ma
+
+    print('Combining GOTM daily statistics for {:d}-{:02d}...'.format(year,month))
+    outfn = os.path.join(base_folder,run,'medsea_GOTM_daily_stat_{:d}{:02d}.nc'.format(year,month))
+
+    print('Writing dimensions and metadata...')
+    elapsed = 0
+    tic()
+
+    with Dataset(outfn,'w',format=format) as nc:
+
+        # Dimensions
+        nc.createDimension('day_of_year')
+        nc.createDimension('lat', size = len(medsea_lats))
+        nc.createDimension('lon', size = len(medsea_lons))
+        
+        # Dimension variables.
+        ncday = nc.createVariable('day_of_year','i4',dimensions=('day_of_year',))
+        ncday.units = "number of days since last new year's eve"
+        nclat = nc.createVariable('lat','f4',dimensions=('lat',))
+        nclat.units = 'degrees north'
+        nclon = nc.createVariable('lon','f4',dimensions=('lon',))
+        nclon.units = 'degrees east'
+        nclat[:] = medsea_lats
+        nclon[:] = medsea_lons
+        print('Done initializing dimensions.')
+        
+        nc_assim_time = nc.createVariable('assim_time','i4',dimensions=('day_of_year','lat','lon'))
+        nc_assim_time.units = 'number of seconds since midnight in local time'
+        nc_SST_max = nc.createVariable('SST_max','f4',dimensions=('day_of_year','lat','lon'))
+        nc_SST_max.units = 'degree Celsius'
+        nc_SST_min_day = nc.createVariable('SST_min_day','f4',dimensions=('day_of_year','lat','lon'))
+        nc_SST_min_day.units = 'degree Celsius'
+        nc_SST_min_night = nc.createVariable('SST_min_night','f4',dimensions=('day_of_year','lat','lon'))
+        nc_SST_min_night.units = 'degree Celsius'
+        nc_SST_max_time = nc.createVariable('SST_max_time','i4',dimensions=('day_of_year','lat','lon'))
+        nc_SST_max_time.units = 'number of seconds since midnight in local time'
+        nc_SST_min_day_time = nc.createVariable('SST_min_day_time','i4',dimensions=('day_of_year','lat','lon'))
+        nc_SST_min_day_time.units = 'number of seconds since midnight in local time'
+        nc_SST_min_night_time = nc.createVariable('SST_min_night_time','i4',dimensions=('day_of_year','lat','lon'))
+        nc_SST_min_night_time.units = 'number of seconds since midnight in local time'
+        print('Done creating variables')
+
+        for m,n in sea_mn:
+            stat_fn = os.path.join(get_local_folder(m,n,run),'daily_stat-{:d}{:02d}.dat'.format(year,month))
+            assert os.path.isfile(stat_fn)
+            try:
+                tmp = loadtxt(stat_fn)
+            except ValueError:
+                print('Problematic location: ' + print_lat_lon(*get_lat_lon(m,n)))
+                raise
+            
+            ncday[:] = tmp[:,0]
+            nc_assim_time[:,m,n] = ma.masked_equal(tmp[:,1],0)
+            nc_SST_min_day_time[:,m,n] = ma.masked_equal(tmp[:,2],0)
+            nc_SST_min_day[:,m,n] = ma.masked_equal(tmp[:,3],99.)
+            nc_SST_max_time[:,m,n] = ma.masked_equal(tmp[:,4],0)
+            nc_SST_max[:,m,n] = ma.masked_equal(tmp[:,5],-99.)
+            nc_SST_min_night_time[:,m,n] = ma.masked_equal(tmp[:,6],0)
+            nc_SST_min_night[:,m,n] = ma.masked_equal(tmp[:,7],99.)
+          
+        print("Done creating " + outfn)
+        elapsed += toc()
+        
 
 ### Medsea results visualization toolbox
 
