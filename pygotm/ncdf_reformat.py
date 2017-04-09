@@ -18,17 +18,18 @@ from .medsea import *
 # ERA_folder = os.path.join(data_folder,'p_sossta','medsea_ERA-INTERIM','3-hourly')
 
 # The corresponding index ranges in medsea_ERA-INTERIM datasets.
-ERA_lat_ind = slice(-8,4,-1)
-ERA_lon_ind = slice(12,-18,1)
+medsea_ERA_lat_ind = slice(-8,4,-1)
+medsea_ERA_lon_ind = slice(12,-18,1)
 
 # The corresponding index ranges in medsea_rea datasets.
-rea_lat_ind = slice(9,250,12)
-rea_lon_ind = slice(0,673,12)
-# In CMCC ocean reanalysis data:
+medsea_rea_lat_ind = slice(9,250,12)
+medsea_rea_lon_ind = slice(0,673,12)
+
+# In medsea_rea ocean reanalysis data:
 # depth[24] = 176.82929993, we want up to 150m only.
 # We used depth[18] = 101.78025055, when our max_depth was 100m.
 #ndepth = 18
-ndepth = 24
+ndepth = 24 # Use this for any region? Double check!
 rea_depth_ind = slice(0,ndepth)
 
 met_names = ['u10m','v10m','sp','t2m','q2m','precip','snow']
@@ -38,16 +39,6 @@ heat_alias = ['var175','var169']
 
 # ERA_names = met_names + heat_names
 # ERA_alias = met_alias + heat_alias
-
-def get_ERA_yearly_data(folder,year,name,alias,lat_indices,lon_indices):
-    from netCDF4 import Dataset
-    fn = 'MEDSEA_ERA-INT_' + name + '_y' + str(year) + '.nc'
-    with Dataset(os.path.join(folder,fn),'r') as nc:
-        # First, confirm every time that the indices for lat and lon are correct.
-        assert all(nc['lat'][ERA_lat_ind] == medsea_lats)
-        assert all(nc['lon'][ERA_lon_ind] == medsea_lons)
-        # Then return the data unpacked from the netCDF object.
-        return nc[alias][:,lat_indices,lon_indices]
 
 def timings(year,month):
     from datetime import datetime,timedelta
@@ -119,7 +110,7 @@ def timings(year,month):
     return start_hour, end_hour, start_ind, end_ind
 
 
-def ERA_reformat(year):
+def ERA_reformat(year,region='medsea'):
     " Reformat the ERA data by combining variables needed for met.dat into monthly files. "
     import os
     from time import time
@@ -137,8 +128,21 @@ def ERA_reformat(year):
     # Create the monthly files first with the basic dimensions.
     #for month in range(1,13):
     #    # Output filename and full path.
-    #    outfn = 'medsea_ERA_{0:d}{1:02d}.nc'.format(year,month)
-    #    fullfile = os.path.join(data_folder,'medsea_ERA-INTERIM',outfn)
+    #    outfn = region+'_ERA_{0:d}{1:02d}.nc'.format(year,month)
+    #    fullfile = os.path.join(data_folder,region+'_ERA-INTERIM',outfn)
+
+    def get_ERA_yearly_data(name,alias,region='medsea'):
+        if region == 'medsea':
+            fn = 'MEDSEA_ERA-INT_' + name + '_y' + str(year) + '.nc'
+            with Dataset(os.path.join(ERA_folder,fn),'r') as nc:
+                # First, confirm every time that the indices for lat and lon are correct.
+                assert all(nc['lat'][medsea_ERA_lat_ind] == medsea_lats)
+                assert all(nc['lon'][medsea_ERA_lon_ind] == medsea_lons)
+                # Then return the data unpacked from the netCDF object.
+                data = nc[alias][:,medsea_ERA_lat_ind,medsea_ERA_lon_ind]
+        else:
+            raise NotImplementedError('The specified region: ' + region + ' is not implemented for yet.')
+        return data
             
     # Iterate through the variables and append the data.
     def write_ERA(ERA_names, ERA_alias, subtype):
@@ -146,7 +150,7 @@ def ERA_reformat(year):
             # Fetch the yearly data in one go.
             tic()
             print("Reading in {:d}'s ERA-INTERIM data for {:s}...".format(year,name))
-            data = get_ERA_yearly_data(ERA_folder,year,name,alias,ERA_lat_ind,ERA_lon_ind)
+            data = get_ERA_yearly_data(name,alias)
             toc()
         
             # Output monthly and yearly files.
@@ -155,8 +159,8 @@ def ERA_reformat(year):
                 tic()
                 print("Writing {1:s} data for the month #{0:d}...".format(month,name))
                 # Output filename and full path.
-                outfn = 'medsea_ERA_{2:s}_{0:d}{1:02d}.nc'.format(year,month,subtype)
-                fullfile = os.path.join(data_folder,'medsea_ERA-INTERIM',outfn)
+                outfn = region+'_ERA_{2:s}_{0:d}{1:02d}.nc'.format(year,month,subtype)
+                fullfile = os.path.join(data_folder,region+'_ERA-INTERIM',outfn)
                 # Interpretation of ERA data timings CRITICAL here to get these indices correct.
                 start_hour, end_hour, start_ind, end_ind = timings(year,month)
 
@@ -180,10 +184,11 @@ def ERA_reformat(year):
     write_ERA(heat_names, heat_alias,'heat')
     write_ERA(met_names, met_alias,'met')
 
-def rea_reformat(year,month,varname,fn_keyword):
+def medsea_rea_reformat(year,month,varname,fn_keyword):
     from netCDF4 import Dataset, MFDataset, num2date, date2num
     from numpy import linspace
     from os.path import isfile
+
     output_folder = os.path.join(data_folder,'medsea_rea')
     outfn = os.path.join(output_folder,'medsea_rea_{2}_{0:d}{1:02d}.nc'.format(year,month,varname,output_folder))
                        
@@ -196,48 +201,47 @@ def rea_reformat(year,month,varname,fn_keyword):
 
         # Create the variable in question.
         infn = "{0:d}{1:02d}??_{2}_re-fv6.nc".format(year,month,fn_keyword)
-        with MFDataset(os.path.join(rea_folder,str(year),infn),'r') as REA_data:
+        with MFDataset(os.path.join(rea_folder,str(year),infn),'r') as rea_data:
             # Copy over the depths up to the truncation level.
-            ncdepth[:] = REA_data['depth'][0:ndepth]
-            ncdepth.units = REA_data['depth'].units
+            ncdepth[:] = rea_data['depth'][0:ndepth]
+            ncdepth.units = rea_data['depth'].units
             # Write in the time values, convert to our epoch and units.
-            nctime[:] = date2num(num2date(REA_data['time'][:],REA_data['time'].units),'hours since '+str(epoch))
+            nctime[:] = date2num(num2date(rea_data['time'][:],rea_data['time'].units),'hours since '+str(epoch))
             # Copy over variable data.
-            temp = REA_data[varname][:,rea_depth_ind,rea_lat_ind,rea_lon_ind]
+            temp = rea_data[varname][:,rea_depth_ind,medsea_rea_lat_ind,medsea_rea_lon_ind]
             ncvar[:] = temp # Now random-access in RAM to copy over.
-            ncvar.units = REA_data[varname].units
+            ncvar.units = rea_data[varname].units
             print('Done copying over {} values of one month.'.format(varname))
 
     # Also copy over the data for the first day of the next month.
-    if not((year == 2014) and (month == 12)): # Cannot do 2014-12 without data for 2015-01
+    if month == 12:
+        year_new = year+1
+        month_new = 1
+    else:
+        year_new = year
+        month_new = month+1
+    infn = "{0:d}{1:02d}01_{2}_re-fv6.nc".format(year_new,month_new,fn_keyword)
+    if os.path.isfile(infn): # Check availability of data, e.g. cannot do 2014-12 without data for 2015-01
         with Dataset(outfn,"a") as nc:
-            if month == 12:
-                year_new = year+1
-                month_new = 1
-            else:
-                year_new = year
-                month_new = month+1
             ncvar = nc[varname]
-            infn = "{0:d}{1:02d}01_{2}_re-fv6.nc".format(year_new,month_new,fn_keyword)
-            with Dataset(os.path.join(rea_folder,str(year_new),infn),'r') as REA_data:
+            with Dataset(os.path.join(rea_folder,str(year_new),infn),'r') as rea_data:
                 print('Before appending first day value of the next month, {0}, has dimensions {1},'.format(varname,ncvar[:].shape))
                 print('whereas time has length {}'.format(len(nc['time'][:])))
                 last = len(nc['time'])
-                nc['time'][last] = date2num(num2date(REA_data['time'][0],REA_data['time'].units),'hours since '+str(epoch))
-                ncvar[last,:,:,:] = REA_data[varname][0,rea_depth_ind,rea_lat_ind,rea_lon_ind]
+                nc['time'][last] = date2num(num2date(rea_data['time'][0],rea_data['time'].units),'hours since '+str(epoch))
+                ncvar[last,:,:,:] = rea_data[varname][0,rea_depth_ind,medsea_rea_lat_ind,medsea_rea_lon_ind]
                 print('After appending, the dimensions of {0} become {1},'.format(varname,ncvar[:].shape))
                 print('whereas time has length {}'.format(len(nc['time'][:])))
             
     print("Done creating {}".format(outfn))
-
         
-if __name__ == '__main__':
-    if len(sys.argv) == 1: # No arguments provided, assume 2013, 2014.
-        years = [2013, 2014]
-    else:
-        years = [int(sys.argv[i+1]) for i in range(len(argv)-1)]
-    for year in years:
-        ERA_reformat(year)
-        for i in range(24):
-            rea_reformat(2013+int(i/12),1+i%12,'votemper','TEMP')
-            rea_reformat(2013+int(i/12),1+i%12,'vosaline','PSAL')
+# if __name__ == '__main__':
+#     if len(sys.argv) == 1: # No arguments provided, assume 2013, 2014.
+#         years = [2013, 2014]
+#     else:
+#         years = [int(sys.argv[i+1]) for i in range(len(argv)-1)]
+#     for year in years:
+#         ERA_reformat(year)
+#         for i in range(24):
+#             rea_reformat(2013+int(i/12),1+i%12,'votemper','TEMP')
+#             rea_reformat(2013+int(i/12),1+i%12,'vosaline','PSAL')

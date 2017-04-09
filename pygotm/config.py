@@ -51,7 +51,7 @@ ERA_folder = os.path.join(p_sossta_folder,'medsea_ERA-INTERIM','3-hourly')
 rea_folder = os.path.join(p_sossta_folder,'medsea_rea')
 
 # GOTM dat files' netCDF reformatted dataset sources.
-def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','sprof']):
+def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','sprof'], region='medsea'):
     """ 
     Return the netCDF4 Dataset (or MFDataset) handles for the data source. 
     Calling data_sources() returns MFDataset of all available data for dat = ['heat','met','tprof','sprof']
@@ -88,12 +88,12 @@ def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','spr
     suffix += '.nc'
 
     # print(suffix) # debug
-    fn_dict = {'heat' : os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_heat' + suffix),
-               'met'  : os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_met' + suffix),
-               'tprof': os.path.join(data_folder,'medsea_rea','medsea_rea_votemper' + suffix),
-               'sprof': os.path.join(data_folder,'medsea_rea','medsea_rea_vosaline' + suffix),
-               'sst'  : os.path.join(data_folder,'medsea_OSTIA','medsea_OSTIA_sst' + suffix),
-               'chlo' : os.path.join(data_folder,'medsea_MODIS','medsea_MODIS_chlor_a' + suffix)}
+    fn_dict = {'heat' : os.path.join(data_folder,region+'_ERA-INTERIM',region+'_ERA_heat' + suffix),
+               'met'  : os.path.join(data_folder,region+'_ERA-INTERIM',region+'_ERA_met' + suffix),
+               'tprof': os.path.join(data_folder,region+'_rea',region+'_rea_votemper' + suffix),
+               'sprof': os.path.join(data_folder,region+'_rea',region+'_rea_vosaline' + suffix),
+               'sst'  : os.path.join(data_folder,region+'_OSTIA',region+'_OSTIA_sst' + suffix),
+               'chlo' : os.path.join(data_folder,region+'_MODIS',region+'_MODIS_chlor_a' + suffix)}
 
     assert all([each in fn_dict.keys() for each in dat]) # Check that the function is called correctly.
 
@@ -116,52 +116,3 @@ def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','spr
 
 # Global setting for the core_dat() routines (and possibly the ERA routines as well)
 overwrite=True
-
-# Our grid points. Maybe we can reduce dependence on numpy by just using a Python array.
-medsea_lats = tuple(30.75+0.75*i for i in range(21))
-medsea_lons = tuple(-6.0+0.75*i for i in range(57))
-
-# The corresponding index ranges in medsea_ERA-INTERIM datasets.
-ERA_lat_ind = slice(-8,4,-1)
-ERA_lon_ind = slice(12,-18,1)
-
-# The corresponding index ranges in medsea_rea datasets.
-rea_lat_ind = slice(9,250,12)
-rea_lon_ind = slice(0,673,12)
-rea_depth_ind = slice(0,18)
-
-# Enumerate the grid points 
-import itertools
-mm, nn = zip(*itertools.product(range(21),range(57)))
-# Make use of a medsea_rea dataset to infer sea, shallow and land locations.
-with data_sources(2014,1,dat='tprof') as rea_ds:
-    votemper = rea_ds['votemper']
-    # Preallocate
-    is_sea = list(None for i in range(21*57))
-    is_shallow = list(None for i in range(21*57))
-    is_land = list(None for i in range(21*57))
-    for i in range(21*57):
-        # Since fill value is 1e20, and sea water should not be boiling...
-        is_sea[i] = (votemper[0,-1,mm[i],nn[i]]<max_depth) # deepest location in our data should be about 100m.
-        is_land[i] = (votemper[0,0,mm[i],nn[i]]>max_depth) # shallowest data
-        is_shallow[i] = \
-            (votemper[0,0,mm[i],nn[i]]<max_depth) and \
-            (votemper[0,-1,mm[i],nn[i]]>max_depth)
-
-# Check that there are no logical loopholes.
-assert sum(is_sea) + sum(is_land) + sum(is_shallow) == 21*57
-
-# Return the counters i for lat/lon index arrays mm and nn.
-sea_i = tuple(itertools.compress(range(21*57),is_sea))
-land_i = tuple(itertools.compress(range(21*57),is_land))
-shallow_i = tuple(itertools.compress(range(21*57),is_shallow))
-
-# Return the actual lat/lon index pairs (m,n)
-sea_mn = tuple((mm[i],nn[i]) for i in sea_i)
-shallow_mn = tuple((mm[i],nn[i]) for i in shallow_i)
-land_mn = tuple((mm[i],nn[i]) for i in land_i)
-
-# Return the actual (lat,lon) coorindates as well
-sea_locations = tuple((medsea_lats[m],medsea_lons[n]) for (m,n) in sea_mn)
-shallow_locations = tuple((medsea_lats[m],medsea_lons[n]) for (m,n) in shallow_mn)
-land_locations = tuple((medsea_lats[m],medsea_lons[n]) for (m,n) in land_mn)

@@ -1,12 +1,61 @@
 from .config import *
 from .gotmks import *
 
-### Medsea run functions
-
+## Global settings
 run_profiles = {'ASM0': dict(assimilation_type=0, extinct_method=9),
                 'ASM1': dict(assimilation_type=0, extinct_method=12),
                 'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9),
-                'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12)}                
+                'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12)}
+
+# Our grid points. Maybe we can reduce dependence on numpy by just using a Python array.
+medsea_lats = tuple(30.75+0.75*i for i in range(21))
+medsea_lons = tuple(-6.0+0.75*i for i in range(57))
+
+## Moved to ncdf_reformat.py
+# The corresponding index ranges in medsea_ERA-INTERIM datasets.
+#ERA_lat_ind = slice(-8,4,-1)
+#ERA_lon_ind = slice(12,-18,1)
+
+# The corresponding index ranges in medsea_rea datasets.
+#rea_lat_ind = slice(9,250,12)
+#rea_lon_ind = slice(0,673,12)
+#rea_depth_ind = slice(0,ndepth)
+
+# Enumerate the grid points 
+import itertools
+mm, nn = zip(*itertools.product(range(21),range(57)))
+# Make use of a medsea_rea dataset to infer sea, shallow and land locations.
+with data_sources(2014,1,dat='tprof') as rea_ds:
+    votemper = rea_ds['votemper']
+    # Preallocate
+    is_sea = list(None for i in range(21*57))
+    is_shallow = list(None for i in range(21*57))
+    is_land = list(None for i in range(21*57))
+    for i in range(21*57):
+        # Since fill value is 1e20, and sea water should not be boiling...
+        is_sea[i] = (votemper[0,-1,mm[i],nn[i]]<max_depth) # deepest location in our data should be about 100m.
+        is_land[i] = (votemper[0,0,mm[i],nn[i]]>max_depth) # shallowest data
+        is_shallow[i] = \
+            (votemper[0,0,mm[i],nn[i]]<max_depth) and \
+            (votemper[0,-1,mm[i],nn[i]]>max_depth)
+
+# Check that there are no logical loopholes.
+assert sum(is_sea) + sum(is_land) + sum(is_shallow) == 21*57
+
+# Return the counters i for lat/lon index arrays mm and nn.
+sea_i = tuple(itertools.compress(range(21*57),is_sea))
+land_i = tuple(itertools.compress(range(21*57),is_land))
+shallow_i = tuple(itertools.compress(range(21*57),is_shallow))
+
+# Return the actual lat/lon index pairs (m,n)
+sea_mn = tuple((mm[i],nn[i]) for i in sea_i)
+shallow_mn = tuple((mm[i],nn[i]) for i in shallow_i)
+land_mn = tuple((mm[i],nn[i]) for i in land_i)
+
+# Return the actual (lat,lon) coorindates as well
+sea_locations = tuple((medsea_lats[m],medsea_lons[n]) for (m,n) in sea_mn)
+shallow_locations = tuple((medsea_lats[m],medsea_lons[n]) for (m,n) in shallow_mn)
+land_locations = tuple((medsea_lats[m],medsea_lons[n]) for (m,n) in land_mn)
                     
 ## Helper functions
 def timestr(nctime,i):
@@ -629,10 +678,9 @@ def combine_stat(run,year,month,format='NETCDF3_CLASSIC'):
             nc_SST_min_night[:,m,n] = ma.masked_equal(tmp[:,7],99.)
           
         print("Done creating " + outfn)
-        elapsed += toc()
-        
+        elapsed += toc()        
 
-### Medsea results visualization toolbox
+## Medsea results visualization toolbox
 
 # Import matplotlib colormap for assigning default values to functions.
 from matplotlib import cm
