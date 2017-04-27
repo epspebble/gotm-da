@@ -41,9 +41,9 @@ base_folder = os.path.join(data_folder,'medsea_GOTM')
 
 if not(os.path.isdir(base_folder)):
     raise IOError('The base folder: ' + base_folder + ' is either not accessible or created.')
-run_folder = os.path.join(base_folder,'run')
-if not(os.path.isdir(run_folder)):
-    os.mkdir(run_folder)
+# run_folder = os.path.join(base_folder,'run')
+# if not(os.path.isdir(run_folder)):
+#     os.mkdir(run_folder)
 
 # Ocean and Satellite products datasets source folders.
 p_sossta_folder = os.path.join(data_folder,'p_sossta')
