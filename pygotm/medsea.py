@@ -684,13 +684,14 @@ def combine_stat(run,year,month,format='NETCDF3_CLASSIC'):
 
 # Import matplotlib colormap for assigning default values to functions.
 from matplotlib import cm
+from numpy.ma import mean
 
 def medsea_heatmap(data, # The only necessary argument: a netCDF Dataset to be opened by user.
                    varnames=['sst'],fun = lambda varargin: mean(varargin[0][:],axis=0),
                    ax=None, draw_colorbar=True, vlim = None,cmap=cm.coolwarm):
-    
     # Expect a netCDF4 Data
     from netCDF4 import Dataset
+    from matplotlib.pyplot import subplots
     if not(isinstance(data,Dataset)):
         raise Exception('First argument must be a netCDF4 Dataset.')
     
