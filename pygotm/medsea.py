@@ -23,40 +23,49 @@ medsea_lons = tuple(-6.0+0.75*i for i in range(57))
 
 # Enumerate the grid points 
 import itertools
-mm, nn = zip(*itertools.product(range(21),range(57)))
+M = len(medsea_lats)
+N = len(medsea_lons)
+mm, nn = zip(*itertools.product(range(M),range(N)))
 # Make use of a medsea_rea dataset to infer sea, shallow and land locations.
 with data_sources(2014,1,dat='tprof') as rea_ds:
     votemper = rea_ds['votemper']
     # Preallocate
-    is_sea = list(None for i in range(21*57))
-    is_shallow = list(None for i in range(21*57))
-    is_land = list(None for i in range(21*57))
-    for i in range(21*57):
+    is_sea = list(None for i in range(M*N))
+    is_shallow = list(None for i in range(M*N))
+    is_deep = list(None for i in range(M*N))
+    is_land = list(None for i in range(M*N))
+    for i in range(M*N):
         # Since fill value is 1e20, and sea water should not be boiling...
-        is_sea[i] = (votemper[0,-1,mm[i],nn[i]]<max_depth) # deepest location in our data should be about 100m.
-        is_land[i] = (votemper[0,0,mm[i],nn[i]]>max_depth) # shallowest data
+        max_temp = 100
+        is_land[i] = (votemper[0,0,mm[i],nn[i]] > max_temp) # shallowest data
+        is_deep[i] = (votemper[0,-1,mm[i],nn[i]] < max_temp) # deepest data
         is_shallow[i] = \
-            (votemper[0,0,mm[i],nn[i]]<max_depth) and \
-            (votemper[0,-1,mm[i],nn[i]]>max_depth)
+            (votemper[0,0,mm[i],nn[i]] < max_temp) and \
+            (votemper[0,-1,mm[i],nn[i]] > max_temp)
+        is_sea[i] = (is_deep[i] or is_shallow[i]) 
 
 # Check that there are no logical loopholes.
-assert sum(is_sea) + sum(is_land) + sum(is_shallow) == 21*57
+assert sum(is_deep) + sum(is_shallow) == sum(is_sea)
+assert sum(is_sea) + sum(is_land) == M*N
 
 ## TBC: Maybe we should rename sea_mn as deep_mn  and then have sea_mn = deep_mn + shallow_mn etc...?
 
 # Return the counters i for lat/lon index arrays mm and nn.
-sea_i = tuple(itertools.compress(range(21*57),is_sea))
-land_i = tuple(itertools.compress(range(21*57),is_land))
-shallow_i = tuple(itertools.compress(range(21*57),is_shallow))
+shallow_i = tuple(itertools.compress(range(M*N),is_shallow))
+deep_i = tuple(itertools.compress(range(M*N),is_deep))
+sea_i = tuple(itertools.compress(range(M*N),is_sea))
+land_i = tuple(itertools.compress(range(M*N),is_land))
 
 # Return the actual lat/lon index pairs (m,n)
-sea_mn = tuple((mm[i],nn[i]) for i in sea_i)
 shallow_mn = tuple((mm[i],nn[i]) for i in shallow_i)
+deep_mn = tuple((mm[i],nn[i]) for i in deep_i)
+sea_mn = tuple((mm[i],nn[i]) for i in sea_i)
 land_mn = tuple((mm[i],nn[i]) for i in land_i)
 
 # Return the actual (lat,lon) coorindates as well
-sea_locations = tuple((medsea_lats[m],medsea_lons[n]) for (m,n) in sea_mn)
 shallow_locations = tuple((medsea_lats[m],medsea_lons[n]) for (m,n) in shallow_mn)
+deep_locations = tuple((medsea_lats[m],medsea_lons[n]) for (m,n) in deep_mn)
+sea_locations = tuple((medsea_lats[m],medsea_lons[n]) for (m,n) in sea_mn)
 land_locations = tuple((medsea_lats[m],medsea_lons[n]) for (m,n) in land_mn)
                     
 ## Helper functions
@@ -477,7 +486,7 @@ def local_run(year,month,m,n,run,verbose=False,**gotm_user_args):
     return stat
 
 def core_run(year,month,m=None,n=None,lat=None,lon=None,verbose=False,**gotm_user_args):
-    """ Generate GOTM results for the (m,n)-th grid point for a specified month in the 21x57 (lat,long) medsea grid. 
+    """ Generate GOTM results for the (m,n)-th grid point for a specified month in the MxN (lat,long) medsea grid. 
     
         All necessary files (*.inp, *.dat) are assumed to be present in `core_folder` (see get_core_folder(year,month,m,n)), 
         except the GOTM executable. The program changes directory into the core folder to run and the log and results are 
@@ -606,9 +615,9 @@ def combine_run(year, month, run,
         else:
             num_hr = (datetime(year,month+1,1)-datetime(year,month,1)).days*24;
         for var in var3d_nc.keys():
-            var3d_data[var] = masked_array(zeros((num_hr,21,57)),mask=True)
+            var3d_data[var] = masked_array(zeros((num_hr,M,N)),mask=True)
         for var in var4d_nc.keys():
-            var4d_data[var] = masked_array(zeros((num_hr,nz,21,57)),mask=True) # Danger, here the dimensions depends on a preselected grid.
+            var4d_data[var] = masked_array(zeros((num_hr,nz,M,N)),mask=True) # Danger, here the dimensions depends on a preselected grid.
             
         # Now proceed to read from each GOTM result nc file.
         for m, n in sea_mn:
@@ -776,13 +785,13 @@ def medsea_plot_mean(varname='sst', ax=None, cmap = cm.coolwarm,
 
 def sst_range_ASM0(time,lon,sst):
     nday = int(time[-1]/86400)
-    sst_max = ones((nday,21,57))*NaN
-    sst_min = ones((nday,21,57))*NaN
-    sst_range = ones((nday,21,57))*NaN
+    sst_max = ones((nday,M,N))*NaN
+    sst_min = ones((nday,M,N))*NaN
+    sst_range = ones((nday,M,N))*NaN
     for day in range(nday):
-        for k in range(21*57):
-            m = int(k/57)
-            n = mod(k,57)
+        for k in range(M*N):
+            m = int(k/N)
+            n = mod(k,N)
             offset = int(ceil(lon[n]/15))
 
             h1 = 11 - offset + day*24
@@ -800,13 +809,13 @@ def sst_range_ASM0(time,lon,sst):
 def sst_range_ASM2(time,lon,sst,swr):
     import numpy
     nday = int(time[-1]/86400)
-    sst_max = ones((nday,21,57))*NaN
-    sst_min = ones((nday,21,57))*NaN
-    sst_range = ones((nday,21,57))*NaN
+    sst_max = ones((nday,M,N))*NaN
+    sst_min = ones((nday,M,N))*NaN
+    sst_range = ones((nday,M,N))*NaN
     for day in range(nday):
-        for k in range(21*57):
-            m = int(k/57)
-            n = mod(k,57)
+        for k in range(M*N):
+            m = int(k/N)
+            n = mod(k,N)
             offset = int(ceil(lon[n]/15))
 
             h1 = 11 - offset + day*24
