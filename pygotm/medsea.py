@@ -5,7 +5,13 @@ from .gotmks import *
 run_profiles = {'ASM0': dict(assimilation_type=0, extinct_method=9),
                 'ASM1': dict(assimilation_type=0, extinct_method=12),
                 'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9),
-                'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12)}
+                'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12),
+                'ASM3-100m': dict(assimilation_type=2, assim_window=1, extinct_method=12, 
+                                  depth = 99.282236525788903, nlev = 132,
+                                  grid_method = 2, grid_file = 'grid_100m.dat'),
+                'ASM3-75m': dict(assimilation_type=2, assim_window=1, extinct_method=12, 
+                                  depth = 74.539324233308434, nlev = 122,
+                                  grid_method = 2, grid_file = 'grid_75m.dat')}
 
 # Our grid points. Maybe we can reduce dependence on numpy by just using a Python array.
 medsea_lats = tuple(30.75+0.75*i for i in range(21))
@@ -29,19 +35,29 @@ mm, nn = zip(*itertools.product(range(M),range(N)))
 # Make use of a medsea_rea dataset to infer sea, shallow and land locations.
 with data_sources(2014,1,dat='tprof') as rea_ds:
     votemper = rea_ds['votemper']
+    rea_depth = rea_ds['depth']
     # Preallocate
-    is_sea = list(None for i in range(M*N))
-    is_shallow = list(None for i in range(M*N))
-    is_deep = list(None for i in range(M*N))
-    is_land = list(None for i in range(M*N))
+    is_sea = list(False for i in range(M*N))
+    is_shallow = list(False for i in range(M*N))
+    is_deep = list(False for i in range(M*N))
+    is_land = list(False for i in range(M*N))
+    medsea_depths = list(0 for i in range(M*N))
+    
     for i in range(M*N):
         # Since fill value is 1e20, and sea water should not be boiling...
         max_temp = 100
-        is_land[i] = (votemper[0,0,mm[i],nn[i]] > max_temp) # shallowest data
-        is_deep[i] = (votemper[0,-1,mm[i],nn[i]] < max_temp) # deepest data
-        is_shallow[i] = \
-            (votemper[0,0,mm[i],nn[i]] < max_temp) and \
-            (votemper[0,-1,mm[i],nn[i]] > max_temp)
+        if (votemper[0,0,mm[i],nn[i]] > max_temp): # shallowest data
+            is_land[i] = True
+            medsea_depths[i] = 0
+        if (votemper[0,-1,mm[i],nn[i]] < max_temp): # deepest data
+            is_deep[i] = True
+            medsea_depths[i] = rea_depth[-1]
+            
+        if (votemper[0,0,mm[i],nn[i]] < max_temp) and (votemper[0,-1,mm[i],nn[i]] > max_temp):
+            is_shallow[i] = True
+            deepest_idx = sum(votemper[0,:,mm[i],nn[i]] < max_temp)-1
+            medsea_depths[i] = rea_depth[deepest_idx]
+            
         is_sea[i] = (is_deep[i] or is_shallow[i]) 
 
 # Check that there are no logical loopholes.
@@ -540,6 +556,8 @@ def core_run(year,month,m=None,n=None,lat=None,lon=None,verbose=False,**gotm_use
 def combine_run(year, month, run,
                 varsout = None, # The subset of variables to output, defaults to all available variables
                 format = 'NETCDF3_CLASSIC', # Do not store in HDF5 format unless we know our collaborators use tools that are compatible.
+                grid = (medsea_lats, medsea_lons), # Defaults to the global latlongs in medsea_lats and medsea_lons.
+                indices = sea_mn, # Defaults to read from each folder by sea location lat/lon, ignoring all land locations. 
                 cleanup = False): # If number or sizes of files generated is a concern... maybe True here.
     " Combine GOTM results nc files from each grid point into a single monthly nc file. "
     from netCDF4 import Dataset
@@ -553,24 +571,23 @@ def combine_run(year, month, run,
     tic()
 
     with Dataset(outfn,'w',format=format) as nc:
-        # Default dimensions for medsea.
-        nctime, nclat, nclon = create_dimensions(nc)
-
-        # Also create the depth dimension.
-        nz = 150 # Could use a global setting when we refactor next time.
-        nc.createDimension('depth', size = nz)
-        ncdepth = nc.createVariable('depth','f4',dimensions=('depth',))
+        # Default dimensions for medsea
+        nctime, nclat, nclon = create_dimensions(nc, *grid)
         
-        # We actually know all our sea locations, and (30.75N,18.75E) is the first point in our medsea grid.
+        # Having precomputed the sea locations, and use the first point (30.75N,18.75E) in our 21 x 57 medsea grid. Still works
+        # for finer grids as long as the sea_locaions global variable is updated.
         fn = os.path.join(base_folder,run,print_lat_lon(*sea_locations[0]),'results-{0:d}{1:02d}.nc'.format(year,month))
 
         # Transfer units, dimensions and create the nc variables.
         with Dataset(fn,'r') as first:
             # Is there any need for these? We did put units when calling create_dimesions()
-            nclat.units = first['lat'].units 
-            nclon.units = first['lon'].units
+            #nclat.units = first['lat'].units 
+            #nclon.units = first['lon'].units
             
-            # Cover the depths and reverse order and sign.
+            # Create the depth dimension, save the depth levels by reversing order and sign of the GOTM z variable.
+            nz = len(first['z'])
+            nc.createDimension('depth', size = nz)
+            ncdepth = nc.createVariable('depth','f4',dimensions=('depth',))
             ncdepth.units = first['z'].units
             ncdepth[:] = -first['z'][::-1]
 
@@ -620,8 +637,11 @@ def combine_run(year, month, run,
             var4d_data[var] = masked_array(zeros((num_hr,nz,M,N)),mask=True) # Danger, here the dimensions depends on a preselected grid.
             
         # Now proceed to read from each GOTM result nc file.
-        for m, n in sea_mn:
+        for m, n in indices:
             fn = os.path.join(base_folder,run,print_lat_lon(*get_lat_lon(m,n)),'results-{0:d}{1:02d}.nc'.format(year,month))
+            if not(os.path.isfile(fn)):
+                print(fn, ' not found. Skipping this grid point...')
+                continue
             with Dataset(fn,'r') as each:
                 for var in var3d_nc.keys():
                     # print(each[var][:,0,0].shape)
@@ -645,7 +665,7 @@ def combine_run(year, month, run,
         print('Finished combining GOTM results after {0:.0f}s'.format(elapsed))
     return outfn
 
-def combine_stat(run,year,month,format='NETCDF3_CLASSIC'):
+def combine_stat(run,year,month,format='NETCDF3_CLASSIC', indices=sea_mn):
 
     from numpy import loadtxt
     from numpy import ma
@@ -691,7 +711,7 @@ def combine_stat(run,year,month,format='NETCDF3_CLASSIC'):
         nc_SST_min_night_time.units = 'number of seconds since midnight in local time'
         print('Done creating variables')
 
-        for m,n in sea_mn:
+        for m,n in indices:
             stat_fn = os.path.join(get_local_folder(m,n,run),'daily_stat-{:d}{:02d}.dat'.format(year,month))
             assert os.path.isfile(stat_fn)
             try:
