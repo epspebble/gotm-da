@@ -37,10 +37,16 @@ max_depth = 150
 
 # Top-level project folders
 data_folder = os.path.join('/global/scratch',os.getenv('USER'))
+while not(os.path.isdir(data_folder)):
+    print('The data folder ' + data_folder + 'is either not accessible or created.')
+    data_folder = input("Enter new data folder location.")
+    
 base_folder = os.path.join(data_folder,'medsea_GOTM')
-
-if not(os.path.isdir(base_folder)):
-    raise IOError('The base folder: ' + base_folder + ' is either not accessible or created.')
+while not(os.path.isdir(base_folder)):
+#    raise IOError('The base folder: ' + base_folder + ' is either not accessible or created.')
+    print('The base folder: ' + base_folder + ' is either not accessible or created.')
+    base_folder = input("Enter new folder location.")
+    
 # run_folder = os.path.join(base_folder,'run')
 # if not(os.path.isdir(run_folder)):
 #     os.mkdir(run_folder)
