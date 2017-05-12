@@ -13,9 +13,13 @@ run_profiles = {'ASM0': dict(assimilation_type=0, extinct_method=9),
                                   depth = 74.539324233308434, nlev = 122,
                                   grid_method = 2, grid_file = 'grid_75m.dat')}
 
+import numpy as np
+
 # Our grid points. Maybe we can reduce dependence on numpy by just using a Python array.
 medsea_lats = tuple(30.75+0.75*i for i in range(21))
 medsea_lons = tuple(-6.0+0.75*i for i in range(57))
+M = len(medsea_lats)
+N = len(medsea_lons)
 
 ## Moved to ncdf_reformat.py
 # The corresponding index ranges in medsea_ERA-INTERIM datasets.
@@ -27,63 +31,75 @@ medsea_lons = tuple(-6.0+0.75*i for i in range(57))
 #rea_lon_ind = slice(0,673,12)
 #rea_depth_ind = slice(0,ndepth)
 
-# Enumerate the grid points 
-import itertools
-M = len(medsea_lats)
-N = len(medsea_lons)
-mm, nn = zip(*itertools.product(range(M),range(N)))
-# Make use of a medsea_rea dataset to infer sea, shallow and land locations.
-with data_sources(2014,1,dat='tprof') as rea_ds:
-    votemper = rea_ds['votemper']
-    rea_depth = rea_ds['depth']
-    # Preallocate
-    is_sea = list(False for i in range(M*N))
-    is_shallow = list(False for i in range(M*N))
-    is_deep = list(False for i in range(M*N))
-    is_land = list(False for i in range(M*N))
-    medsea_depths = list(0 for i in range(M*N))
+def find_depths(lats = medsea_lats, lons = medsea_lons):   
+    global M
+    global N
+    # Enumerate the grid points 
+    import itertools
+    if len(lats) != M or len(lons) != N:
+        print('Warning: a new grid is detected. Logical loophole checks not yet complete.')
+        M = len(lats)
+        N = len(lons)
+
+    mm, nn = zip(*itertools.product(range(M),range(N)))
+    # Make use of a medsea_rea dataset to infer sea, shallow and land locations.
+    with data_sources(2014,1,dat='tprof') as rea_ds:
+        votemper = rea_ds['votemper']
+        rea_depth = rea_ds['depth']
+        # Preallocate
+        is_sea = list(False for i in range(M*N))
+        is_shallow = list(False for i in range(M*N))
+        is_deep = list(False for i in range(M*N))
+        is_land = list(False for i in range(M*N))
+        medsea_depths = list(0 for i in range(M*N))
     
-    for i in range(M*N):
-        # Since fill value is 1e20, and sea water should not be boiling...
-        max_temp = 100
-        if (votemper[0,0,mm[i],nn[i]] > max_temp): # shallowest data
-            is_land[i] = True
-            medsea_depths[i] = 0
-        if (votemper[0,-1,mm[i],nn[i]] < max_temp): # deepest data
-            is_deep[i] = True
-            medsea_depths[i] = rea_depth[-1]
-            
-        if (votemper[0,0,mm[i],nn[i]] < max_temp) and (votemper[0,-1,mm[i],nn[i]] > max_temp):
-            is_shallow[i] = True
-            deepest_idx = sum(votemper[0,:,mm[i],nn[i]] < max_temp)-1
-            medsea_depths[i] = rea_depth[deepest_idx]
-            
-        is_sea[i] = (is_deep[i] or is_shallow[i]) 
+        for i in range(M*N):
+            # Since fill value is 1e20, and sea water should not be boiling...
+            max_temp = 100
+            if (votemper[0,0,mm[i],nn[i]] > max_temp): # shallowest data
+                is_land[i] = True
+                medsea_depths[i] = 0
+            if (votemper[0,-1,mm[i],nn[i]] < max_temp): # deepest data
+                is_deep[i] = True
+                medsea_depths[i] = rea_depth[-1]
+            if (votemper[0,0,mm[i],nn[i]] < max_temp) and (votemper[0,-1,mm[i],nn[i]] > max_temp):
+                is_shallow[i] = True
+                deepest_idx = sum(votemper[0,:,mm[i],nn[i]] < max_temp)-1
+                medsea_depths[i] = rea_depth[deepest_idx]    
+            is_sea[i] = (is_deep[i] or is_shallow[i]) 
 
-# Check that there are no logical loopholes.
-assert sum(is_deep) + sum(is_shallow) == sum(is_sea)
-assert sum(is_sea) + sum(is_land) == M*N
+    # Check that there are no logical loopholes.
+    assert sum(is_deep) + sum(is_shallow) == sum(is_sea)
+    assert sum(is_sea) + sum(is_land) == M*N
 
-## TBC: Maybe we should rename sea_mn as deep_mn  and then have sea_mn = deep_mn + shallow_mn etc...?
+    # Return the counters i for lat/lon index arrays mm and nn.
+    shallow_i = tuple(itertools.compress(range(M*N),is_shallow))
+    deep_i = tuple(itertools.compress(range(M*N),is_deep))
+    sea_i = tuple(itertools.compress(range(M*N),is_sea))
+    land_i = tuple(itertools.compress(range(M*N),is_land))
 
-# Return the counters i for lat/lon index arrays mm and nn.
-shallow_i = tuple(itertools.compress(range(M*N),is_shallow))
-deep_i = tuple(itertools.compress(range(M*N),is_deep))
-sea_i = tuple(itertools.compress(range(M*N),is_sea))
-land_i = tuple(itertools.compress(range(M*N),is_land))
+    # Return the actual lat/lon index pairs (m,n)
+    shallow_mn = tuple((mm[i],nn[i]) for i in shallow_i)
+    deep_mn = tuple((mm[i],nn[i]) for i in deep_i)
+    sea_mn = tuple((mm[i],nn[i]) for i in sea_i)
+    land_mn = tuple((mm[i],nn[i]) for i in land_i)
 
-# Return the actual lat/lon index pairs (m,n)
-shallow_mn = tuple((mm[i],nn[i]) for i in shallow_i)
-deep_mn = tuple((mm[i],nn[i]) for i in deep_i)
-sea_mn = tuple((mm[i],nn[i]) for i in sea_i)
-land_mn = tuple((mm[i],nn[i]) for i in land_i)
-
-# Return the actual (lat,lon) coorindates as well
-shallow_locations = tuple((medsea_lats[m],medsea_lons[n]) for (m,n) in shallow_mn)
-deep_locations = tuple((medsea_lats[m],medsea_lons[n]) for (m,n) in deep_mn)
-sea_locations = tuple((medsea_lats[m],medsea_lons[n]) for (m,n) in sea_mn)
-land_locations = tuple((medsea_lats[m],medsea_lons[n]) for (m,n) in land_mn)
+    # Return the actual (lat,lon) coorindates as well
+    shallow_locations = tuple((lats[m],lons[n]) for (m,n) in shallow_mn)
+    deep_locations = tuple((lats[m],lons[n]) for (m,n) in deep_mn)
+    sea_locations = tuple((lats[m],lons[n]) for (m,n) in sea_mn)
+    land_locations = tuple((lats[m],lons[n]) for (m,n) in land_mn)
                     
+    return (is_shallow, is_deep, is_sea, is_land), (shallow_i,deep_i,sea_i,land_i), (shallow_mn, deep_mn, sea_mn, land_mn), (shallow_locations, deep_locations, sea_locations, land_locations)
+
+if not(os.path.isfile('medsea_depths.cache')):
+    filtered = np.array(find_depths())
+    np.save('medsea_depths.cache',filtered)
+else:
+    filtered = np.load('medsea_depths.cache')
+
+(is_shallow, is_deep, is_sea, is_land), (shallow_i,deep_i,sea_i,land_i), (shallow_mn, deep_mn, sea_mn, land_mn), (shallow_locations, deep_locations, sea_locations, land_locations) = filtered
+
 ## Helper functions
 def timestr(nctime,i):
     " Return a formatted time string from a nc time variable at index i."
