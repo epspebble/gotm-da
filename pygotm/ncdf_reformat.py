@@ -234,6 +234,119 @@ def medsea_rea_reformat(year,month,varname,fn_keyword):
                 print('whereas time has length {}'.format(len(nc['time'][:])))
             
     print("Done creating {}".format(outfn))
+
+# New functions
+def get_REA_grid():
+    with Dataset('/global/scratch/simontse/p_sossta/medsea_rea/2013/20130101_TEMP_re-fv6.nc','r') as nc:
+        lat_rea = nc['lat'][:]
+        lon_rea = nc['lon'][:]
+        temp_rea = nc['votemper'][:]
+        is_sea = ~temp_rea[0,0,:].mask
+    return lat_rea, lon_rea, is_sea
+
+def get_ERA_yearly_data(name,alias,year=2013,region='medsea'):
+    if region == 'medsea':
+        fn = 'MEDSEA_ERA-INT_' + name + '_y' + str(year) + '.nc'
+        with Dataset(os.path.join(ERA_folder,fn),'r') as nc:
+            # These indices are selected to cover the rea grid just right.
+            lat = nc['lat'][-7:3:-1]
+            lon = nc['lon'][12:-17]
+            data = nc[alias][:,-7:3:-1,12:-17] # Now we want to cover the rea grid
+    else:
+        raise NotImplementedError('The specified region: ' + region + ' is not implemented for yet.')
+    return lat, lon, data
+
+def write_ERA_on_rea_grid(ERA_names, ERA_alias, subtype, 
+                          year=2013, months=range(1,13),
+                          format="NETCDF4"):
+    from scipy.interpolate import RectBivariateSpline
+    from numpy.ma import array
+    region = 'medsea'
+    lat, lon, is_sea = get_REA_grid() 
+
+    for i,(name,alias) in enumerate(zip(ERA_names,ERA_alias)):
+        # Fetch the yearly data in one go.
+        tic()
+        print("Reading in {:d}'s ERA-INTERIM data for {:s}...".format(year,name))
+        lat_ERA, lon_ERA, data = get_ERA_yearly_data(name,alias,year=year)
+        toc()
+
+        # Output monthly and yearly files.
+        elapsed = 0
+        for month in months:
+            tic()
+            print("Writing 144x (full rea grid) interpolated {1:s} data for the month #{0:d}...".format(month,name))
+            # Output filename and full path.
+            outfn = region+'_ERA_{2:s}_{0:d}{1:02d}.nc'.format(year,month,subtype)
+            fullfile = os.path.join(data_folder,region+'_ERA-INTERIM_144x',outfn)
+            # Interpretation of ERA data timings CRITICAL here to get these indices correct.
+            start_hour, end_hour, start_ind, end_ind = timings(year,month)
+
+            # Once: open nc file and create dimensions.
+            if i == 0: # At the first variable only.
+                # Start the nc file with the basic dimensions, overwriting existing file.
+                with Dataset(fullfile,'w',format=format) as nc:
+                    # Routine stuff delegated to a helper funciton.
+                    nctime, nclat, nclon = create_dimensions(nc,lat=lat,lon=lon)
+                    # Write the time values to the nc file.
+                    nctime[:] = [hour for hour in range(start_hour, end_hour+3,3)]
+                    #print(fullfile + ' with time({}), lat({}), lon({}) set up.'.format(len(nctime),len(nclat),len(nclon)))
+
+            # Create each variable and append values.
+            with Dataset(fullfile,"a") as nc:
+                ncvar = create_variable(nc,name,'f8',zlib=True)
+                data_slice = data[start_ind:end_ind,:]
+                data_intp = array([RectBivariateSpline(lat_ERA,lon_ERA,data_slice[i,:])(lat,lon) for i in range(data_slice.shape[0])])
+                ncvar[:] = data_intp[:]
+            elapsed += toc()
+        print("Total time for writing {:s}: {:2f}s".format(name,elapsed))
+
+def write_SWR_CS_on_rea_grid(year,month):
+    from pygotm.medsea import tic, toc
+    from netCDF4 import Dataset
+    from numpy.ma import array
+    from numpy import load
+    from scipy.interpolate import RectBivariateSpline
+    swr_cs = load('swr_cs.npy')
+
+    print('Interpolating the swrd_clear_sky values for {:d}-{:02d}'.format(year,month))
+    tic()
+    def swr_cs_interp(year,month):
+        with Dataset('/home/simontse/scratch/medsea_ERA-INTERIM_20170331_withCF/medsea_ERA_{:d}{:02d}.nc'.format(year,month),'r') as ds:
+            lat_ERA = ds['lat'][:]
+            lon_ERA = ds['lon'][:]
+            num = (year-2013)*12 + month-1
+            vals = array([RectBivariateSpline(lat_new,lon_new,swr_cs[num][i,:])(lat_rea,lon_rea) for i in range(swr_cs[num].shape[0])]) 
+        return vals
+
+    with Dataset('/home/simontse/scratch/medsea_ERA-INTERIM_144x/medsea_ERA_heat_{:d}{:02d}.nc'.format(year,month),'a') as ds:
+        new_data = swr_cs_interp(year,month)
+        if 'swrd_clear_sky' not in ds.variables.keys():
+            new_var = ds.createVariable('swrd_clear_sky','f8',dimensions=('time','lat','lon'),zlib=True,fill_value=1e20)
+        else:
+            new_var = ds['swrd_clear_sky']
+        new_var[:] = new_data
+    toc()
+
+def write_CF_on_rea_grid(year,month):
+    from pygotm.medsea import tic, toc
+    from numpy.ma import divide, masked_outside
+    print('Calcuating cloud_factor values for {:d}-{:02d}'.format(year,month))
+    tic()
+    fn = '/home/simontse/scratch/medsea_ERA-INTERIM_144x/medsea_ERA_heat_{:d}{:02d}.nc'.format(year,month)
+    with Dataset(fn,'a') as ds:
+        if 'swrd_clear_sky' not in ds.variables.keys():
+            raise Exception('The variable swrd_clear_sky not found in ' + fn)
+        else:
+            swr_cs = ds['swrd_clear_sky'][:]
+            swr_era = ds['swrd'][:]
+        if 'cloud_factor' not in ds.variables.keys():
+            cf = ds.createVariable('cloud_factor','f8',dimensions=('time','lat','lon'),zlib=True,fill_value=1e20)
+        else:
+            cf = ds['cloud_factor']
+        cf[:] = masked_outside(divide(swr_era,swr_cs),0,1)
+    toc()
+
         
 # if __name__ == '__main__':
 #     if len(sys.argv) == 1: # No arguments provided, assume 2013, 2014.

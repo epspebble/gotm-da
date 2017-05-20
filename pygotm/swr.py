@@ -6,6 +6,12 @@ from .config import *
 year = 2014
 
 ## Helper functions        
+def tz(lon):
+    if lon > 0:
+        return int((lon+7.5)/15)
+    else:
+        return int((lon-7.5)/15)
+
 def yrdays(year):
     return 366 if year % 4 == 0 else 365
 
@@ -179,7 +185,7 @@ def swr_3hourly_mean(ndays,nsecs,lat,lon,timestep,method='quadrature'):
     return swr_mean
     
 
-def swr_3hourly_mean_monthly(year,month,m,n,method='quadrature'):
+def swr_3hourly_mean_monthly(year,month,lat,lon,method='quadrature'):
     """ 3-hourly mean computed for a month (UTC day 1 of month midnight to UTC day of of next month, midnight) """
     from time import time
     from datetime import datetime
@@ -205,21 +211,21 @@ def swr_3hourly_mean_monthly(year,month,m,n,method='quadrature'):
             # TAKE CARE BELOW.
             # Local time not necssarily at 0, 3, 6, 9 ... etc hours. 
             # Also, swr_3hourly_mean gives the mean over the SUBSEQUENT 3 hours. 
-            I_0_calc = swr_3hourly_mean(*UTC_to_local_nv(ndays,nsecs,medsea_lons[n]),
-                                        medsea_lats[m],medsea_lons[n],timestep,
-                                        method=method) 
+            I_0_calc = swr_3hourly_mean(*UTC_to_local_nv(ndays,nsecs,lon),
+                                        lat,lon,timestep,method=method) 
             swr_mean[j] = I_0_calc
     #toc = time()
     # How long does it take for one grid point and one 3-hourly period?
     #print('time elapsed for (m,n) = ({},{}):'.format(m,n), toc-tic)
     return swr_mean
 
-def cloud_factor_calc(year,month,m,n,swr_ERA,method='quadrature'):
+def cloud_factor_local(year,month,lat,lon,swr_obs,method='quadrature'):
+
+    " Compute cloud factor per grid point: lat/lon required and I_0 and I_0_calc expected to be given for the month with same number of records."
     from datetime import datetime
     from time import time
     from netCDF4 import Dataset
     import os
-    from gotm import medsea_lats, medsea_lons
     from numpy import ones
 
     # The following datetimes are to be interpreted as UTC, wich is also the timezone assumed for all date values used in GOTM 
@@ -232,7 +238,7 @@ def cloud_factor_calc(year,month,m,n,swr_ERA,method='quadrature'):
     
     #tic = time()
     cloud_factor = ones((ndays_stop-ndays_start)*8) # Defaults to clear sky value.
-    swr_mean = swr_3hourly_mean_monthly(year,month,m,n,method=method)
+    swr_mean = swr_3hourly_mean_monthly(year,month,lat,lon,method=method)
     for ndays in range(ndays_start,ndays_stop):
         for i in range(8):
             nsecs = i*3*3600
@@ -243,7 +249,7 @@ def cloud_factor_calc(year,month,m,n,swr_ERA,method='quadrature'):
             # If it's non-zero, compute the factor, otherwise, sun below horizon, so we just keep it as the defaul
             # value of 1 as initialized. Well, it should not matter.
             I_0_calc = swr_mean[j]
-            I_0_obs = swr_ERA[j,m,n]
+            I_0_obs = swr_obs[j] # To be taken from swr_ERA[:,m,n], where lat = lat[m], lon = lon[n].
             if I_0_calc > 1: 
                 # If I_0_calc is really small but positive, we get into some trouble...
                 cloud_factor[j] = I_0_obs / I_0_calc
@@ -259,20 +265,23 @@ def cloud_factor_calc(year,month,m,n,swr_ERA,method='quadrature'):
     
     return cloud_factor, swr_mean
 
-def cloud_factor_calc_monthly(year,month,use_ipp=True,append_to_ERA_dataset_now=False):
+def cloud_factor_all(year,month,grid='1x',use_ipp=True,append_to_ERA_dataset_now=False):
     """ Calculate cloud factor from ERA swrd and internal algorithm, then append a cloud_factor to the ERA dataset. """
     
     import itertools as itt
-    ## Get the cloud_factor value for the month
-    swr_ERA = data_sources(year,month)['heat']['swrd'][:]
+    swr_ERA = data_sources(year,month,grid=grid)['heat']['swrd'][:]
+    lat = data_sources(year,month,grid=grid)['heat']['lat'][:]
+    lon = data_sources(year,month,grid=grid)['heat']['lon'][:]
 
-    mm,nn = zip(*itt.product(range(21),range(57)))
+    M = len(lat)
+    N = len(lon)
+    mm,nn = zip(*itt.product(range(M),range(N)))
 
+    run = lambda m,n: cloud_factor_calc(year,month,m,n,swr_ERA[:,m,n])
     if use_ipp:
         ## Start an ipcluster to speed up.
         rc, lv = prepare_engine()
         dv = rc[:]
-        run = lambda m,n: cloud_factor_calc(year,month,m,n,swr_ERA)
         
         # Push these common values to global scope of each engine.
         dv.push(dict(year=year,month=month,swr_ERA=swr_ERA))
@@ -281,7 +290,7 @@ def cloud_factor_calc_monthly(year,month,use_ipp=True,append_to_ERA_dataset_now=
         results.wait()
         toc()
     else:
-        results = [cloud_factor_calc(year,month,mm[i],nn[i],swr_ERA) for i in range(21*57)]
+        results = [run(mm[i],nn[i]) for i in range(M*N)]
     
     ## Append to the ERA_file.
     if not(append_to_ERA_dataset_now):

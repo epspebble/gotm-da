@@ -57,7 +57,7 @@ ERA_folder = os.path.join(p_sossta_folder,'medsea_ERA-INTERIM','3-hourly')
 rea_folder = os.path.join(p_sossta_folder,'medsea_rea')
 
 # GOTM dat files' netCDF reformatted dataset sources.
-def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','sprof'], region='medsea'):
+def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','sprof'], region='medsea', grid='1x'):
     """ 
     Return the netCDF4 Dataset (or MFDataset) handles for the data source. 
     Calling data_sources() returns MFDataset of all available data for dat = ['heat','met','tprof','sprof']
@@ -94,12 +94,16 @@ def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','spr
     suffix += '.nc'
 
     # print(suffix) # debug
-    fn_dict = {'heat' : os.path.join(data_folder,region+'_ERA-INTERIM',region+'_ERA_heat' + suffix),
-               'met'  : os.path.join(data_folder,region+'_ERA-INTERIM',region+'_ERA_met' + suffix),
-               'tprof': os.path.join(data_folder,region+'_rea',region+'_rea_votemper' + suffix),
-               'sprof': os.path.join(data_folder,region+'_rea',region+'_rea_vosaline' + suffix),
-               'sst'  : os.path.join(data_folder,region+'_OSTIA',region+'_OSTIA_sst' + suffix),
-               'chlo' : os.path.join(data_folder,region+'_MODIS',region+'_MODIS_chlor_a' + suffix)}
+    if grid == '1x':
+        grid_level = '' # Temporary hack for backward compatibility.
+    else:
+        grid_level = '_' + grid
+    fn_dict = {'heat' : os.path.join(data_folder,region+'_ERA-INTERIM' + grid_level,region+'_ERA_heat' + suffix),
+               'met'  : os.path.join(data_folder,region+'_ERA-INTERIM' + grid_level,region+'_ERA_met' + suffix),
+               'tprof': os.path.join(data_folder,region+'_rea' + grid_level,region+'_rea_votemper' + suffix),
+               'sprof': os.path.join(data_folder,region+'_rea' + grid_level,region+'_rea_vosaline' + suffix),
+               'sst'  : os.path.join(data_folder,region+'_OSTIA' + grid_level,region+'_OSTIA_sst' + suffix),
+               'chlo' : os.path.join(data_folder,region+'_MODIS' + grid_level,region+'_MODIS_chlor_a' + suffix)}
 
     assert all([each in fn_dict.keys() for each in dat]) # Check that the function is called correctly.
 
