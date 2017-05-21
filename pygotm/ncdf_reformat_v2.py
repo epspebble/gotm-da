@@ -1,15 +1,8 @@
 ### Common settings
 import sys, os
-#import .config_9x as cfg
-#import .medsea_9x as ms
-#import .gotmks as g
-
-# The following imports the default values of global names like max_depth, medsea_lats, medsea_lons etc.
-# We should explicitly use ms.medsea_lats etc. for safety if it is desirable to use new values that
-# are not the default ones.
-#from .gotmks import *
-#from .config import *
-#from .medsea import *
+from .config import *
+from .gotmks import *
+from .medsea import *
 
 ## These global settings should now in pygotm.config, imported above.
 
@@ -25,12 +18,12 @@ import sys, os
 # ERA_folder = os.path.join(data_folder,'p_sossta','medsea_ERA-INTERIM','3-hourly')
 
 # The corresponding index ranges in medsea_ERA-INTERIM datasets.
-#medsea_ERA_lat_ind = slice(-8,4,-1)
-#medsea_ERA_lon_ind = slice(12,-18,1)
+medsea_ERA_lat_ind = slice(-8,4,-1)
+medsea_ERA_lon_ind = slice(12,-18,1)
 
 # The corresponding index ranges in medsea_rea datasets.
-#medsea_rea_lat_ind = slice(9,250,12)
-#medsea_rea_lon_ind = slice(0,673,12)
+medsea_rea_lat_ind = slice(9,250,12)
+medsea_rea_lon_ind = slice(0,673,12)
 
 # In medsea_rea ocean reanalysis data:
 # depth[24] = 176.82929993, we want up to 150m only.
@@ -242,7 +235,14 @@ def medsea_rea_reformat(year,month,varname,fn_keyword):
             
     print("Done creating {}".format(outfn))
 
-# New functions on 2017-05-20
+# New functions
+def get_REA_grid():
+    with Dataset('/global/scratch/simontse/p_sossta/medsea_rea/2013/20130101_TEMP_re-fv6.nc','r') as nc:
+        lat_rea = nc['lat'][:]
+        lon_rea = nc['lon'][:]
+        temp_rea = nc['votemper'][:]
+        is_sea = ~temp_rea[0,0,:].mask
+    return lat_rea, lon_rea, is_sea
 
 def get_ERA_yearly_data(name,alias,year=2013,region='medsea'):
     if region == 'medsea':
@@ -262,7 +262,7 @@ def write_ERA_on_rea_grid(ERA_names, ERA_alias, subtype,
     from scipy.interpolate import RectBivariateSpline
     from numpy.ma import array
     region = 'medsea'
-    lat, lon, is_sea = ms.subgrid
+    lat, lon, is_sea = get_REA_grid() 
 
     for i,(name,alias) in enumerate(zip(ERA_names,ERA_alias)):
         # Fetch the yearly data in one go.
@@ -278,7 +278,7 @@ def write_ERA_on_rea_grid(ERA_names, ERA_alias, subtype,
             print("Writing 144x (full rea grid) interpolated {1:s} data for the month #{0:d}...".format(month,name))
             # Output filename and full path.
             outfn = region+'_ERA_{2:s}_{0:d}{1:02d}.nc'.format(year,month,subtype)
-            fullfile = os.path.join(data_folder,'144x',region+'_ERA-INTERIM',outfn)
+            fullfile = os.path.join(data_folder,region+'_ERA-INTERIM_144x',outfn)
             # Interpretation of ERA data timings CRITICAL here to get these indices correct.
             start_hour, end_hour, start_ind, end_ind = timings(year,month)
 
@@ -302,6 +302,7 @@ def write_ERA_on_rea_grid(ERA_names, ERA_alias, subtype,
         print("Total time for writing {:s}: {:2f}s".format(name,elapsed))
 
 def write_SWR_CS_on_rea_grid(year,month):
+    from pygotm.medsea import tic, toc
     from netCDF4 import Dataset
     from numpy.ma import array
     from numpy import load
@@ -311,16 +312,14 @@ def write_SWR_CS_on_rea_grid(year,month):
     print('Interpolating the swrd_clear_sky values for {:d}-{:02d}'.format(year,month))
     tic()
     def swr_cs_interp(year,month):
-        fn = os.path.join(data_folder,'1x','medsea_ERA-INTERIM_20170331_withCF','medsea_ERA_{:d}{:02d}.nc'.format(year,month))
-        with Dataset(fn1,'r') as ds:
+        with Dataset('/home/simontse/scratch/medsea_ERA-INTERIM_20170331_withCF/medsea_ERA_{:d}{:02d}.nc'.format(year,month),'r') as ds:
             lat_ERA = ds['lat'][:]
             lon_ERA = ds['lon'][:]
             num = (year-2013)*12 + month-1
             vals = array([RectBivariateSpline(lat_new,lon_new,swr_cs[num][i,:])(lat_rea,lon_rea) for i in range(swr_cs[num].shape[0])]) 
         return vals
 
-    fn = os.path.join(data_folder,'144x','medsea_ERA-INTERIM','medsea_ERA_heat_{:d}{:02d}.nc'.format(year,month))
-    with Dataset(fn,'a') as ds:
+    with Dataset('/home/simontse/scratch/medsea_ERA-INTERIM_144x/medsea_ERA_heat_{:d}{:02d}.nc'.format(year,month),'a') as ds:
         new_data = swr_cs_interp(year,month)
         if 'swrd_clear_sky' not in ds.variables.keys():
             new_var = ds.createVariable('swrd_clear_sky','f8',dimensions=('time','lat','lon'),zlib=True,fill_value=1e20)
@@ -334,7 +333,7 @@ def write_CF_on_rea_grid(year,month):
     from numpy.ma import divide, masked_outside
     print('Calcuating cloud_factor values for {:d}-{:02d}'.format(year,month))
     tic()
-    fn = os.path.join(data_folder,'144x','medsea_ERA-INTERIM','medsea_ERA_heat_{:d}{:02d}.nc'.format(year,month))
+    fn = '/home/simontse/scratch/medsea_ERA-INTERIM_144x/medsea_ERA_heat_{:d}{:02d}.nc'.format(year,month)
     with Dataset(fn,'a') as ds:
         if 'swrd_clear_sky' not in ds.variables.keys():
             raise Exception('The variable swrd_clear_sky not found in ' + fn)

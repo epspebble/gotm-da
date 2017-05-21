@@ -1,7 +1,7 @@
 from .config import *
 from .gotmks import *
 
-## Global settings
+## Global settings and initializations.
 run_profiles = {'ASM0': dict(assimilation_type=0, extinct_method=9),
                 'ASM1': dict(assimilation_type=0, extinct_method=12),
                 'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9),
@@ -15,90 +15,82 @@ run_profiles = {'ASM0': dict(assimilation_type=0, extinct_method=9),
 
 import numpy as np
 
-# Our grid points. Maybe we can reduce dependence on numpy by just using a Python array.
-medsea_lats = tuple(30.75+0.75*i for i in range(21))
-medsea_lons = tuple(-6.0+0.75*i for i in range(57))
-M = len(medsea_lats)
-N = len(medsea_lons)
-
-## Moved to ncdf_reformat.py
-# The corresponding index ranges in medsea_ERA-INTERIM datasets.
-#ERA_lat_ind = slice(-8,4,-1)
-#ERA_lon_ind = slice(12,-18,1)
-
-# The corresponding index ranges in medsea_rea datasets.
-#rea_lat_ind = slice(9,250,12)
-#rea_lon_ind = slice(0,673,12)
-#rea_depth_ind = slice(0,ndepth)
-
-def find_depths(lats = medsea_lats, lons = medsea_lons):   
-    global M
-    global N
-    # Enumerate the grid points 
-    import itertools
-    if len(lats) != M or len(lons) != N:
-        print('Warning: a new grid is detected. Logical loophole checks not yet complete.')
-        M = len(lats)
-        N = len(lons)
-
-    mm, nn = zip(*itertools.product(range(M),range(N)))
-    # Make use of a medsea_rea dataset to infer sea, shallow and land locations.
-    with data_sources(2014,1,dat='tprof') as rea_ds:
-        votemper = rea_ds['votemper']
-        rea_depth = rea_ds['depth']
-        # Preallocate
-        is_sea = list(False for i in range(M*N))
-        is_shallow = list(False for i in range(M*N))
-        is_deep = list(False for i in range(M*N))
-        is_land = list(False for i in range(M*N))
-        medsea_depths = list(0 for i in range(M*N))
+# A CRUCIAL routine to double-check for parallelizing over grid points.
+def set_grid(depth=75,
+             subindices=(slice(1,None,4),slice(0,None,4)),
+             plot = False, stat = False,
+             ):
+    """ Obtain the 1/16 degree grid used in medsea_rea, and classify each grid points according to 'max_depth'. 
+        A sub-grid is set to the global variables in the module, and also returned by specifying 'subindices':
+            ** 9x test grid (the only one with both lat and lon being multiples of 0.25): 
+                    subindices=(slice(1,None,4), slice(0,None,4))
+            ** 9x grids (16 of them, including the 9x test grid above): 
+                    subindices=(slice(i,None,4), slice(j,None,4)) 
+               for (i,j) in {0,1,2,3} x {0,1,2,3}
+            ** 1x grid that is co-locational with ERA data grid:
+                    subindices=(slice(9,None,12), slice(None,None,12))
+            ** a mini grid with only 23 sea locations with depth >= 75 that can be used for testing:
+                    subindices=(slice(1,None,48), slice(None,None,48))
+               NOTE: In medsea_ERA dataset, the latitudes are arranged, exceptionally, in descending order.
+    """
+    print('Initializing grid.')
+    global max_depth, ndepth, medsea_lats, medsea_lons, medsea_flags, M, N, sea_mn, sea_m, sea_n
     
-        for i in range(M*N):
-            # Since fill value is 1e20, and sea water should not be boiling...
-            max_temp = 100
-            if (votemper[0,0,mm[i],nn[i]] > max_temp): # shallowest data
-                is_land[i] = True
-                medsea_depths[i] = 0
-            if (votemper[0,-1,mm[i],nn[i]] < max_temp): # deepest data
-                is_deep[i] = True
-                medsea_depths[i] = rea_depth[-1]
-            if (votemper[0,0,mm[i],nn[i]] < max_temp) and (votemper[0,-1,mm[i],nn[i]] > max_temp):
-                is_shallow[i] = True
-                deepest_idx = sum(votemper[0,:,mm[i],nn[i]] < max_temp)-1
-                medsea_depths[i] = rea_depth[deepest_idx]    
-            is_sea[i] = (is_deep[i] or is_shallow[i]) 
+    max_depth = depth
+    with Dataset('/global/scratch/simontse/p_sossta/medsea_rea/2013/20130101_TEMP_re-fv6.nc','r') as ds:
+        lat_rea = ds['lat'][:]
+        lon_rea = ds['lon'][:]
+        temp_rea = ds['votemper'][:]
+        depth = ds['depth'][:]
+        ndepth = sum(depth<max_depth)
+        # 2 means deeper than max_depth, 1 means less than max_depth, 0 means land
+        loc_type = 0 + ~temp_rea[0,0,:].mask + ~temp_rea[0,ndepth+1,:].mask
+        #print(loc_type.shape)
+        drei = loc_type.size
+        zwei = (loc_type == 2).sum()
+        ein = (loc_type == 1).sum()
+        null = (loc_type == 0).sum()
+        if stat:
+            print('sea (>{!s}m) locations:'.format(max_depth), zwei, ', {!s}% out of {!s}'.format(zwei*100/drei,drei))
+            print('sea (<{!s}m) locations:'.format(max_depth), ein, ', {!s}% out of {!s}'.format(ein*100/drei,drei))
+            print('land locations:', null, ', {!s}% out of {!s}'.format(null*100/drei,drei))
+        if plot:
+            imshow(loc_type,origin='lower',extent=[lon_rea.min(),lon_rea.max(),lat_rea.min(),lat_rea.max()],cmap=cm.Blues)
+            xlabel('longitude')
+            ylabel('latitude')
+            title('max_depth = {!s}m'.format(max_depth))
+        #print(null,ein,zwei,drei)
+        assert null+ein+zwei == drei
+    subgrid = lat_rea[subindices[0]], lon_rea[subindices[1]], loc_type[subindices[0],subindices[1]]
+    assert subgrid[0].shape, subgrid[1].shape == subgrid[2].shape
+    
+    # Setting global values in this module.
+    medsea_lats, medsea_lons, medsea_flags = subgrid
+    M, N = medsea_flags.shape
+    assert M == medsea_lats.size and N == medsea_lons.size
+    sea_m, sea_n = np.where(medsea_flags==2)
+    sea_mn = [(sea_m[i],sea_n[i]) for i in range(sea_m.size)]
 
-    # Check that there are no logical loopholes.
-    assert sum(is_deep) + sum(is_shallow) == sum(is_sea)
-    assert sum(is_sea) + sum(is_land) == M*N
+    print('A subgrid of shape {!s}x{!s} is set.'.format(subgrid[0].size,subgrid[1].size))
+    return subgrid # Values written directly to global variables as well.
 
-    # Return the counters i for lat/lon index arrays mm and nn.
-    shallow_i = tuple(itertools.compress(range(M*N),is_shallow))
-    deep_i = tuple(itertools.compress(range(M*N),is_deep))
-    sea_i = tuple(itertools.compress(range(M*N),is_sea))
-    land_i = tuple(itertools.compress(range(M*N),is_land))
-
-    # Return the actual lat/lon index pairs (m,n)
-    shallow_mn = tuple((mm[i],nn[i]) for i in shallow_i)
-    deep_mn = tuple((mm[i],nn[i]) for i in deep_i)
-    sea_mn = tuple((mm[i],nn[i]) for i in sea_i)
-    land_mn = tuple((mm[i],nn[i]) for i in land_i)
-
-    # Return the actual (lat,lon) coorindates as well
-    shallow_locations = tuple((lats[m],lons[n]) for (m,n) in shallow_mn)
-    deep_locations = tuple((lats[m],lons[n]) for (m,n) in deep_mn)
-    sea_locations = tuple((lats[m],lons[n]) for (m,n) in sea_mn)
-    land_locations = tuple((lats[m],lons[n]) for (m,n) in land_mn)
-                    
-    return (is_shallow, is_deep, is_sea, is_land), (shallow_i,deep_i,sea_i,land_i), (shallow_mn, deep_mn, sea_mn, land_mn), (shallow_locations, deep_locations, sea_locations, land_locations)
-
-if not(os.path.isfile('medsea_depths.cache')):
-    filtered = np.array(find_depths())
-    np.save('medsea_depths.cache',filtered)
+if not(os.path.isfile(os.path.join(project_folder,'medsea_9x_test.npy'))):
+    subgrid = set_grid()
+    np.save(os.path.join(project_folder,'medsea_9x_test.npy'),subgrid)
 else:
-    filtered = np.load('medsea_depths.cache')
+    subgrid = np.load(os.path.join(project_folder,'medsea_9x_test.npy'))
+    medsea_lats, medsea_lons, medsea_flags = subgrid
 
-(is_shallow, is_deep, is_sea, is_land), (shallow_i,deep_i,sea_i,land_i), (shallow_mn, deep_mn, sea_mn, land_mn), (shallow_locations, deep_locations, sea_locations, land_locations) = filtered
+# 2017-05-20 First time doing this, let's be safe.
+assert all(medsea_lats == np.arange(30.25,45.75+0.25,0.25))
+assert all(medsea_lons == np.arange(-6.0,36.25+0.25,0.25))
+
+# The global variables that are still needed by some code.
+M = medsea_lats.size
+N = medsea_lons.size
+
+sea_m, sea_n = np.where(medsea_flags == 2)
+sea_mn = [(sea_m[i],sea_n[i]) for i in range(sea_m.size)]
 
 ## Helper functions
 def timestr(nctime,i):
@@ -114,13 +106,13 @@ def timestr(nctime,i):
     return ts
 
 def change_base(new_base_folder):
-    global base_folder, run_folder
+    global base_folder
     if not(os.path.isdir(new_base_folder)):
         raise IOError('The base folder: ' + new_base_folder + 'is either not accessible or created.')
-    base_folder = new_base_folder
-    run_folder=os.path.join(base_folder,'run')
-    if not(os.path.isdir(run_folder)):
-        os.mkdir(run_folder)
+#    base_folder = new_base_folder
+#    run_folder=os.path.join(base_folder,'run')
+#    if not(os.path.isdir(run_folder)):
+#        os.mkdir(run_folder)
        
 def print_lat_lon(lat,lon,fmt_str='.2f'):
     "Helper function for printing (lat,lon) as 10.5N2.1E etc. "
@@ -146,8 +138,9 @@ def chunk(c,k,fun,*args,**kwargs):
 
 
 def get_m_n(lat,lon):
-    "Return the grid index (m,n) given latlong."
-    return int((lat-medsea_lats[0])/0.75), int((lon-medsea_lons[0])/0.75)
+    "Return the grid index (m,n) given latlong. Assume uniformly-spaced grid."
+    spacing = medsea_lats[1]-medsea_lats[0]
+    return int((lat-medsea_lats[0])/spacing), int((lon-medsea_lons[0])/spacing)
 
 def get_lat_lon(m,n):
     "Return the latlong given the grid index (m,n)."

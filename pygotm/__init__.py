@@ -1,1 +1,1 @@
-__all__ = ['gotmks','medsea','ncdf_reformat','swr']
+__all__ = ['gotmks','medsea','ncdf_reformat','swr','MODIS']
