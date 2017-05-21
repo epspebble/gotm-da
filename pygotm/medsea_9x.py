@@ -34,7 +34,7 @@ def set_grid(depth=75,
                NOTE: In medsea_ERA dataset, the latitudes are arranged, exceptionally, in descending order.
     """
     print('Initializing grid.')
-    global max_depth, medsea_lats, medsea_lons, medsea_flags, M, N, sea_mn, sea_m, sea_n
+    global max_depth, ndepth, medsea_lats, medsea_lons, medsea_flags, M, N, sea_mn, sea_m, sea_n
     
     max_depth = depth
     with Dataset('/global/scratch/simontse/p_sossta/medsea_rea/2013/20130101_TEMP_re-fv6.nc','r') as ds:

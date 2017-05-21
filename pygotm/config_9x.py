@@ -36,7 +36,7 @@ timestep = 30
 ## For medsea simulations
 
 # Top-level project folders
-data_folder = os.path.join('/global/scratch',os.getenv('USER'))
+data_folder = os.path.join('/global/scratch',os.getenv('USER'),'medsea_data')
 while not(os.path.isdir(data_folder)):
     print('The data folder ' + data_folder + 'is either not accessible or created.')
     data_folder = input("Enter new data folder location.")
@@ -57,7 +57,7 @@ ERA_folder = os.path.join(p_sossta_folder,'medsea_ERA-INTERIM','3-hourly')
 rea_folder = os.path.join(p_sossta_folder,'medsea_rea')
 
 # GOTM dat files' netCDF reformatted dataset sources.
-def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','sprof','chlo'], region='medsea', grid='9x'):
+def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','sprof','chlo'], region='medsea', grid='144x'):
     """ 
     Return the netCDF4 Dataset (or MFDataset) handles for the data source. 
     Calling data_sources() returns MFDataset of all available data for dat = ['heat','met','tprof','sprof']
@@ -72,10 +72,13 @@ def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','spr
         # Need to use MFDataset
         NCDataset = MFDataset
     else:
+        # When both year and month is given, we can specifically return handle to our reformatted datasets 
+        # organized by months.
         NCDataset = Dataset
 
     if isinstance(dat,str):
-        dat = [dat] # So that list comprehension still works.
+        # if only one type is requested, still make it into a list so that list comprehension still works.
+        dat = [dat]
 
     # nc_dict = dict(heat = MFDataset(os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_*.nc')), 
     #                met = MFDataset(os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_*.nc')), 
@@ -93,17 +96,12 @@ def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','spr
         suffix += '*'
     suffix += '.nc'
 
-    # print(suffix) # debug
-    if grid == '1x':
-        grid_level = '' # Temporary hack for backward compatibility.
-    else:
-        grid_level = '_' + grid
-    fn_dict = {'heat' : os.path.join(data_folder,region+'_ERA-INTERIM' + grid_level,region+'_ERA_heat' + suffix),
-               'met'  : os.path.join(data_folder,region+'_ERA-INTERIM' + grid_level,region+'_ERA_met' + suffix),
-               'tprof': os.path.join(data_folder,region+'_rea' + grid_level,region+'_rea_votemper' + suffix),
-               'sprof': os.path.join(data_folder,region+'_rea' + grid_level,region+'_rea_vosaline' + suffix),
-               'sst'  : os.path.join(data_folder,region+'_OSTIA' + grid_level,region+'_OSTIA_sst' + suffix),
-               'chlo' : os.path.join(data_folder,region+'_MODIS' + grid_level,region+'_MODIS_chlor_a' + suffix)}
+    fn_dict = {'heat' : os.path.join(data_folder,grid,region+'_ERA-INTERIM',region+'_ERA_heat' + suffix),
+               'met'  : os.path.join(data_folder,grid,region+'_ERA-INTERIM',region+'_ERA_met' + suffix),
+               'tprof': os.path.join(data_folder,grid,region+'_rea',region+'_rea_votemper' + suffix),
+               'sprof': os.path.join(data_folder,grid,region+'_rea',region+'_rea_vosaline' + suffix),
+               'sst'  : os.path.join(data_folder,grid,region+'_OSTIA',region+'_OSTIA_sst' + suffix),
+               'chlo' : os.path.join(data_folder,grid,region+'_MODIS',region+'_MODIS_chlor_a' + suffix)}
 
     assert all([each in fn_dict.keys() for each in dat]) # Check that the function is called correctly.
 
