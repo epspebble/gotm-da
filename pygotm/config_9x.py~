@@ -18,7 +18,7 @@ epoch = datetime(1981,1,1)
 
 # Set the default GOTM executable and namelist locations.
 userhome = os.getenv('HOME')
-project_folder = os.path.join(userhome,'medsea_GOTM')
+project_folder = os.path.join(userhome,'medsea_GOTM') # notebooks, jobs, scripts, config templates
 GOTM_executable = os.path.join(project_folder,'bin','gotm')
 if not(os.path.isfile(GOTM_executable)):
     raise FileNotFoundError("The GOTM executable not found at " + GOTM_executable)
@@ -57,7 +57,7 @@ ERA_folder = os.path.join(p_sossta_folder,'medsea_ERA-INTERIM','3-hourly')
 rea_folder = os.path.join(p_sossta_folder,'medsea_rea')
 
 # GOTM dat files' netCDF reformatted dataset sources.
-def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','sprof'], region='medsea', grid='1x'):
+def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','sprof','chlo'], region='medsea', grid='1x'):
     """ 
     Return the netCDF4 Dataset (or MFDataset) handles for the data source. 
     Calling data_sources() returns MFDataset of all available data for dat = ['heat','met','tprof','sprof']

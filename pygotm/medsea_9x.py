@@ -16,22 +16,27 @@ run_profiles = {'ASM0': dict(assimilation_type=0, extinct_method=9),
 import numpy as np
 
 # A CRUCIAL routine to double-check for parallelizing over grid points.
-def get_rea_grid(max_depth=75,
-                 subindices=(slice(1,None,4),slice(0,None,4)),
-                 plot = False, stat = False,
-                ):
-    """ Obtain the 1/16 degree grid used in medsea_rea, and find classify the grid points according to 'max_depth'. 
-        A sub-grid is returned by specifying 'subindices':
+def set_grid(depth=75,
+             subindices=(slice(1,None,4),slice(0,None,4)),
+             plot = False, stat = False,
+             ):
+    """ Obtain the 1/16 degree grid used in medsea_rea, and classify each grid points according to 'max_depth'. 
+        A sub-grid is set to the global variables in the module, and also returned by specifying 'subindices':
             ** 9x test grid (the only one with both lat and lon being multiples of 0.25): 
-                    (slice(1,None,4), slice(0,None,4))
+                    subindices=(slice(1,None,4), slice(0,None,4))
             ** 9x grids (16 of them, including the 9x test grid above): 
-                    (slice(i,None,4), slice(j,None,4)) 
+                    subindices=(slice(i,None,4), slice(j,None,4)) 
                for (i,j) in {0,1,2,3} x {0,1,2,3}
             ** 1x grid that is co-locational with ERA data grid:
-                    (slice(9,None,12), slice(None,None,12))
+                    subindices=(slice(9,None,12), slice(None,None,12))
+            ** a mini grid with only 23 sea locations with depth >= 75 that can be used for testing:
+                    subindices=(slice(1,None,48), slice(None,None,48))
                NOTE: In medsea_ERA dataset, the latitudes are arranged, exceptionally, in descending order.
     """
     print('Initializing grid.')
+    global max_depth, medsea_lats, medsea_lons, medsea_flags, M, N, sea_mn, sea_m, sea_n
+    
+    max_depth = depth
     with Dataset('/global/scratch/simontse/p_sossta/medsea_rea/2013/20130101_TEMP_re-fv6.nc','r') as ds:
         lat_rea = ds['lat'][:]
         lon_rea = ds['lon'][:]
@@ -58,26 +63,33 @@ def get_rea_grid(max_depth=75,
         assert null+ein+zwei == drei
     subgrid = lat_rea[subindices[0]], lon_rea[subindices[1]], loc_type[subindices[0],subindices[1]]
     assert subgrid[0].shape, subgrid[1].shape == subgrid[2].shape
-    print('Returning a subgrid of shape {!s}x{!s}'.format(subgrid[0].size,subgrid[1].size))
-    return subgrid
+    
+    # Setting global values in this module.
+    medsea_lats, medsea_lons, medsea_flags = subgrid
+    M, N = loc_type.shape
+    assert M == medsea_lats.size and N == medsea_lons.size
+    sea_m, sea_n = np.where(medsea_flags==2)
+    sea_mn = [(sea_m[i],sea_n[i]) for i in range(sea_m.size)]
+
+    print('A subgrid of shape {!s}x{!s} is set.'.format(subgrid[0].size,subgrid[1].size))
+    return subgrid # Values written directly to global variables.
 
 if not(os.path.isfile('medsea_9x_test.npy')):
-    subgrid = get_rea_grid()
+    subgrid = set_grid()
     np.save('medsea_9x_test.npy',subgrid)
 else:
     subgrid = np.load('medsea_9x_test.npy')
-
-medsea_lats, medsea_lons, loc_type = subgrid
+    medsea_lats, medsea_lons, medsea_flags = subgrid
 
 # 2017-05-20 First time doing this, let's be safe.
 assert all(medsea_lats == np.arange(30.25,45.75+0.25,0.25))
 assert all(medsea_lons == np.arange(-6.0,36.25+0.25,0.25))
 
-# The global variables that are still needed by code.
+# The global variables that are still needed by some code.
 M = medsea_lats.size
 N = medsea_lons.size
 
-sea_m, sea_n = np.where(loc_type == 2)
+sea_m, sea_n = np.where(medsea_flags == 2)
 sea_mn = [(sea_m[i],sea_n[i]) for i in range(sea_m.size)]
 
 ## Helper functions
