@@ -4,8 +4,8 @@ from .gotmks import *
 import numpy as np
 
 ## Global settings and initializations. 
-run = 'default'
-grid = '144x'
+run = 'ASM3-75m-9x_4'
+grid = '9x_4'
 region = 'medsea'
 overwrite = True
 
@@ -134,7 +134,7 @@ def set_folders():
         base_folder = input("Enter new folder location.")
     run_folder = os.path.join(base_folder,run)
     if not(os.path.isdir(run_folder)):
-        print('Run folder: {:s} not found. Creating it now.')
+        print('Run folder: {:s} not found. Creating it now.'.format(run_folder))
         os.mkdir(run_folder)
 
     # Ocean and Satellite products datasets source folders.
@@ -268,7 +268,7 @@ def timestr(nctime,i):
 def change_base(new_base_folder):
     global base_folder, run_folder
     if not(os.path.isdir(new_base_folder)):
-        raise IOError('The base folder: ' + new_base_folder + 'is either not accessible or created.')
+        raise IOError('The base folder: ' + new_base_folder + ' is either not accessible or created.')
     base_folder = new_base_folder    
     run_folder=os.path.join(base_folder,run)
     if not(os.path.isdir(run_folder)):
@@ -629,7 +629,7 @@ def core_dat(year,month,m,n,**nc_dict):
         write_dat(m,n,dat_fn,nc,core_folder)
     return
 
-def prepare_run(start,stop,out_dir,out_fn='results',m=None,n=None,lat=None,lon=None, **gotm_user_args):
+def prepare_run(start,stop,out_dir,out_fn='results',m=None,n=None,lat=None,lon=None, grid_dat='grid_75m.dat',**gotm_user_args):
     "Transfer config files and GOTM executable to the folder in which GOTM will be run."
     import shutil
     # Determine the grid point location.
@@ -637,8 +637,9 @@ def prepare_run(start,stop,out_dir,out_fn='results',m=None,n=None,lat=None,lon=N
         (m,n) = get_m_n(lat,lon)
     if (lat is None) and (lon is None):
         (lat,lon) = get_lat_lon(m,n)
-    latlong = print_lat_lon(lat,lon)        
-    run_name = 'medsea_GOTM, #(m,n)=({1:d},{2:d})'.format(latlong,m,n)    
+    assert not(m is None or n is None or lat is None or lon is None), 'Either a (m,n) or (lat,lon) should be specified.'
+
+    run_name = 'medsea_GOTM, {:s} grid, #(m,n)=({:d},{:d})'.format(grid,m,n)    
 
     # Set up GOTM arguments.
     gotm_args = dict(name = run_name,
@@ -654,6 +655,9 @@ def prepare_run(start,stop,out_dir,out_fn='results',m=None,n=None,lat=None,lon=N
         # All config files are overwritten every time GOTM is run.
         shutil.copyfile(os.path.join(GOTM_nml_path,each),os.path.join(out_dir,each))       
     
+    # Temporary hack. Also copy the grid data file.
+    shutil.copyfile(os.path.join(GOTM_nml_path,grid_dat),os.path.join(out_dir,grid_dat))
+
     updatecfg(path=out_dir, **gotm_args)
     return gotm_args
 
