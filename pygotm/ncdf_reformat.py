@@ -11,6 +11,26 @@ import sys, os
 #from .config import *
 #from .medsea import *
 
+from .config import get_folders, epoch
+from .gotmks import tic, toc
+from .medsea import get_grid, create_variable, create_dimensions
+from netCDF4 import *
+
+def update_config():
+    global scratch_folder, data_folder, base_folder, p_sossta_folder, ERA_folder, rea_folder 
+    scratch_folder, data_folder, base_folder, p_sossta_folder, ERA_folder, rea_folder = get_folders()
+
+    global medsea_lats, medsea_lons, medsea_flags, max_depth
+    global medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth
+    global M, N, sea_mn, sea_m, sea_n
+    subgrid, rea_indices, grid_indices = get_grid()
+    medsea_lats, medsea_lons, medsea_flags, max_depth = subgrid
+    medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth = rea_indices
+    M, N, sea_mn, sea_m, sea_n = grid_indices
+
+# Now run it
+update_config()
+
 ## These global settings should now in pygotm.config, imported above.
 
 # ### Global settings
@@ -36,8 +56,8 @@ import sys, os
 # depth[24] = 176.82929993, we want up to 150m only.
 # We used depth[18] = 101.78025055, when our max_depth was 100m.
 #ndepth = 18
-ndepth = 24 # Use this for any region? Double check!
-rea_depth_ind = slice(0,ndepth)
+#ndepth = 24 # Use this for any region? Double check!
+#rea_depth_ind = slice(0,ndepth)
 
 met_names = ['u10m','v10m','sp','t2m','q2m','precip','snow']
 met_alias = ['u10m','v10m','sp','t2m','q2m','var144','var228']
@@ -137,6 +157,8 @@ def ERA_reformat(year,region='medsea'):
     #    # Output filename and full path.
     #    outfn = region+'_ERA_{0:d}{1:02d}.nc'.format(year,month)
     #    fullfile = os.path.join(data_folder,region+'_ERA-INTERIM',outfn)
+    medsea_ERA_lat_ind = slice(-8,4,-1)
+    medsea_ERA_lon_ind = slice(12,-18,1)
 
     def get_ERA_yearly_data(name,alias,region='medsea'):
         if region == 'medsea':
@@ -191,19 +213,23 @@ def ERA_reformat(year,region='medsea'):
     write_ERA(heat_names, heat_alias,'heat')
     write_ERA(met_names, met_alias,'met')
 
-def medsea_rea_reformat(year,month,varname,fn_keyword):
+def medsea_rea_reformat(year,month,varname,fn_keyword,format='NETCDF4_CLASSIC'):
     from netCDF4 import Dataset, MFDataset, num2date, date2num
     from numpy import linspace
     from os.path import isfile
+    from .medsea import create_dimensions, create_variable
 
     output_folder = os.path.join(data_folder,'medsea_rea')
+    if not(os.path.isdir(output_folder)):
+        os.mkdir(output_folder)
     outfn = os.path.join(output_folder,'medsea_rea_{2}_{0:d}{1:02d}.nc'.format(year,month,varname,output_folder))
                        
-    with Dataset(outfn,"w",format='NETCDF3_CLASSIC') as nc:
-        nctime, nclat, nclon = create_dimensions(nc)
+    with Dataset(outfn,"w",format=format) as nc:
+        nctime, nclat, nclon = create_dimensions(nc, lat=medsea_lats,lon=medsea_lons)
         nc.createDimension('depth', size = ndepth) 
         ncdepth = nc.createVariable('depth','f4',dimensions=('depth',))
         ncvar = create_variable(nc,varname,'f8',dimensions=('time','depth','lat','lon'))
+        # print(ncvar.shape)
         print('Done initializing dimensions and variables.')
 
         # Create the variable in question.
@@ -215,7 +241,7 @@ def medsea_rea_reformat(year,month,varname,fn_keyword):
             # Write in the time values, convert to our epoch and units.
             nctime[:] = date2num(num2date(rea_data['time'][:],rea_data['time'].units),'hours since '+str(epoch))
             # Copy over variable data.
-            temp = rea_data[varname][:,rea_depth_ind,medsea_rea_lat_ind,medsea_rea_lon_ind]
+            temp = rea_data[varname][:,0:ndepth,medsea_rea_lat_ind,medsea_rea_lon_ind]
             ncvar[:] = temp # Now random-access in RAM to copy over.
             ncvar.units = rea_data[varname].units
             print('Done copying over {} values of one month.'.format(varname))
@@ -236,7 +262,7 @@ def medsea_rea_reformat(year,month,varname,fn_keyword):
                 print('whereas time has length {}'.format(len(nc['time'][:])))
                 last = len(nc['time'])
                 nc['time'][last] = date2num(num2date(rea_data['time'][0],rea_data['time'].units),'hours since '+str(epoch))
-                ncvar[last,:,:,:] = rea_data[varname][0,rea_depth_ind,medsea_rea_lat_ind,medsea_rea_lon_ind]
+                ncvar[last,:,:,:] = rea_data[varname][0,0:ndepth,medsea_rea_lat_ind,medsea_rea_lon_ind]
                 print('After appending, the dimensions of {0} become {1},'.format(varname,ncvar[:].shape))
                 print('whereas time has length {}'.format(len(nc['time'][:])))
             
@@ -255,15 +281,18 @@ def get_ERA_yearly_data(name,alias,year=2013,region='medsea'):
     else:
         raise NotImplementedError('The specified region: ' + region + ' is not implemented for yet.')
     return lat, lon, data
+from numpy import arange
+
+lat_rea = arange(30.1875,45.9375+0.0625,0.0625)
+lon_rea = arange(-6.,36.25+0.0625,0.0625)
 
 def write_ERA_on_rea_grid(ERA_names, ERA_alias, subtype, 
                           year=2013, months=range(1,13),
-                          format="NETCDF4"):
+                          format="NETCDF4_CLASSIC"):
     from scipy.interpolate import RectBivariateSpline
+    from pygotm.gotmks import tic, toc
     from numpy.ma import array
     region = 'medsea'
-    lat, lon, is_sea = ms.subgrid
-
     for i,(name,alias) in enumerate(zip(ERA_names,ERA_alias)):
         # Fetch the yearly data in one go.
         tic()
@@ -278,7 +307,7 @@ def write_ERA_on_rea_grid(ERA_names, ERA_alias, subtype,
             print("Writing 144x (full rea grid) interpolated {1:s} data for the month #{0:d}...".format(month,name))
             # Output filename and full path.
             outfn = region+'_ERA_{2:s}_{0:d}{1:02d}.nc'.format(year,month,subtype)
-            fullfile = os.path.join(data_folder,'144x',region+'_ERA-INTERIM',outfn)
+            fullfile = os.path.join(os.getenv('HOME'),'medsea_data','144x',region+'_ERA-INTERIM',outfn)
             # Interpretation of ERA data timings CRITICAL here to get these indices correct.
             start_hour, end_hour, start_ind, end_ind = timings(year,month)
 
@@ -287,7 +316,7 @@ def write_ERA_on_rea_grid(ERA_names, ERA_alias, subtype,
                 # Start the nc file with the basic dimensions, overwriting existing file.
                 with Dataset(fullfile,'w',format=format) as nc:
                     # Routine stuff delegated to a helper funciton.
-                    nctime, nclat, nclon = create_dimensions(nc,lat=lat,lon=lon)
+                    nctime, nclat, nclon = create_dimensions(nc,lat=lat_rea,lon=lon_rea)
                     # Write the time values to the nc file.
                     nctime[:] = [hour for hour in range(start_hour, end_hour+3,3)]
                     #print(fullfile + ' with time({}), lat({}), lon({}) set up.'.format(len(nctime),len(nclat),len(nclon)))
@@ -296,7 +325,7 @@ def write_ERA_on_rea_grid(ERA_names, ERA_alias, subtype,
             with Dataset(fullfile,"a") as nc:
                 ncvar = create_variable(nc,name,'f8',zlib=True)
                 data_slice = data[start_ind:end_ind,:]
-                data_intp = array([RectBivariateSpline(lat_ERA,lon_ERA,data_slice[i,:])(lat,lon) for i in range(data_slice.shape[0])])
+                data_intp = array([RectBivariateSpline(lat_ERA,lon_ERA,data_slice[i,:])(lat_rea,lon_rea) for i in range(data_slice.shape[0])])
                 ncvar[:] = data_intp[:]
             elapsed += toc()
         print("Total time for writing {:s}: {:2f}s".format(name,elapsed))
@@ -304,22 +333,25 @@ def write_ERA_on_rea_grid(ERA_names, ERA_alias, subtype,
 def write_SWR_CS_on_rea_grid(year,month):
     from netCDF4 import Dataset
     from numpy.ma import array
-    from numpy import load
+    from numpy import load, arange
     from scipy.interpolate import RectBivariateSpline
     swr_cs = load('swr_cs.npy')
 
     print('Interpolating the swrd_clear_sky values for {:d}-{:02d}'.format(year,month))
     tic()
     def swr_cs_interp(year,month):
-        fn = os.path.join(data_folder,'1x','medsea_ERA-INTERIM_20170331_withCF','medsea_ERA_{:d}{:02d}.nc'.format(year,month))
-        with Dataset(fn1,'r') as ds:
+        fn = os.path.join(os.getenv('HOME'),'medsea_data','1x','medsea_ERA-INTERIM_20170331_withCF','medsea_ERA_{:d}{:02d}.nc'.format(year,month))
+        with Dataset(fn,'r') as ds:
             lat_ERA = ds['lat'][:]
             lon_ERA = ds['lon'][:]
             num = (year-2013)*12 + month-1
+            #print(lat_ERA.size,lon_ERA.size,swr_cs[num][0,:].shape)
+            lat_new = arange(30.,46.5+0.75,0.75)
+            lon_new = arange(-6,36.75+0.75,0.75)
             vals = array([RectBivariateSpline(lat_new,lon_new,swr_cs[num][i,:])(lat_rea,lon_rea) for i in range(swr_cs[num].shape[0])]) 
         return vals
 
-    fn = os.path.join(data_folder,'144x','medsea_ERA-INTERIM','medsea_ERA_heat_{:d}{:02d}.nc'.format(year,month))
+    fn = os.path.join(os.getenv('HOME'),'medsea_data','144x','medsea_ERA-INTERIM','medsea_ERA_heat_{:d}{:02d}.nc'.format(year,month))
     with Dataset(fn,'a') as ds:
         new_data = swr_cs_interp(year,month)
         if 'swrd_clear_sky' not in ds.variables.keys():
@@ -334,7 +366,7 @@ def write_CF_on_rea_grid(year,month):
     from numpy.ma import divide, masked_outside
     print('Calcuating cloud_factor values for {:d}-{:02d}'.format(year,month))
     tic()
-    fn = os.path.join(data_folder,'144x','medsea_ERA-INTERIM','medsea_ERA_heat_{:d}{:02d}.nc'.format(year,month))
+    fn = os.path.join(os.getenv('HOME'),'medsea_data','144x','medsea_ERA-INTERIM','medsea_ERA_heat_{:d}{:02d}.nc'.format(year,month))
     with Dataset(fn,'a') as ds:
         if 'swrd_clear_sky' not in ds.variables.keys():
             raise Exception('The variable swrd_clear_sky not found in ' + fn)

@@ -1,19 +1,15 @@
 from .config import *
 from .gotmks import *
 
-## Global settings and initializations.
-run_profiles = {'ASM0': dict(assimilation_type=0, extinct_method=9),
-                'ASM1': dict(assimilation_type=0, extinct_method=12),
-                'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9),
-                'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12),
-                'ASM3-100m': dict(assimilation_type=2, assim_window=1, extinct_method=12, 
-                                  depth = 99.282236525788903, nlev = 132,
-                                  grid_method = 2, grid_file = 'grid_100m.dat'),
-                'ASM3-75m': dict(assimilation_type=2, assim_window=1, extinct_method=12, 
-                                  depth = 74.539324233308434, nlev = 122,
-                                  grid_method = 2, grid_file = 'grid_75m.dat')}
-
 import numpy as np
+
+## Global settings and initializations. 
+run = 'default'
+grid = '144x'
+region = 'medsea'
+overwrite = True
+
+# Routines to set global values in this module. Can be used in interactive session to change config.
 
 # A CRUCIAL routine to double-check for parallelizing over grid points.
 def set_grid(depth=75,
@@ -32,65 +28,229 @@ def set_grid(depth=75,
             ** a mini grid with only 23 sea locations with depth >= 75 that can be used for testing:
                     subindices=(slice(1,None,48), slice(None,None,48))
                NOTE: In medsea_ERA dataset, the latitudes are arranged, exceptionally, in descending order.
+ 
+       Returns three tuples:
+            subgrid = (medsea_lats, medsea_lons, medsea_flags, max_depth)
+            rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth)
+            grid_indices = (M, N, sea_mn, sea_m, sea_n) 
     """
     print('Initializing grid.')
-    global max_depth, ndepth, medsea_lats, medsea_lons, medsea_flags, M, N, sea_mn, sea_m, sea_n
+    global medsea_lats, medsea_lons, medsea_flags, max_depth
+    global medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth 
+    global M, N, sea_mn, sea_m, sea_n
     
+    medsea_rea_lat_ind = subindices[0]
+    medsea_rea_lon_ind = subindices[1]
     max_depth = depth
     with Dataset('/global/scratch/simontse/p_sossta/medsea_rea/2013/20130101_TEMP_re-fv6.nc','r') as ds:
         lat_rea = ds['lat'][:]
         lon_rea = ds['lon'][:]
         temp_rea = ds['votemper'][:]
-        depth = ds['depth'][:]
-        ndepth = sum(depth<max_depth)
-        # 2 means deeper than max_depth, 1 means less than max_depth, 0 means land
-        loc_type = 0 + ~temp_rea[0,0,:].mask + ~temp_rea[0,ndepth+1,:].mask
-        #print(loc_type.shape)
-        drei = loc_type.size
-        zwei = (loc_type == 2).sum()
-        ein = (loc_type == 1).sum()
-        null = (loc_type == 0).sum()
-        if stat:
-            print('sea (>{!s}m) locations:'.format(max_depth), zwei, ', {!s}% out of {!s}'.format(zwei*100/drei,drei))
-            print('sea (<{!s}m) locations:'.format(max_depth), ein, ', {!s}% out of {!s}'.format(ein*100/drei,drei))
-            print('land locations:', null, ', {!s}% out of {!s}'.format(null*100/drei,drei))
-        if plot:
-            imshow(loc_type,origin='lower',extent=[lon_rea.min(),lon_rea.max(),lat_rea.min(),lat_rea.max()],cmap=cm.Blues)
-            xlabel('longitude')
-            ylabel('latitude')
-            title('max_depth = {!s}m'.format(max_depth))
-        #print(null,ein,zwei,drei)
-        assert null+ein+zwei == drei
-    subgrid = lat_rea[subindices[0]], lon_rea[subindices[1]], loc_type[subindices[0],subindices[1]]
-    assert subgrid[0].shape, subgrid[1].shape == subgrid[2].shape
-    
-    # Setting global values in this module.
-    medsea_lats, medsea_lons, medsea_flags = subgrid
+        depth_rea = ds['depth'][:]
+
+    ndepth = sum(depth_rea<max_depth)+1
+    # 2 means deeper than max_depth, 1 means less than max_depth, 0 means land
+    loc_type = 0 + ~temp_rea[0,0,:].mask + ~temp_rea[0,ndepth,:].mask
+        
+    # Setting values to global names.
+    medsea_lats = lat_rea[subindices[0]]
+    medsea_lons = lon_rea[subindices[1]]
+    medsea_flags = loc_type[subindices[0],subindices[1]]
+    assert medsea_lats.shape, medsea_lons.shape == medsea_flags.shape
+
     M, N = medsea_flags.shape
     assert M == medsea_lats.size and N == medsea_lons.size
+
     sea_m, sea_n = np.where(medsea_flags==2)
     sea_mn = [(sea_m[i],sea_n[i]) for i in range(sea_m.size)]
+    assert len(sea_mn) == sea_m.size
 
-    print('A subgrid of shape {!s}x{!s} is set.'.format(subgrid[0].size,subgrid[1].size))
-    return subgrid # Values written directly to global variables as well.
+    print('Finished setting up a subgrid of shape {!s} x {!s} with {!s} <= latitude <= {!s}, {!s} <= longitude <= {!s}.'.format( \
+           medsea_lats.size,medsea_lons.size,medsea_lats.min(),medsea_lats.max(),medsea_lons.min(),medsea_lons.max()))
+    if stat:
+        # The following are for the current subgrid.
+        def print_stat(bl_array):  
+            drei = bl_array.size
+            zwei = (bl_array == 2).sum()
+            ein = (bl_array == 1).sum()
+            null = (bl_array == 0).sum()
+            assert null+ein+zwei == drei
+            print('\t' + 'sea (>{!s}m) locations: {!s}'.format(max_depth,zwei) + ', {:4.2f}% out of {!s}'.format(zwei*100/drei,drei))
+            print('\t' + 'sea (<{!s}m) locations: {!s}'.format(max_depth,ein) + ', {:4.2f}% out of {!s}'.format(ein*100/drei,drei))
+            print('\t' + 'land locations: {!s}'.format(null) + ', {:4.2f}% out of {!s}'.format(null*100/drei,drei))        
 
+        print('In the current grid:')
+        print_stat(medsea_flags)
+        print('In the full medsea_rea grid:')
+        print_stat(loc_type)
+
+    if plot:
+        import matplotlib.pyplot as plt
+        fig, axes = plt.subplots(2,1,figsize=(14,14))
+        ax1, ax2 = axes
+        ax1.imshow(loc_type,origin='lower',extent=[lon_rea.min(),lon_rea.max(),lat_rea.min(),lat_rea.max()],cmap=cm.Blues)
+        ax1.set_title('full medsea_rea grid')
+        ax2.imshow(medsea_flags,origin='lower',extent=[lon_rea.min(),lon_rea.max(),lat_rea.min(),lat_rea.max()],cmap=cm.Blues)
+        ax2.set_title('current subgrid')
+        for ax in axes:
+            ax.set_xlabel('longitude')
+            ax.set_ylabel('latitude')
+          
+    # These values have been written directly to global variables as well.
+    subgrid = (medsea_lats, medsea_lons, medsea_flags, max_depth)
+    rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth)
+    grid_indices = (M, N, sea_mn, sea_m, sea_n) 
+    return subgrid, rea_indices, grid_indices
+
+def get_grid():
+    """ 
+    A simple getter for the global variables, returning three tuples.
+
+    subgrid = (medsea_lats, medsea_lons, medsea_flags, max_depth)
+    rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth)
+    grid_indices = (M, N, sea_mn, sea_m, sea_n) 
+    """
+
+    global medsea_lats, medsea_lons, medsea_flags, max_depth
+    global medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth 
+    global M, N, sea_mn, sea_m, sea_n
+    return (medsea_lats, medsea_lons, medsea_flags, max_depth), \
+        (medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth), \
+        (M, N, sea_mn, sea_m, sea_n)
+
+def set_folders():
+    global scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder
+    # Top-level project folders
+    scratch_folder = os.path.join(userhome,'scratch')
+    # the grid subfolder is now part of the data_folder
+    data_folder = os.path.join(userhome,'medsea_data', grid)
+    while not(os.path.isdir(data_folder)):
+        print('The data folder ' + data_folder + 'is either not accessible or created.')
+        data_folder = input("Enter new data folder location.")
+    base_folder = os.path.join(scratch_folder,'medsea_GOTM')
+    while not(os.path.isdir(base_folder)):
+        #    raise IOError('The base folder: ' + base_folder + ' is either not accessible or created.')
+        print('The base folder: ' + base_folder + ' is either not accessible or created.')
+        base_folder = input("Enter new folder location.")
+    run_folder = os.path.join(base_folder,run)
+    if not(os.path.isdir(run_folder)):
+        print('Run folder: {:s} not found. Creating it now.')
+        os.mkdir(run_folder)
+
+    # Ocean and Satellite products datasets source folders.
+    p_sossta_folder = os.path.join(scratch_folder,'p_sossta')
+    ERA_folder = os.path.join(p_sossta_folder,'medsea_ERA-INTERIM','3-hourly')
+    rea_folder = os.path.join(p_sossta_folder,'medsea_rea')
+    return scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder
+
+def get_folders():
+    global scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder
+    return scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder
+
+
+# Set default global values at the loading of this module.
+
+# For the grid info. Load from the file if it exists.
 if not(os.path.isfile(os.path.join(project_folder,'medsea_9x_test.npy'))):
-    subgrid = set_grid()
-    np.save(os.path.join(project_folder,'medsea_9x_test.npy'),subgrid)
+    subgrid_data = set_grid()
+    np.save(os.path.join(project_folder,'medsea_9x_test.npy'),subgrid_data)
 else:
-    subgrid = np.load(os.path.join(project_folder,'medsea_9x_test.npy'))
-    medsea_lats, medsea_lons, medsea_flags = subgrid
+    subgrid, rea_indices, grid_indices = np.load(os.path.join(project_folder,'medsea_9x_test.npy'))
+    medsea_lats, medsea_lons, medsea_flags, max_depth = subgrid
+    medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth = rea_indices
+    M, N, sea_mn, sea_m, sea_n = grid_indices
+
+# For the folders.
+set_folders()
+
+
+# GOTM dat files' netCDF reformatted dataset sources.
+def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','sprof','chlo']):
+    """ 
+    Return the netCDF4 Dataset (or MFDataset) handles for the data source. 
+    Calling data_sources() returns MFDataset of all available data for dat = ['heat','met','tprof','sprof']
+    by default in read-only mode.
+    
+    """
+    from netCDF4 import Dataset, MFDataset
+    import os
+
+    if (year is None) or (month is None):
+        MF = True 
+        # Need to use MFDataset
+        NCDataset = MFDataset
+    else:
+        # When both year and month is given, we can specifically return handle to our reformatted datasets 
+        # organized by months.
+        NCDataset = Dataset
+
+    if isinstance(dat,str):
+        # if only one type is requested, still make it into a list so that list comprehension still works.
+        dat = [dat]
+
+    # nc_dict = dict(heat = MFDataset(os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_*.nc')), 
+    #                met = MFDataset(os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_*.nc')), 
+    #                tprof = MFDataset(os.path.join(data_folder,'medsea_rea','medsea_rea_votemper_*.nc')), 
+    #                sprof = MFDataset(os.path.join(data_folder,'medsea_rea','medsea_rea_vosaline_*.nc')))
+
+    suffix = '_'
+    if (year is not None):
+        suffix += '{:d}'.format(year)
+    else:
+        suffix += '*'
+    if (month is not None):
+        suffix += '{:02d}'.format(month)
+    else:
+        suffix += '*'
+    suffix += '.nc'
+
+    fn_dict = {'heat' : os.path.join(data_folder,region+'_ERA-INTERIM',region+'_ERA_heat' + suffix),
+               'met'  : os.path.join(data_folder,region+'_ERA-INTERIM',region+'_ERA_met' + suffix),
+               'tprof': os.path.join(data_folder,region+'_rea',region+'_rea_votemper' + suffix),
+               'sprof': os.path.join(data_folder,region+'_rea',region+'_rea_vosaline' + suffix),
+               'sst'  : os.path.join(data_folder,region+'_OSTIA',region+'_OSTIA_sst' + suffix)}
+
+    if year is None:
+        MODIS_suffix = '*.nc'
+    else:
+        MODIS_suffix = '_{:d}.nc'
+
+    fn_dict.update(chlo = os.path.join(data_folder,region+'_MODIS',region+'_MODIS_chlor_a_8D' + suffix)) 
+
+    assert all([each in fn_dict.keys() for each in dat]) # Check that the function is called correctly.
+
+    for each in fn_dict.keys():
+        try:
+            ds_dict = {each : NCDataset(fn_dict[each],mode) for each in dat}
+        except OSError:
+            print('Error accessing {:s}.'.format(fn_dict[each]))
+            raise
+        except:
+            print('Error accessing {:s}.'.format(fn_dict[each]))
+            raise
+
+    if len(ds_dict.keys()) == 1:
+        # If only one dataset requested, return the netcdf dataset unwrapped from the dict. 
+        return ds_dict[dat[0]] 
+    else:
+        # Else return a dictionary of datasets.
+        return ds_dict
+
+# Global setting for the core_dat() routines (and possibly the ERA routines as well)
+
+
 
 # 2017-05-20 First time doing this, let's be safe.
-assert all(medsea_lats == np.arange(30.25,45.75+0.25,0.25))
-assert all(medsea_lons == np.arange(-6.0,36.25+0.25,0.25))
+#assert all(medsea_lats == np.arange(30.25,45.75+0.25,0.25))
+#assert all(medsea_lons == np.arange(-6.0,36.25+0.25,0.25))
 
-# The global variables that are still needed by some code.
-M = medsea_lats.size
-N = medsea_lons.size
-
-sea_m, sea_n = np.where(medsea_flags == 2)
-sea_mn = [(sea_m[i],sea_n[i]) for i in range(sea_m.size)]
+# 20170521 Following no longer needed.
+## The global variables that are still needed by some code.
+#M = medsea_lats.size
+#N = medsea_lons.size
+#
+#sea_m, sea_n = np.where(medsea_flags == 2)
+#sea_mn = [(sea_m[i],sea_n[i]) for i in range(sea_m.size)]
 
 ## Helper functions
 def timestr(nctime,i):
@@ -106,15 +266,15 @@ def timestr(nctime,i):
     return ts
 
 def change_base(new_base_folder):
-    global base_folder
+    global base_folder, run_folder
     if not(os.path.isdir(new_base_folder)):
         raise IOError('The base folder: ' + new_base_folder + 'is either not accessible or created.')
-#    base_folder = new_base_folder
-#    run_folder=os.path.join(base_folder,'run')
-#    if not(os.path.isdir(run_folder)):
-#        os.mkdir(run_folder)
+    base_folder = new_base_folder    
+    run_folder=os.path.join(base_folder,run)
+    if not(os.path.isdir(run_folder)):
+        os.mkdir(run_folder)
        
-def print_lat_lon(lat,lon,fmt_str='.2f'):
+def print_lat_lon(lat,lon,fmt_str='g'):
     "Helper function for printing (lat,lon) as 10.5N2.1E etc. "
 
     # if not(isinstance(lat,float)):
@@ -199,7 +359,7 @@ def prepare_engine():
 
 ## Medsea serial / parallel run toolbox
 
-def get_local_folder(lat,lon,run):
+def get_local_folder(lat,lon):
     "Return the corresponding local folder for given given grid point for the given run code."
     # Temporary hack, be forgiving if the provided lat, lon are actually indices of our medsea grid.
     if isinstance(lat,int):
@@ -210,8 +370,9 @@ def get_local_folder(lat,lon,run):
     latlong = print_lat_lon(lat,lon)
     local_folder = os.path.join(base_folder,run,latlong)
     if not(os.path.isdir(local_folder)):
-        raise IOError("The local folder {:s} is not found. Have you run local_dat()?".format(local_folder))
-    #     os.mkdir(local_folder)
+    #    raise IOError("The local folder {:s} is not found. Have you run local_dat()?".format(local_folder))
+        print('The folder {:s} is not found, creating it.'.format(local_folder))
+        os.mkdir(local_folder)
     return local_folder 
 
 def get_core_folder(year,month,lat,lon):
@@ -254,16 +415,16 @@ def write_dat(m,n,dat_fn,nc,outdir):
         print(fn) # Print the filename for debug.
         if dat_fn == 'tprof':
             for i in range(len(time)):
-                ndepth = nc['depth']
-                f.write(timestr(time,i) + ' {0:d} 2\n'.format(len(ndepth))) # Always two columns.
-                for j in range(len(ndepth)):
+                nc_depth = nc['depth']
+                f.write(timestr(time,i) + ' {0:d} 2\n'.format(len(nc_depth))) # Always two columns.
+                for j in range(len(nc_depth)):
                     line = ('{0:g} {1:g}\n').format(-nc['depth'][j],nc['votemper'][i,j,m,n])
                     f.write(line)
         elif dat_fn == 'sprof':
             for i in range(len(time)):
-                ndepth = nc['depth']
-                f.write(timestr(time,i) + ' {0:d} 2\n'.format(len(ndepth))) # Always two columns.
-                for j in range(len(ndepth)):
+                nc_depth = nc['depth']
+                f.write(timestr(time,i) + ' {0:d} 2\n'.format(len(nc_depth))) # Always two columns.
+                for j in range(len(nc_depth)):
                     line = ('{0:g} {1:g}\n').format(-nc['depth'][j],nc['vosaline'][i,j,m,n])
                     f.write(line)
         elif dat_fn == 'heat':
@@ -273,34 +434,89 @@ def write_dat(m,n,dat_fn,nc,outdir):
             # plethora of nan values.
             if timestr(time,0)[-8:] == '03:00:00':
                 col[0] = timestr(time,0)[:-8] + '00:00:00'
-                col[1] = nc['swrd'][0,m,n]
-                col[2] = 1 if 'cloud_factor' not in nc.variables else nc['cloud_factor'][0,m,n]
+                I_0_obs = nc['swrd'][0,m,n]
+                col[1] = I_0_obs
+
+                # Let's not use cloud_factor, some values got accidentally masked.
+                if 'swrd_clear_sky' not in nc.variables:
+                    col[2] = 1
+                else:
+                    I_0_calc = nc['swrd_clear_sky'][0,m,n]
+                    if I_0_obs < 1 or I_0_calc < 1:
+                        col[2] = 0
+                    else:
+                        col[2] = I_0_obs / I_0_calc
+                #col[2] = 1 if 'cloud_factor' not in nc.variables else nc['cloud_factor'][0,m,n]
+
                 col[3] = nc['lwrd'][0,m,n]
-                line = ('{:s}' + ' {:g}'*3 + '\n').format(*col)
-                f.write(line)
+                try:
+                    line = ('{:s}' + ' {:g}'*3 + '\n').format(*col)
+                    f.write(line)
+                except Exception:
+                    print('col',col)
+                    print('m,n',m,n)
+                    raise
 
             # The following loop is hacked temporarily to accomodate GOTM Fortran code assumption,
             # reinterpreting the timsteamp to mean the beginning of 3-hourly periods.
             for i in range(len(time)-1): #  Last record is not used.
                 #col[0] = timestr(time,i)
                 col[0] = timestr(time,i)
-                col[1] = nc['swrd'][i+1,m,n]
-                col[2] = 1 if 'cloud_factor' not in nc.variables else nc['cloud_factor'][i+1,m,n]
+
+                I_0_obs = nc['swrd'][i+1,m,n]
+                col[1] = I_0_obs
+                
+                # Let's not use cloud_factor, some values got accidentally masked.
+                if 'swrd_clear_sky' not in nc.variables:
+                    col[2] = 1
+                else:
+                    I_0_calc = nc['swrd_clear_sky'][i+1,m,n]
+                    if I_0_obs < 1 or I_0_calc < 1:
+                        col[2] = 0
+                    else:
+                        col[2] = I_0_obs / I_0_calc
+
+                #col[2] = 1 if 'cloud_factor' not in nc.variables else nc['cloud_factor'][i+1,m,n]
+
                 col[3] = nc['lwrd'][i+1,m,n]
-                line = ('{:s}' + ' {:g}'*3 + '\n').format(*col)
-                f.write(line)
-            
+                try:
+                    line = ('{:s}' + ' {:g}'*3 + '\n').format(*col)
+                    f.write(line)
+                except Exception:
+                    print('col',col)
+                    print('m,n',m,n)
+                    raise
+        
             # Temporary hack #3: include the last line being first day next month midnight, whose
             # value should not be used because of the new interpretation of timing. However, for some 
             # reason GOTM halted at the last hour of time. So let's just repeat the value 3 hours earlier
             # at 21:00:00 last day of month.
             assert timestr(time,-1)[-8:] == '00:00:00' # The last record is at midnight.
             col[0] = timestr(time,-1)
-            col[1] = nc['swrd'][-1,m,n]
-            col[2] = 1 if 'cloud_factor' not in nc.variables else nc['cloud_factor'][-1,m,n]
+
+            I_0_obs = nc['swrd'][-1,m,n]
+            col[1] = I_0_obs
+            
+            # Let's not use cloud_factor, some values got accidentally masked.
+            if 'swrd_clear_sky' not in nc.variables:
+                col[2] = 1
+            else:
+                I_0_calc = nc['swrd_clear_sky'][-1,m,n]
+                if I_0_obs < 1 or I_0_calc < 1:
+                    col[2] = 0
+                else:
+                    col[2] = I_0_obs / I_0_calc
+
+            #col[2] = 1 if 'cloud_factor' not in nc.variables else nc['cloud_factor'][-1,m,n]
             col[3] = nc['lwrd'][-1,m,n]
-            line = ('{:s}' + ' {:g}'*3 + '\n').format(*col)
-            f.write(line)
+            try:
+                line = ('{:s}' + ' {:g}'*3 + '\n').format(*col)
+                f.write(line)
+            except Exception:
+                print('col',col)
+                print('m,n',m,n)
+                raise
+
         elif dat_fn == 'met':
             col = [None for i in range(9)]
             # Temporary hack #1 (with the one for 'heat'). Just repeat the first value but use it for midnight.
@@ -336,10 +552,10 @@ def write_dat(m,n,dat_fn,nc,outdir):
             count = 0
             for i in range(len(time)):
                 if is_masked(nc['chlor_a'][i,m,n]):
-                    print('i,m,n')
-                    print(i,m,n)
-                    print('time[i]')
-                    print(timestr(time,i))
+                    #print('i,m,n')
+                    #print(i,m,n)
+                    #print('time[i]')
+                    #print(timestr(time,i))
                     count +=1
                     continue
                 line = '{:s} {:g}\n'.format(timestr(time,i),nc['chlor_a'][i,m,n])
