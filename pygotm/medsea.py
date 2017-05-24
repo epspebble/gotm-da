@@ -3,17 +3,24 @@ from .gotmks import *
 
 import numpy as np
 
-## Global settings and initializations. 
-run = 'ASM3-75m-9x_4'
+## Global settings and initializations.
+
+# If a change to the following is desired, do so right after loading the module and then call set_grid() and set_folders() in this order.
+ASM = 3 # This selects the GOTM extra parameters profile
+max_depth = 75 
 grid = '9x_4'
-region = 'medsea'
+
+# This will also be the subfolder name under base_folder. 
+run = 'ASM3-75m-9x_4' # Will be reset when set_grid() is called.
+
+region = 'medsea' # practically just a prefix of filenames for now, the code is strongly tied to this assumption
 overwrite = True
 
 # Routines to set global values in this module. Can be used in interactive session to change config.
 
 # A CRUCIAL routine to double-check for parallelizing over grid points.
-def set_grid(depth=75,
-             subindices=(slice(1,None,4),slice(0,None,4)),
+def set_grid(new_max_depth=max_depth, new_grid = grid, # These names just need to be different... Because we cannot declare an input name global below...
+             subindices=None,
              plot = False, stat = False,
              ):
     """ Obtain the 1/16 degree grid used in medsea_rea, and classify each grid points according to 'max_depth'. 
@@ -35,13 +42,34 @@ def set_grid(depth=75,
             grid_indices = (M, N, sea_mn, sea_m, sea_n) 
     """
     print('Initializing grid.')
+    global run, grid, max_depth, ASM # these should be visible to us, but setting them to new values requires this line
     global medsea_lats, medsea_lons, medsea_flags, max_depth
     global medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth 
     global M, N, sea_mn, sea_m, sea_n
-    
+
+    # Override the global variables
+    grid = new_grid
+    max_depth = new_max_depth
+    # Update the run name
+    run = 'ASM{:d}-{:d}m-{:s}'.format(ASM,max_depth,grid)
+
+    # Set up the slices for the subgrid using the name.
+    if new_grid in ['9x_{:d}'.format(i) for i in range(16)]:
+        k = int(new_grid[3:])
+        #print('k=',k)
+        if subindices is not None:
+            raise Exception("Mistakes? 'subindices' need not be given if a known 'grid' is provided.")
+        else:
+            i = int(k/4)
+            j = k%4
+            subindices = (slice(i,None,4), slice(j,None,4))
+
     medsea_rea_lat_ind = subindices[0]
     medsea_rea_lon_ind = subindices[1]
-    max_depth = depth
+    #print(medsea_rea_lat_ind)
+    #print(medsea_rea_lon_ind)
+
+    # Load the rea grid, and a sample set of data for its masks.
     with Dataset('/global/scratch/simontse/p_sossta/medsea_rea/2013/20130101_TEMP_re-fv6.nc','r') as ds:
         lat_rea = ds['lat'][:]
         lon_rea = ds['lon'][:]
@@ -49,6 +77,7 @@ def set_grid(depth=75,
         depth_rea = ds['depth'][:]
 
     ndepth = sum(depth_rea<max_depth)+1
+ 
     # 2 means deeper than max_depth, 1 means less than max_depth, 0 means land
     loc_type = 0 + ~temp_rea[0,0,:].mask + ~temp_rea[0,ndepth,:].mask
         
@@ -56,6 +85,7 @@ def set_grid(depth=75,
     medsea_lats = lat_rea[subindices[0]]
     medsea_lons = lon_rea[subindices[1]]
     medsea_flags = loc_type[subindices[0],subindices[1]]
+    #print(medsea_lats,medsea_lons)
     assert medsea_lats.shape, medsea_lons.shape == medsea_flags.shape
 
     M, N = medsea_flags.shape
@@ -65,8 +95,9 @@ def set_grid(depth=75,
     sea_mn = [(sea_m[i],sea_n[i]) for i in range(sea_m.size)]
     assert len(sea_mn) == sea_m.size
 
-    print('Finished setting up a subgrid of shape {!s} x {!s} with {!s} <= latitude <= {!s}, {!s} <= longitude <= {!s}.'.format( \
-           medsea_lats.size,medsea_lons.size,medsea_lats.min(),medsea_lats.max(),medsea_lons.min(),medsea_lons.max()))
+    #print(medsea_lats.size,medsea_lons.size,medsea_lats.min(),medsea_lats.max(),medsea_lons.min(),medsea_lons.max())
+    print('Finished setting up a subgrid of shape {!s} x {!s} with {!s} <= latitude <= {!s}, {!s} <= longitude <= {!s}.'.format(\
+            medsea_lats.size,medsea_lons.size,medsea_lats.min(),medsea_lats.max(),medsea_lons.min(),medsea_lons.max()))
     if stat:
         # The following are for the current subgrid.
         def print_stat(bl_array):  
