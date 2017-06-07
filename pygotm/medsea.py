@@ -38,13 +38,13 @@ def set_grid(new_grid=grid,
                NOTE: In medsea_ERA dataset, the latitudes are arranged, exceptionally, in descending order.
  
        Returns three tuples:
-            subgrid = (medsea_lats, medsea_lons, medsea_flags, max_depth)
+            subgrid = (grid_lats, grid_lons, medsea_flags, max_depth)
             rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth)
             grid_indices = (M, N, sea_mn, sea_m, sea_n) 
     """
     print('Initializing grid.')
     global run, grid, max_depth, ASM # these should be visible to us, but setting them to new values requires this line
-    global medsea_lats, medsea_lons, medsea_flags, max_depth
+    global grid_lats, grid_lons, medsea_flags, max_depth
     global medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth 
     global M, N, sea_mn, sea_m, sea_n
 
@@ -86,22 +86,22 @@ def set_grid(new_grid=grid,
     loc_type = 0 + ~temp_rea[0,0,:].mask + ~temp_rea[0,ndepth,:].mask
         
     # Setting values to global names.
-    medsea_lats = lat_rea[subindices[0]]
-    medsea_lons = lon_rea[subindices[1]]
+    grid_lats = lat_rea[subindices[0]]
+    grid_lons = lon_rea[subindices[1]]
     medsea_flags = loc_type[subindices[0],subindices[1]]
-    #print(medsea_lats,medsea_lons)
-    assert medsea_lats.shape, medsea_lons.shape == medsea_flags.shape
+    #print(grid_lats,grid_lons)
+    assert grid_lats.shape, grid_lons.shape == medsea_flags.shape
 
     M, N = medsea_flags.shape
-    assert M == medsea_lats.size and N == medsea_lons.size
+    assert M == grid_lats.size and N == grid_lons.size
 
     sea_m, sea_n = np.where(medsea_flags==2)
     sea_mn = [(sea_m[i],sea_n[i]) for i in range(sea_m.size)]
     assert len(sea_mn) == sea_m.size
 
-    #print(medsea_lats.size,medsea_lons.size,medsea_lats.min(),medsea_lats.max(),medsea_lons.min(),medsea_lons.max())
+    #print(grid_lats.size,grid_lons.size,grid_lats.min(),grid_lats.max(),grid_lons.min(),grid_lons.max())
     print('Finished setting up a subgrid of shape {!s} x {!s} with {!s} <= latitude <= {!s}, {!s} <= longitude <= {!s}.'.format(\
-            medsea_lats.size,medsea_lons.size,medsea_lats.min(),medsea_lats.max(),medsea_lons.min(),medsea_lons.max()))
+            grid_lats.size,grid_lons.size,grid_lats.min(),grid_lats.max(),grid_lons.min(),grid_lons.max()))
     if stat:
         # The following are for the current subgrid.
         def print_stat(bl_array):  
@@ -132,7 +132,7 @@ def set_grid(new_grid=grid,
             ax.set_ylabel('latitude')
           
     # These values have been written directly to global variables as well.
-    subgrid = (medsea_lats, medsea_lons, medsea_flags, max_depth)
+    subgrid = (grid_lats, grid_lons, medsea_flags, max_depth)
     rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth)
     grid_indices = (M, N, sea_mn, sea_m, sea_n) 
     return subgrid, rea_indices, grid_indices
@@ -141,15 +141,15 @@ def get_grid():
     """ 
     A simple getter for the global variables, returning three tuples.
 
-    subgrid = (medsea_lats, medsea_lons, medsea_flags, max_depth)
+    subgrid = (grid_lats, grid_lons, medsea_flags, max_depth)
     rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth)
     grid_indices = (M, N, sea_mn, sea_m, sea_n) 
     """
 
-    global medsea_lats, medsea_lons, medsea_flags, max_depth
+    global grid_lats, grid_lons, medsea_flags, max_depth
     global medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth 
     global M, N, sea_mn, sea_m, sea_n
-    return (medsea_lats, medsea_lons, medsea_flags, max_depth), \
+    return (grid_lats, grid_lons, medsea_flags, max_depth), \
         (medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth), \
         (M, N, sea_mn, sea_m, sea_n)
 
@@ -191,7 +191,7 @@ if not(os.path.isfile(os.path.join(project_folder,'medsea_9x_test.npy'))):
     np.save(os.path.join(project_folder,'medsea_9x_test.npy'),subgrid_data)
 else:
     subgrid, rea_indices, grid_indices = np.load(os.path.join(project_folder,'medsea_9x_test.npy'))
-    medsea_lats, medsea_lons, medsea_flags, max_depth = subgrid
+    grid_lats, grid_lons, medsea_flags, max_depth = subgrid
     medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth = rea_indices
     M, N, sea_mn, sea_m, sea_n = grid_indices
 
@@ -276,13 +276,13 @@ def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','spr
 
 
 # 2017-05-20 First time doing this, let's be safe.
-#assert all(medsea_lats == np.arange(30.25,45.75+0.25,0.25))
-#assert all(medsea_lons == np.arange(-6.0,36.25+0.25,0.25))
+#assert all(grid_lats == np.arange(30.25,45.75+0.25,0.25))
+#assert all(grid_lons == np.arange(-6.0,36.25+0.25,0.25))
 
 # 20170521 Following no longer needed.
 ## The global variables that are still needed by some code.
-#M = medsea_lats.size
-#N = medsea_lons.size
+#M = grid_lats.size
+#N = grid_lons.size
 #
 #sea_m, sea_n = np.where(medsea_flags == 2)
 #sea_mn = [(sea_m[i],sea_n[i]) for i in range(sea_m.size)]
@@ -334,14 +334,14 @@ def chunk(c,k,fun,*args,**kwargs):
 
 def get_m_n(lat,lon):
     "Return the grid index (m,n) given latlong. Assume uniformly-spaced grid."
-    spacing = medsea_lats[1]-medsea_lats[0]
-    return int((lat-medsea_lats[0])/spacing), int((lon-medsea_lons[0])/spacing)
+    spacing = grid_lats[1]-grid_lats[0]
+    return int((lat-grid_lats[0])/spacing), int((lon-grid_lons[0])/spacing)
 
 def get_lat_lon(m,n):
     "Return the latlong given the grid index (m,n)."
-    return medsea_lats[m],medsea_lons[n]
+    return grid_lats[m],grid_lons[n]
 
-def create_dimensions(nc, lat=medsea_lats, lon=medsea_lons):
+def create_dimensions(nc, lat=grid_lats, lon=grid_lons):
     " Declaring dimensions and creating the coordinate variables for each dimension."
 
     # Dimensions
@@ -394,7 +394,7 @@ def prepare_engine():
 
 ## Medsea serial / parallel run toolbox
 
-def get_local_folder(m,n,new_run=None,new_lats=None,new_lons=None,create=False):
+def get_local_folder(m=None,n=None,i=None,new_run=None,new_lats=None,new_lons=None,create=False):
     """
     Return the corresponding local folder for given grid point indices (m,n) or latlong (lat,lon). 
     Defaults to the run_folder set by the module 'run' global variable, and 'run_folder' generated by
@@ -402,26 +402,41 @@ def get_local_folder(m,n,new_run=None,new_lats=None,new_lons=None,create=False):
     """
     # # Temporary hack, be forgiving if the provided lat, lon are actually indices of our medsea grid.
     # if isinstance(lat_or_m,int):
-    #     lat = medsea_lats[lat_or_m]
+    #     lat = grid_lats[lat_or_m]
     # else:
     #     lat = lat_or_m
     # if isinstance(lon_or_n,int):
-    #     lon = medsea_lons[lon_or_n]
+    #     lon = grid_lons[lon_or_n]
     # else:
     #     lon = lat_or_m
+
+    ## Setting default argument values.
+
+    # use module defaults if not provided:
+    if new_lats is None:
+        new_lats = grid_lats
+    if new_lons is None:
+        new_lons = grid_lons
+    if new_run is None:
+        new_run = run
+
+    if i is not None:
+        assert isinstance(i,int)
+        assert m is None and n is None
+        m = sea_m[i]
+        n = sea_n[i]
+
+    if m is None or n is None:
+        assert i is None 
+        assert m is None
+        assert n is None
+        # Defaults to a favourite grid point near buoy 61277.
+        m, n = get_m_n(36.,25.5) 
 
     if not(int(m) == m and int(n) == n):
         raise Exception('The first two arguments must be indices of the medsea grid.')
 
-    # use module defaults if not provided:
-    if new_lats is None:
-        new_lats = medsea_lats
-    if new_lons is None:
-        new_lons = medsea_lons
-    if new_run is None:
-        new_run = run
-
-    # local variables
+    ## local variables
     lat  = new_lats[m]
     lon = new_lons[n]
     latlong = print_lat_lon(lat,lon)
@@ -445,9 +460,9 @@ def get_core_folder(year,month,lat,lon):
         It contains settings (*.inp), input data (*.dat) and output data (*.nc) """
     # Temporary hack, be forgiving if the provided lat, lon are actually indices of our medsea grid.
     if isinstance(lat,int):
-        lat = medsea_lats[lat]
+        lat = grid_lats[lat]
     if isinstance(lon,int):
-        lon = medsea_lons[lon]
+        lon = grid_lons[lon]
         
     monthly_folder = os.path.join(run_folder,'{:d}{:02d}'.format(year,month))
     if not(os.path.isdir(monthly_folder)):
@@ -459,7 +474,7 @@ def get_core_folder(year,month,lat,lon):
     return core_folder 
 
 def write_dat(m,n,dat_fn,nc,outdir):
-    " Write dat files for each lat/lon in medsea_lats/medsea_lons from a given netCDF Dataset or MFDataset."
+    " Write dat files for each lat/lon in grid_lats/grid_lons from a given netCDF Dataset or MFDataset."
 
     from numpy.ma import is_masked
     from netCDF4 import Dataset, MFDataset
@@ -643,8 +658,8 @@ def local_dat(m,n,run='default',dat=['heat','met','tprof','sprof']):
     if isinstance(dat,str):
         dat = [dat]
 
-    lat = medsea_lats[m]
-    lon = medsea_lons[n]
+    lat = grid_lats[m]
+    lon = grid_lons[n]
 
     run_folder = os.path.join(base_folder,run)
     if not(os.path.isdir(run_folder)):
@@ -682,8 +697,8 @@ def core_dat(year,month,m,n,**nc_dict):
     """
 
     # Get the location of the core_folder.
-    lat = medsea_lats[m]
-    lon = medsea_lons[n]
+    lat = grid_lats[m]
+    lon = grid_lons[n]
     # latlong = print_lat_lon(lat,lon)
     core_folder = get_core_folder(year,month,lat,lon) 
     
@@ -806,9 +821,9 @@ def core_run(year,month,m=None,n=None,lat=None,lon=None,verbose=False,**gotm_use
     start = datetime(year,month,1,0,0)
     stop = datetime(year,month+1,1,0,0) if month < 12 else datetime(year+1,1,1,0,0)
     if not m is None:
-        lat = medsea_lats[m]
+        lat = grid_lats[m]
     if not n is None:
-        lon = medsea_lons[n]
+        lon = grid_lons[n]
     latlong = print_lat_lon(lat,lon)
     run_name = 'medsea_GOTM, #(m,n)=({1:d},{2:d})'.format(latlong,m,n)
     core_folder = get_core_folder(year,month,lat,lon)    
@@ -848,7 +863,7 @@ def core_run(year,month,m=None,n=None,lat=None,lon=None,verbose=False,**gotm_use
 def combine_run(year, month, run,
                 varsout = None, # The subset of variables to output, defaults to all available variables
                 format = 'NETCDF3_CLASSIC', # Do not store in HDF5 format unless we know our collaborators use tools that are compatible.
-                grid = (medsea_lats, medsea_lons), # Defaults to the global latlongs in medsea_lats and medsea_lons.
+                grid = (grid_lats, grid_lons), # Defaults to the global latlongs in grid_lats and grid_lons.
                 indices = sea_mn, # Defaults to read from each folder by sea location lat/lon, ignoring all land locations. 
                 cleanup = False): # If number or sizes of files generated is a concern... maybe True here.
     " Combine GOTM results nc files from each grid point into a single monthly nc file. "
@@ -973,8 +988,8 @@ def combine_stat(run,year,month,format='NETCDF3_CLASSIC', indices=sea_mn):
 
         # Dimensions
         nc.createDimension('day_of_year')
-        nc.createDimension('lat', size = len(medsea_lats))
-        nc.createDimension('lon', size = len(medsea_lons))
+        nc.createDimension('lat', size = len(grid_lats))
+        nc.createDimension('lon', size = len(grid_lons))
         
         # Dimension variables.
         ncday = nc.createVariable('day_of_year','i4',dimensions=('day_of_year',))
@@ -983,8 +998,8 @@ def combine_stat(run,year,month,format='NETCDF3_CLASSIC', indices=sea_mn):
         nclat.units = 'degrees north'
         nclon = nc.createVariable('lon','f4',dimensions=('lon',))
         nclon.units = 'degrees east'
-        nclat[:] = medsea_lats
-        nclon[:] = medsea_lons
+        nclat[:] = grid_lats
+        nclon[:] = grid_lons
         print('Done initializing dimensions.')
         
         nc_assim_time = nc.createVariable('assim_time','i4',dimensions=('day_of_year','lat','lon'))
