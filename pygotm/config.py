@@ -42,11 +42,19 @@ run_profiles = {'ASM0': dict(assimilation_type=0, extinct_method=9),
                 'ASM1': dict(assimilation_type=0, extinct_method=12),
                 'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9),
                 'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12),
-                'ASM3-100m': dict(assimilation_type=2, assim_window=1, extinct_method=12, 
+ 
+                # In the following alternative depth levels, should make nlev depend on the number of level widths
+                # given in the 'grid.dat' files.
+                
+                'ASM3-100m': dict(assimilation_type=2, assim_window=1, extinct_method=12,
                                   depth = 99.282236525788903, nlev = 132,
-                                  grid_method = 2, grid_file = 'grid_100m.dat'),
+                                  grid_method = 2, grid_file = 'grid_100m.dat'), 
                 'ASM3-75m': dict(assimilation_type=2, assim_window=1, extinct_method=12, 
                                   depth = 74.539324233308434, nlev = 122,
-                                  grid_method = 2, grid_file = 'grid_75m.dat')}
+                                  grid_method = 2, grid_file = 'grid_75m.dat'),
+                'ASM3-MFC-75m': dict(assimilation_type=2, assim_window=1, extinct_method=12, 
+                                     depth = 74.389762997627258, nlev = 15,
+                                     grid_method = 2, grid_file = 'grid_MFC_75m.dat')}
+
 
 epoch = datetime(1981,1,1)
