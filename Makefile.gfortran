@@ -11,11 +11,11 @@ SHELL	= /bin/sh
 
 # Set up the path to the NetCDF library - very important.
 
-NETCDFINCDIR	= /usr/local/include
+#NETCDFINCDIR	= ./netcdf-3.6.2/libsrc/
 #/users/zxb/netcdf/netcdf-350/src/f90/netcdf.mod
-#/usr/include
+NETCDFINCDIR = /usr/include
 
-NETCDFLIB       = /usr/local/lib/libnetcdff.a
+NETCDFLIB = libnetcdf.a # Build it and copy it to our working folder
 #/usr/lib/libnetcdf.a
 
 
@@ -32,12 +32,19 @@ NETCDFLIB       = /usr/local/lib/libnetcdff.a
 #FFLAGS = -I$(NETCDFINCDIR)
 
 #Intel Fortran  compiler for 
-#FC    = ifort
+#FC=ifort
+#FFLAGS=-g
+#FFLAGS=-g -fbacktrace -ffpe-trap=zero,overflow,underflow
+#FFLAGS=-g -fbacktrace -ffpe-trap=overflow,underflow
+
+FC=gfortran
+#FFLAGS=-g -fbacktrace
+## No more need.
 #FFLAGS = -I$(NETCDFINCDIR)
 
 #Mac Fortran  compiler for 
-FC    = gfortran
-FFLAGS = -I$(NETCDFINCDIR)
+#FC    = gfortran
+#FFLAGS = -I$(NETCDFINCDIR)
 
 #sun fortran compiler
 #FC = f90
@@ -118,18 +125,20 @@ libobservations.a(get_t_profile.o)	\
 libobservations.a(get_vel_profile.o)	\
 libobservations.a(get_w_adv.o)	\
 libobservations.a(get_zeta.o)	\
-libobservations.a(read_extinction.o)
+libobservations.a(read_extinction.o)	\
+libobservations.a(read_chlo.o)	\
+
 
 LIBS	=	libairsea.a		\
 		libturbulence.a 	\
 		libmeanflow.a 		\
 		libobservations.a	\
 		liboutput.a		\
-		libutil.a
+		libutil.a		
 
 all: gotm 
 
-gotm: $(MODULES) $(LIBS) main.o
+gotm: $(MODULES) $(LIBS) $(NETCDFLIB) main.o
 	$(FC) main.o -o $@ gotm.o $(LIBS) $(NETCDFLIB)
 	-rm main.o
 
@@ -146,6 +155,15 @@ libutil.a: $(UTIL)
 libmeanflow.a: $(MEANFLOW)
 
 libobservations.a: $(OBSERVATIONS)
+
+libnetcdf.a: 	
+	# These commands needs to be chained together, and must end with
+	# backslash for MAKE to know it is one single command.
+	cd ./netcdf-3.6.2 && ./configure && \
+	make && \
+	cp ./libsrc/.libs/libnetcdf.a .. && \
+	make distclean && \
+	cd ..
 
 clean:
 	-rm -f lib*.a  *.mod *.o

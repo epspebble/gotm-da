@@ -548,11 +548,13 @@ contains
                    if (first) then
                       ! This result is for the part of the day before the first assimilation event.
                       write(unit_daily_stat,714) dayofyear, lsecs_assim_time, & 
-                           lsecs_SST_min_day, daily_SST_min_day, lsecs_SST_max, daily_SST_max, lsecs_SST_min_night, daily_SST_min_night
+                           lsecs_SST_min_day, daily_SST_min_day, lsecs_SST_max, daily_SST_max, &
+                           lsecs_SST_min_night, daily_SST_min_night
                    else ! Expects daily_SST_min_day and daily_SST_max to be unset, i.e. 99 and -99 repectively.
                       ! These result is for the assim cycle that is just completed, i.e. the previous day.
                       write(unit_daily_stat,714) dayofyear-1, lsecs_assim_time, & 
-                           lsecs_SST_min_day, daily_SST_min_day, lsecs_SST_max, daily_SST_max, lsecs_SST_min_night, daily_SST_min_night
+                           lsecs_SST_min_day, daily_SST_min_day, lsecs_SST_max, daily_SST_max, &
+                           lsecs_SST_min_night, daily_SST_min_night
                       ! The last partial assim cycle will not be treated here, but put at the begining of loop when n reaches MaxN.
                    end if
 713                format(I3,4(1x,I5,1x,F10.6))
