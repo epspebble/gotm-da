@@ -166,7 +166,8 @@ def set_folders():
     # Top-level project folders
     scratch_folder = os.path.join(userhome,'scratch')
     # the grid subfolder is now part of the data_folder
-    data_folder = os.path.join(userhome,'medsea_data', grid)
+#    data_folder = os.path.join(userhome,'medsea_data', grid)
+    data_folder = os.path.join(userhome,'medsea_data')
     while not(os.path.isdir(data_folder)):
         print('The data folder ' + data_folder + 'is either not accessible or created.')
         data_folder = input("Enter new data folder location.")
@@ -175,7 +176,8 @@ def set_folders():
         #    raise IOError('The base folder: ' + base_folder + ' is either not accessible or created.')
         print('The base folder: ' + base_folder + ' is either not accessible or created.')
         base_folder = input("Enter new folder location.")
-    run_folder = os.path.join(base_folder,run)
+    #run_folder = os.path.join(base_folder,run)
+    run_folder = base_folder
     if not(os.path.isdir(run_folder)):
         print('Run folder: {:s} not found. Creating it now.'.format(run_folder))
         os.mkdir(run_folder)
@@ -798,6 +800,7 @@ def local_run(year,month,m,n,run,create=False,verbose=False,**gotm_user_args):
                                 **run_profiles[run])
     else:
         print('Running without a pre-defined profile and creating new folder structures for {:s}...'.format(run))
+        suffix = '-{:s}-{:d}{:02d}'.format(run,year,month)
         gotm_args = prepare_run(start,stop,local_folder,lat=lat,lon=lon,
                                 out_fn='results'+suffix,
                                 daily_stat_fn='daily_stat'+suffix+'.dat',
