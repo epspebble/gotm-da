@@ -4,7 +4,7 @@ from numpy.ma import masked_invalid, masked_outside
 import os, sys
 from scipy.interpolate import *
 
-MODIS_folder = '/dev/shm/p_sossta/glo_MODIS/8days'
+MODIS_folder = '/global/scratch/simontse/p_sossta/glo_MODIS/8days'
 data_folder = '/global/scratch/simontse'
 
 def fn(year,num):
