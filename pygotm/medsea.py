@@ -663,7 +663,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
 
     print('Done writing {}.\n'.format(fn))
 
-def local_dat(m,n,run='default',dat=['heat','met','tprof','sprof']):
+def local_dat(m,n,run='default',dat=['heat','met','tprof','sprof','chlo']):
     """
     Generate *.dat files from all available data. See core_dat() for other explanations.
     """
@@ -679,9 +679,14 @@ def local_dat(m,n,run='default',dat=['heat','met','tprof','sprof']):
     lat = grid_lats[m]
     lon = grid_lons[n]
 
-    run_folder = os.path.join(base_folder,run)
-    if not(os.path.isdir(run_folder)):
-        os.mkdir(run_folder)
+# 20170621, we no longer create separate folders for different runs, but share the same set of subfolders named
+# by print_lat_lon(), to avoid creating too many files and draining disk quota too fast.
+
+#    run_folder = os.path.join(base_folder,run)
+    run_folder = base_folder
+
+#    if not(os.path.isdir(run_folder)):
+#        os.mkdir(run_folder)
 
     local_folder = os.path.join(run_folder,print_lat_lon(lat,lon))
     if not(os.path.isdir(local_folder)):

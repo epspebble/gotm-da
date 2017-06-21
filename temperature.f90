@@ -246,7 +246,8 @@
         rad(i)=0
      ElSE      
              trans=0.0
-             IF(cloud.gt.0) then
+             IF(cloud.gt.0.1) then
+             !revised SP 20/06/17 setting clear sky limit as 0.1 following Table 1 in Ohlmann&Siegel(2000)
                 DO j=1,4
                    para_A=C1(j)*chlo+C2(j)*cloud+C4(j)
                    para_K=C1(j+4)*chlo+C2(j+4)*cloud+C4(j+4)
@@ -254,10 +255,11 @@
                 END DO
              ELSE
                 DO j=9,12
-                   IF(coszen.lt.(2.49/(17.81+7.68*chlo))) then
+                   IF(coszen.lt.0.2588) then
             !for very low value of coszen the parameterisation breaks down!  SP 22/02/06 revised 28/02/17
-                      para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
-                      para_K = 0.0
+            !revised again SP 20/06/17 setting the limit as theta=75degrees (cos(theta)=0.2588) the largest angle in Ohlmann&Siegel(2000)
+                      para_A=C1(j)*chlo+(C3(j)/0.2588)+C4(j)
+                      para_K=C1(j+4)*chlo+(C3(j+4)/0.2588)+C4(j+4)
                       trans=trans+para_A*exp(-para_K*z)
                    ELSE                    
                       para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
