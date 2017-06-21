@@ -94,7 +94,7 @@ def data_stat(years=[2013,2014,2015]):
         years = [years]
     for year in years:
         for i in range(46):
-            [lat,lon,chlo] = data(year+int(i/45),int(1+mod(i,45)))
+            [lat,lon,chlo] = data(year+int(i/45),i%45)
             val = sum(~chlo.mask)/(len(lat)*len(lon))
             cumsum += val
             if val < minval[0]:
