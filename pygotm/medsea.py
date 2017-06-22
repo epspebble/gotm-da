@@ -260,7 +260,7 @@ def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','spr
     else:
         MODIS_suffix = '_{:d}.nc'
 
-    fn_dict.update(chlo = os.path.join(data_folder,region+'_MODIS',region+'_MODIS_chlor_a_8D' + suffix)) 
+    fn_dict.update(chlo = os.path.join(data_folder,region+'_MODIS','8days',region+'_MODIS_chlor_a_8D' + suffix)) 
 
     assert all([each in fn_dict.keys() for each in dat]) # Check that the function is called correctly.
 
@@ -271,6 +271,9 @@ def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','spr
             print('Error accessing {:s}.'.format(fn_dict[each]))
             raise
         except:
+            print(dat)
+            print(fn_dict)
+            print(ds_dict)
             print('Error accessing {:s}.'.format(fn_dict[each]))
             raise
 
@@ -508,7 +511,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
 
     with open(fn,'w') as f:
         # Recipes for each type of dat file.
-        print(fn) # Print the filename for debug.
+        # print(fn) # Print the filename for debug.
         if dat_fn == 'tprof':
             for i in range(len(time)):
                 nc_depth = nc['depth']
@@ -656,16 +659,19 @@ def write_dat(m,n,dat_fn,nc,outdir):
                     continue
                 line = '{:s} {:g}\n'.format(timestr(time,i),nc['chlor_a'][i,m,n])
                 f.write(line)
-            if count == 3:
-                raise Exception("3 consecutive nan values.")
+            if count > 3:
+                print('WARNING: {:d} consecutive nan values.'.format(count))
+                
+#                raise Exception("3 consecutive nan values.")
         else:
             raise Exception("Requested {}.dat has no recipes defined in core_dat()".format(dat_fn))
 
     print('Done writing {}.\n'.format(fn))
 
-def local_dat(m,n,run='default',dat=['heat','met','tprof','sprof','chlo']):
+def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo']):
     """
     Generate *.dat files from all available data. See core_dat() for other explanations.
+    mm, nn can be a sequence of m,n's
     """
 
     from netCDF4 import MFDataset
@@ -676,8 +682,6 @@ def local_dat(m,n,run='default',dat=['heat','met','tprof','sprof','chlo']):
     if isinstance(dat,str):
         dat = [dat]
 
-    lat = grid_lats[m]
-    lon = grid_lons[n]
 
 # 20170621, we no longer create separate folders for different runs, but share the same set of subfolders named
 # by print_lat_lon(), to avoid creating too many files and draining disk quota too fast.
@@ -687,10 +691,6 @@ def local_dat(m,n,run='default',dat=['heat','met','tprof','sprof','chlo']):
 
 #    if not(os.path.isdir(run_folder)):
 #        os.mkdir(run_folder)
-
-    local_folder = os.path.join(run_folder,print_lat_lon(lat,lon))
-    if not(os.path.isdir(local_folder)):
-        os.mkdir(local_folder)
 
     # temp_folder = mkdtemp(prefix=temp_base_folder)
     # ERA_files = glob(os.path.join(data_folder,'medsea_ERA-INTERIM','*.nc')) 
@@ -704,7 +704,31 @@ def local_dat(m,n,run='default',dat=['heat','met','tprof','sprof','chlo']):
         nc_dict = {dat[0]: nc_dict} 
 
     for dat_fn, nc in nc_dict.items():
-        write_dat(m,n,dat_fn,nc,local_folder)
+        ## Assume m, n are iterable and of the same length:
+        try:
+            for m, n in zip(mm, nn):
+                lat = grid_lats[m]
+                lon = grid_lons[n]
+
+                # Create the local folder if necessary.
+                local_folder = os.path.join(run_folder,print_lat_lon(lat,lon))
+                if not(os.path.isdir(local_folder)):
+                    os.mkdir(local_folder)
+                    
+                # Actually write.
+                write_dat(m,n,dat_fn,nc,local_folder)
+        except TypeError as te:
+            if isinstance(mm,int) and isinstance(nn,int):
+                m = mm
+                n = nn
+                # So the provided sequences are just a single pair of indices. Just write.
+                write_dat(m,n,dat_fn,nc,local_folder)
+            else:
+                print('mm',mm)
+                print('nn',nn)
+                print(te,'Given arguments do not work.')
+
+#        write_dat(m,n,dat_fn,nc,local_folder)
         
     for nc in nc_dict.values():
         nc.close()
