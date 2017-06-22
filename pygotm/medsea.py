@@ -805,22 +805,33 @@ def local_run(year,month,m,n,run,create=False,verbose=False,**gotm_user_args):
     
     Generate GOTM results for the (m,n)-th grid point at the specified month. Only *.dat files are expected to be 
     in the local folder. The config file, GOTM run time will be generated or copied over. 
-    
+
+    Temporary hack: pass None to month to run for the whole year.
+
     """
     from datetime import datetime
     from netCDF4 import Dataset, num2date
     lat, lon = get_lat_lon(m,n)
 #    local_folder = get_local_folder(lat,lon,run)
     local_folder = get_local_folder(m,n,create=create)
-    start = datetime(year,month,1);
-    stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)
+
+    if month is None:
+        start = datetime(year,1,1)
+        stop = datetime(year+1,1,1)
+    else:
+        start = datetime(year,month,1);
+        stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)
     if run in run_profiles.keys():
         # Should subclass an Exception to tell people what happened.
         if gotm_user_args != {}:
             print(('{:s} = {!s}' * len(gotm_user_args)).format(*(gotm_user_args.items())))
             raise Exception("A recorded run profile {:s} is specified, rejecting all user arguments for GOTM.\n")
         print('Using pre-defined profile: {:s}...'.format(run))
-        suffix = '-{:s}-{:d}{:02d}'.format(run,year,month)
+        if month is None:
+            suffix = '-{:s}-{:d}'.format(run,year)
+        else:
+            suffix = '-{:s}-{:d}{:02d}'.format(run,year,month)
+
         gotm_args = prepare_run(start,stop,local_folder,lat=lat,lon=lon,
                                 out_fn='results'+suffix,
                                 daily_stat_fn='daily_stat'+suffix+'.dat',
@@ -845,8 +856,8 @@ def local_run(year,month,m,n,run,create=False,verbose=False,**gotm_user_args):
         gotm(verbose=verbose, logfn=logfn, run_folder = local_folder, varsout = {})
         stat['elapsed'] = toc()
         # statfn = 'stat_{:d}{:02d}.dat'.format(year,month)
-        statfn = 'run_stat.dat'
-        with open(statfn,'a') as f:
+        statfn = 'run_stat_' + print_ctime(sep='_') + '.log'
+        with open(statfn,'w') as f:
             print('Writing diagnostic statistics to {0}...\n'.format(statfn))
             f.write('--------------------------------------------------------------\n')
             f.write('Run parameters:\n')
