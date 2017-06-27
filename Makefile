@@ -8,6 +8,13 @@
 
 SHELL	= /bin/sh
 
+# Use ifort if available.
+ifneq (,$(shell which ifort)) # if `which ifort` does not return nothing, assume that's the right one to use
+FC=ifort
+else
+# Fallback to gfortran if ifort is unavailable.
+FC=gfortran
+endif
 
 # Set up the path to the NetCDF library - very important.
 
@@ -37,7 +44,7 @@ NETCDFLIB = libnetcdf.a # Build it and copy it to our working folder
 #FFLAGS=-g -fbacktrace -ffpe-trap=zero,overflow,underflow
 #FFLAGS=-g -fbacktrace -ffpe-trap=overflow,underflow
 
-FC=gfortran
+#FC=gfortran
 #FFLAGS=-g -fbacktrace
 ## No more need.
 #FFLAGS = -I$(NETCDFINCDIR)
@@ -172,5 +179,6 @@ realclean: clean
 	-rm -f gotm 
 
 %.o: %.f90
+	echo "Using $(FC)..."
 	$(FC) $(FFLAGS) -c $< -o $@
 
