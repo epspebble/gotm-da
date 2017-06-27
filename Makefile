@@ -32,12 +32,12 @@ NETCDFLIB = libnetcdf.a # Build it and copy it to our working folder
 #FFLAGS = -I$(NETCDFINCDIR)
 
 #Intel Fortran  compiler for 
-FC=ifort
+#FC=ifort
 #FFLAGS=-g
 #FFLAGS=-g -fbacktrace -ffpe-trap=zero,overflow,underflow
 #FFLAGS=-g -fbacktrace -ffpe-trap=overflow,underflow
 
-#FC=gfortran
+FC=gfortran
 #FFLAGS=-g -fbacktrace
 ## No more need.
 #FFLAGS = -I$(NETCDFINCDIR)

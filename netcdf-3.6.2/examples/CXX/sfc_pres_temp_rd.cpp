@@ -17,6 +17,7 @@
 */
 
 #include <iostream>
+#include <string.h>
 #include <netcdfcpp.h>
 
 using namespace std;
