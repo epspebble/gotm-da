@@ -82,7 +82,7 @@ def set_grid(new_grid=grid,
     #print(medsea_rea_lon_ind)
 
     # Load the rea grid, and a sample set of data for its masks.
-    with Dataset('/global/scratch/simontse/p_sossta/medsea_rea/2013/20130101_TEMP_re-fv6.nc','r') as ds:
+    with Dataset(os.path.join(p_sossta_folder, 'medsea_rea/2013/20130101_TEMP_re-fv6.nc'),'r') as ds:
         lat_rea = ds['lat'][:]
         lon_rea = ds['lon'][:]
         temp_rea = ds['votemper'][:]
