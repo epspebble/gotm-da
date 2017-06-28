@@ -1057,7 +1057,7 @@ put_ix_float(void *xp, const float *ip)
 	}
 	else if(ieee_exp > -23)
 	{
-		/* ieee subnormal, right shift */
+		/* ieee subnormal, right  */
 		const int rshift = (48 - 23 - ieee_exp);
 
 		isp->mant = csp->mant >> rshift;
@@ -1105,7 +1105,7 @@ put_ix_float(void *xp, const float *ip)
 	}
 	else if(ieee_exp > -23)
 	{
-		/* ieee subnormal, right shift */
+		/* ieee subnormal, right  */
 		const int rshift = (48 - 23 - ieee_exp);
 
 		isp->mant = csp->mant >> rshift;
@@ -1591,14 +1591,14 @@ put_ix_double(void *xp, const double *ip)
 	}
 	else if(ieee_exp >= (-(52 -48)))
 	{
-		/* ieee subnormal, left shift */
+		/* ieee subnormal, left  */
 		const int lshift = (52 - 48) + ieee_exp;
 		idp->mant = csp->mant << lshift;
 		idp->exp  = 0;
 	}
 	else if(ieee_exp >= -52)
 	{
-		/* ieee subnormal, right shift */
+		/* ieee subnormal, right  */
 		const int rshift = (- (52 - 48) - ieee_exp);
 
 		idp->mant = csp->mant >> rshift;
