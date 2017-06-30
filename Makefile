@@ -216,6 +216,10 @@ clean:
 	-rm -f lib*.a  *.mod *.o
 	-mv libnetcdf.a.backup libnetcdf.a
 
+# Recompile but only leave the GOTM executable in the folder
+gotm-only: gotm clean
+
+# Remove also libnetcdf.a and force a recompilation of the big library. Necessary if you're switching compiler, for instance.
 realclean: clean
 	-rm libnetcdf.a
 	-rm -f gotm 
