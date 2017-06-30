@@ -10,6 +10,16 @@ SHELL	= /bin/sh
 
 ## BEGIN CUSTOM BUILD (FOR GOTM SOSSTA PROJECT, WT 2017-06-29)
 
+# Remember the current directry
+CWD = $(CURDIR)
+
+# Set a temporary directory to speed up, but defaults to the current directory.
+TMP = /dev/shm
+ifneq (,$(wildcard $(TMP)))
+TMP = .
+endif
+
+
 # Use a locally built netcdf-3.6.2 static library. 
 # Prefer Intel Fortran over GNU Fortran compiler (if available)
 
@@ -182,16 +192,17 @@ libobservations.a: $(OBSERVATIONS)
 # 7. Go back to parent folder
 # 8. Remove the source
 libnetcdf.a: 
-	@rm -Rf netcdf-3.6.2 && \
-	tar -xzf netcdf-3.6.2.tar.gz && \
+	@cd $(TMP) && \
+	rm -Rf netcdf-3.6.2 && \
+	tar -xzf $(CWD)/netcdf-3.6.2.tar.gz && \
 	cd ./netcdf-3.6.2 && \
 	echo "Configuring netCDF-3.6.2..." && \
 	./configure --silent --disable-utilities --disable-v2 --disable-examples --disable-cxx --disable-f90 && \
 	echo "Running GNU make to create libnetcdf.a..." && \
 	make -j --silent 2>&1 > make_netCDF-3.6.2.log && \
-	cp ./libsrc/.libs/libnetcdf.a .. && \
-	cd .. && \
-	rm -Rf netcdf-3.6.2
+	cp ./libsrc/.libs/libnetcdf.a $(CWD) && \
+	cd $(CWD) && \
+	rm -Rf $(TMP)/netcdf-3.6.2
 
 # Do not remove libnetcdf.a which takes a long time to build.
 clean:	
