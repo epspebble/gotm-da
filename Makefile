@@ -163,17 +163,30 @@ libmeanflow.a: $(MEANFLOW)
 
 libobservations.a: $(OBSERVATIONS)
 
-libnetcdf.a: 	
+libnetcdf.a: 
 	# These commands needs to be chained together, and must end with
 	# backslash for MAKE to know it is one single command.
-	cd ./netcdf-3.6.2 && ./configure && \
-	make && \
+	# STEPS:
+	# 1. Remove the existing source folder if any.
+	# 2. Extract the archive
+	# 3. Go inside the subfolder
+	# 4. Make only for running Fortran code
+	# 5. Make with unlimited number of threads.
+	# 6. Copy our static library
+	# 7. Go back to parent folder
+	# 8. Remove the source
+	rm -Rf netcdf-3.6.2 && \
+	tar -xzf netcdf-3.6.2.tar.gz && \
+	cd ./netcdf-3.6.2 && \
+	./configure --disable-utilities --disable-v2 --disable-examples --disable-cxx --disable-f90 && \
+	make -j && \
 	cp ./libsrc/.libs/libnetcdf.a .. && \
-	make distclean && \
-	cd ..
+	cd .. && \
+	rm -Rf netcdf-3.6.2
 
 clean:
-	-rm -f lib*.a  *.mod *.o
+	-rm -fR netcdf-3.6.2
+	-rm -f lib*.a  *.mod *.o 
 
 realclean: clean
 	-rm -f gotm 
