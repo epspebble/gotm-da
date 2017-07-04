@@ -36,8 +36,7 @@ def set_folders():
     #run_folder = os.path.join(base_folder,run)
     run_folder = base_folder
     if not(os.path.isdir(run_folder)):
-        print('Run folder: {:s} not found. Creating it now.'.format(run_folder))
-        os.mkdir(run_folder)
+        print('Run folder: {:s} not found. Creating it now.'.format(run_folder))        os.mkdir(run_folder)
 
     # Ocean and Satellite products datasets source folders.
     p_sossta_folder = os.path.join(scratch_folder,'p_sossta')

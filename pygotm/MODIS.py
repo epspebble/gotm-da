@@ -11,8 +11,8 @@ medsea.set_folders()
 
 data_folder = medsea.data_folder
 p_sossta_folder = medsea.p_sossta_folder
-grid_lat = medsea.grid_lat
-grid_lon = medsea.grid_lon
+grid_lats = medsea.grid_lats
+grid_lons = medsea.grid_lons
 
 coverage_length = '8D'
 MODIS_folder = os.path.join(p_sossta_folder,'glo_MODIS',coverage_length)
@@ -68,17 +68,17 @@ def coverage_midpoint(year=2014,num=4):
         
 def data(year,num):
     with Dataset(fn(year,num),'r') as nc:
-        modis_lat = nc['lat'][711:529:-1]
-        modis_lon = nc['lon'][2087:2593]
+        modis_lats = nc['lat'][711:529:-1]
+        modis_lons = nc['lon'][2087:2593]
         modis_data = masked_outside(nc[varname][711:529:-1,2087:2593],0,3)
-    return modis_lat, modis_lon, modis_data
+    return modis_lats, modis_lons, modis_data
 
 def plot(year,num,ax=None):
-    modis_lat, modis_lon, modis_data = data(year,num)
+    modis_lats, modis_lons, modis_data = data(year,num)
     if ax is None:
         fig, ax = subplots(figsize=(10,3))
     fig = ax.get_figure()
-    im = ax.imshow(modis_data, extent=(modis_lon.min(), modis_lon.max(), modis_lat.min(), modis_lat.max()),
+    im = ax.imshow(modis_data, extent=(modis_lons.min(), modis_lons.max(), modis_lats.min(), modis_lats.max()),
                    interpolation='nearest', origin='lower', cmap=cm.coolwarm)
     cbar = fig.colorbar(im)
 #     ax.grid('on')
@@ -161,10 +161,10 @@ def interp(year,num,method='linear'):
         interpolant = NearestNDInterpolator(loc[~val.mask],val[~val.mask])
     
     # New grid
-    xx_new, yy_new = meshgrid(grid_lon,grid_lat)
+    xx_new, yy_new = meshgrid(grid_lons,grid_lats)
     zz_new = ones(xx_new.shape)
-    for m in range(len(grid_lat)):
-        for n in range(len(grid_lon)):
+    for m in range(len(grid_lats)):
+        for n in range(len(grid_lons)):
             if is_sea[m,n]:
                 zz_new[m,n] = interpolant(xx_new[m,n],yy_new[m,n])
             else:
