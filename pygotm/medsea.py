@@ -18,7 +18,39 @@ overwrite = True # True means running at the same grid point will overwrite file
 
 # Routines to set global values in this module. Can be used in interactive session to change config.
 
+def set_folders():
+    global scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder
+    # Top-level project folders
+    scratch_folder = os.path.join(userhome,'scratch')
+    # the grid subfolder is now part of the data_folder
+#    data_folder = os.path.join(userhome,'medsea_data', grid)
+    data_folder = os.path.join(userhome,'medsea_data')
+    while not(os.path.isdir(data_folder)):
+        print('The data folder ' + data_folder + 'is either not accessible or created.')
+        data_folder = input("Enter new data folder location.")
+    base_folder = os.path.join(scratch_folder,'medsea_GOTM')
+    while not(os.path.isdir(base_folder)):
+        #    raise IOError('The base folder: ' + base_folder + ' is either not accessible or created.')
+        print('The base folder: ' + base_folder + ' is either not accessible or created.')
+        base_folder = input("Enter new folder location.")
+    #run_folder = os.path.join(base_folder,run)
+    run_folder = base_folder
+    if not(os.path.isdir(run_folder)):
+        print('Run folder: {:s} not found. Creating it now.'.format(run_folder))
+        os.mkdir(run_folder)
+
+    # Ocean and Satellite products datasets source folders.
+    p_sossta_folder = os.path.join(scratch_folder,'p_sossta')
+    ERA_folder = os.path.join(p_sossta_folder,'medsea_ERA-INTERIM','3-hourly')
+    rea_folder = os.path.join(p_sossta_folder,'medsea_rea')
+    return scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder
+
+def get_folders():
+    global scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder
+    return scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder
+
 # A CRUCIAL routine for parallelizing over grid points.
+set_folders()
 def set_grid(new_grid=grid,
              new_max_depth=max_depth, # These names just need to be different... Because we cannot declare an input name global below...
              subindices=None,
@@ -160,38 +192,6 @@ def get_grid():
     return (grid_lats, grid_lons, medsea_flags, max_depth), \
         (medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth), \
         (M, N, sea_mn, sea_m, sea_n)
-
-def set_folders():
-    global scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder
-    # Top-level project folders
-    scratch_folder = os.path.join(userhome,'scratch')
-    # the grid subfolder is now part of the data_folder
-#    data_folder = os.path.join(userhome,'medsea_data', grid)
-    data_folder = os.path.join(userhome,'medsea_data')
-    while not(os.path.isdir(data_folder)):
-        print('The data folder ' + data_folder + 'is either not accessible or created.')
-        data_folder = input("Enter new data folder location.")
-    base_folder = os.path.join(scratch_folder,'medsea_GOTM')
-    while not(os.path.isdir(base_folder)):
-        #    raise IOError('The base folder: ' + base_folder + ' is either not accessible or created.')
-        print('The base folder: ' + base_folder + ' is either not accessible or created.')
-        base_folder = input("Enter new folder location.")
-    #run_folder = os.path.join(base_folder,run)
-    run_folder = base_folder
-    if not(os.path.isdir(run_folder)):
-        print('Run folder: {:s} not found. Creating it now.'.format(run_folder))
-        os.mkdir(run_folder)
-
-    # Ocean and Satellite products datasets source folders.
-    p_sossta_folder = os.path.join(scratch_folder,'p_sossta')
-    ERA_folder = os.path.join(p_sossta_folder,'medsea_ERA-INTERIM','3-hourly')
-    rea_folder = os.path.join(p_sossta_folder,'medsea_rea')
-    return scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder
-
-def get_folders():
-    global scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder
-    return scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder
-
 
 # Set default global values at the loading of this module.
 
