@@ -3,11 +3,21 @@ from netCDF4 import Dataset
 from numpy.ma import masked_invalid, masked_outside
 import os, sys
 from scipy.interpolate import *
-from pygotm.medsea import data_folder
+from pygotm.medsea import data_folder, p_sossta_folder, grid_lat, grid_lon
 
-MODIS_folder = '/global/scratch/simontse/p_sossta/glo_MODIS'
-#data_folder = '/global/scratch/simontse'
+from pygotm import medsea
 
+target_grid = '144x'
+medsea.set_grid(target_grid)
+medsea.set_folders()
+
+data_folder = medsea.data_folder
+p_sossta_folder = medsea.p_sossta_folder
+grid_lat = medsea.grid_lat
+grid_lon = medsea.grid_lon
+
+coverage_length = '8D'
+MODIS_folder = os.path.join(p_sossta_folder,'glo_MODIS',coverage_length)
 # usually treating one variable at a time, declare as module global variable to avoid passing the same arguments
 # over and over again
 obs_type = 'IOP'
@@ -141,14 +151,6 @@ def mapcomp(z1,z2):
         ax.set_ylabel('latitude')
     fig.tight_layout()
 
-def get_REA_grid():
-    with Dataset('/global/scratch/simontse/p_sossta/medsea_rea/2013/20130101_TEMP_re-fv6.nc','r') as nc:
-        lat_rea = nc['lat'][:]
-        lon_rea = nc['lon'][:]
-        temp_rea = nc['votemper'][:]
-        is_sea = ~temp_rea[0,0,:].mask
-    return lat_rea, lon_rea, is_sea
-
 def interp(year,num,method='linear'):
     # Data
     y,x,z = data(year,num)
@@ -161,16 +163,15 @@ def interp(year,num,method='linear'):
         interpolant = NearestNDInterpolator(loc[~val.mask],val[~val.mask])
     
     # New grid
-    lat_rea, lon_rea, is_sea = get_REA_grid()
-    xx_rea, yy_rea = meshgrid(lon_rea,lat_rea)
-    zz_rea = ones(xx_rea.shape)
-    for m in range(len(lat_rea)):
-        for n in range(len(lon_rea)):
+    xx_new, yy_new = meshgrid(grid_lon,grid_lat)
+    zz_new = ones(xx_new.shape)
+    for m in range(len(grid_lat)):
+        for n in range(len(grid_lon)):
             if is_sea[m,n]:
-                zz_rea[m,n] = interpolant(xx_rea[m,n],yy_rea[m,n])
+                zz_new[m,n] = interpolant(xx_new[m,n],yy_new[m,n])
             else:
-                zz_rea[m,n] = nan     
-    return zz_rea
+                zz_new[m,n] = nan     
+    return zz_new
 
 def plot_interp(year,num, ax=None):
     from netCDF4 import Dataset
@@ -212,7 +213,7 @@ def animate_interp(year):
     anim = animation.FuncAnimation(fig, animate, #init_func=init,
                                    frames=range(46), interval=28, blit=True)
 
-    anim.save('{:d}_medsea_MODIS_rea.gif'.format(year), writer='imagemagick', fps=3)
+    anim.save('{:d}_medsea_MODIS_{:s}.gif'.format(year,grid), writer='imagemagick', fps=3)
     print('Animation saved to {:d}_medsea_MODIS_rea.gif!'.format(year))
     return anim
 # HTML(anim.to_html5_video())

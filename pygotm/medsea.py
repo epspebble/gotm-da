@@ -661,14 +661,28 @@ def write_dat(m,n,dat_fn,nc,outdir):
                 f.write(line)
             if count > 3:
                 print('WARNING: {:d} consecutive nan values.'.format(count))
-                
 #                raise Exception("3 consecutive nan values.")
+        elif dat_fn == 'iop':
+            count = 0
+            for i in range(len(time)):
+                if is_masked(nc['a_488_giop'][i,m,n]) or is_masked(nc['bb_488_giop'][i,m,n]):
+                    #print('i,m,n')
+                    #print(i,m,n)
+                    #print('time[i]')
+                    #print(timestr(time,i))
+                    count +=1
+                    continue
+                line = '{:s} {:g} {:g}\n'.format(timestr(time,i),nc['a_488_giop'][i,m,n],nc['bb_488_giop'][i,m,n])
+                f.write(line)
+            if count > 3:
+                print('WARNING: {:d} consecutive nan values.'.format(count))
+#                raise Exception("3 consecutive nan values.")                
         else:
             raise Exception("Requested {}.dat has no recipes defined in core_dat()".format(dat_fn))
 
     print('Done writing {}.\n'.format(fn))
 
-def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo']):
+def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
     """
     Generate *.dat files from all available data. See core_dat() for other explanations.
     mm, nn can be a sequence of m,n's
