@@ -12,13 +12,14 @@ SHELL	= /bin/sh
 
 # Remember the current directry
 CWD = $(CURDIR)
+# Remember today's date
+TODAY = $(shell date +'%Y%m%d')
 
 # Set a temporary directory to speed up, but defaults to the current directory.
 TMP = /dev/shm
 ifneq (,$(wildcard $(TMP)))
 TMP = .
 endif
-
 
 # Use a locally built netcdf-3.6.2 static library. 
 # Prefer Intel Fortran over GNU Fortran compiler (if available)
@@ -32,7 +33,7 @@ FC=gfortran
 endif
 NETCDFLIB = libnetcdf.a # Build it and copy it to our working folder
 
-# The following build options are all irrelevant.
+# The build options below are all irrelevant for usual PC, Westgrid and ComputeCanada servers.
 
 ## END CUSTOM BUILD
 
@@ -165,6 +166,11 @@ gotm: $(NETCDFLIB) $(MODULES) $(LIBS) main.o
 	$(FC) main.o -o $@ gotm.o $(LIBS) $(NETCDFLIB)
 	-rm main.o
 
+backup: gotm
+	tar -czvf .backup/gotm-src-$(TODAY).tar.gz *.f90 Makefile
+backup-all: gotm
+	tar -czvf .backup/gotm-$(TODAY).tar.gz *
+
 main.o: gotm.o
 
 modules: $(MODULES)
@@ -194,10 +200,10 @@ libobservations.a: $(OBSERVATIONS)
 libnetcdf.a: 
 	@cd $(TMP) && \
 	rm -Rf netcdf-3.6.2 && \
-	tar -xzf $(CWD)/netcdf-3.6.2.tar.gz && \
+	tar -xzf $(CWD)/.backup/netcdf-3.6.2.tar.gz && \
 	cd ./netcdf-3.6.2 && \
 	echo "Configuring netCDF-3.6.2..." && \
-	./configure --silent --disable-utilities --disable-v2 --disable-examples --disable-cxx --disable-f90 && \
+	./configure --silent --disable-utilities --disable-v2 --disable-examples --disable-cxx && \
 	echo "Running GNU make to create libnetcdf.a..." && \
 	make -j --silent 2>&1 > make_netCDF-3.6.2.log && \
 	cp ./libsrc/.libs/libnetcdf.a $(CWD) && \
@@ -206,10 +212,14 @@ libnetcdf.a:
 
 # Do not remove libnetcdf.a which takes a long time to build.
 clean:	
-	-mv libnetcdf.a libnetcdf.a.backup && \
-	rm -f lib*.a  *.mod *.o && \
-	mv libnetcdf.a.backup libnetcdf.a
+	-mv libnetcdf.a libnetcdf.a.backup
+	-rm -f lib*.a  *.mod *.o
+	-mv libnetcdf.a.backup libnetcdf.a
 
+# Recompile but only leave the GOTM executable in the folder
+gotm-only: gotm clean
+
+# Remove also libnetcdf.a and force a recompilation of the big library. Necessary if you're switching compiler, for instance.
 realclean: clean
 	-rm libnetcdf.a
 	-rm -f gotm 
