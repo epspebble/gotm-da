@@ -3,8 +3,6 @@ from netCDF4 import Dataset
 from numpy.ma import masked_invalid, masked_outside
 import os, sys
 from scipy.interpolate import *
-from pygotm.medsea import data_folder, p_sossta_folder, grid_lat, grid_lon
-
 from pygotm import medsea
 
 target_grid = '144x'
