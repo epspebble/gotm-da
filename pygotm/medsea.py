@@ -19,7 +19,7 @@ overwrite = True # True means running at the same grid point will overwrite file
 # Routines to set global values in this module. Can be used in interactive session to change config.
 
 def set_folders():
-    global scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder
+    global scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder, cache_folder
     # Top-level project folders
     scratch_folder = os.path.join(userhome,'scratch')
     # the grid subfolder is now part of the data_folder
@@ -36,17 +36,19 @@ def set_folders():
     #run_folder = os.path.join(base_folder,run)
     run_folder = base_folder
     if not(os.path.isdir(run_folder)):
-        print('Run folder: {:s} not found. Creating it now.'.format(run_folder))        os.mkdir(run_folder)
+        print('Run folder: {:s} not found. Creating it now.'.format(run_folder))
+        os.mkdir(run_folder)
 
     # Ocean and Satellite products datasets source folders.
     p_sossta_folder = os.path.join(scratch_folder,'p_sossta')
     ERA_folder = os.path.join(p_sossta_folder,'medsea_ERA-INTERIM','3-hourly')
     rea_folder = os.path.join(p_sossta_folder,'medsea_rea')
-    return scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder
+    cache_folder = '/dev/shm'
+    return scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder, cache_folder
 
 def get_folders():
-    global scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder
-    return scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder
+    global scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder, cache_folder
+    return scratch_folder, data_folder, base_folder, run_folder, p_sossta_folder, ERA_folder, rea_folder, cache_folder
 
 # A CRUCIAL routine for parallelizing over grid points.
 set_folders()
@@ -73,7 +75,7 @@ def set_grid(new_grid=grid,
             rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth)
             grid_indices = (M, N, sea_mn, sea_m, sea_n) 
     """
-    print('Initializing grid.')
+    print('Initializing grid...')
     # Declaring global is necessary for modifying them interactively after importing this module.
     global run, grid, max_depth, ASM 
     global grid_lats, grid_lons, medsea_flags, max_depth
@@ -767,7 +769,7 @@ def core_dat(year,month,m,n,**nc_dict):
         write_dat(m,n,dat_fn,nc,core_folder)
     return
 
-def prepare_run(start,stop,out_dir,out_fn='results',m=None,n=None,lat=None,lon=None, **gotm_user_args):
+def prepare_run(start,stop,run_folder,out_dir='.',out_fn='results',m=None,n=None,lat=None,lon=None, **gotm_user_args):
     "Transfer config files and GOTM executable to the folder in which GOTM will be run."
     import shutil
     # Determine the grid point location.
@@ -800,17 +802,17 @@ def prepare_run(start,stop,out_dir,out_fn='results',m=None,n=None,lat=None,lon=N
     for each in GOTM_nml_list:
         # All config files are overwritten every time GOTM is run.
         src = os.path.join(GOTM_nml_path,each)
-        dst = os.path.join(out_dir,each)
-        print('Copying {:s} to {:s}'.format(src,dst))
+        dst = os.path.join(run_folder,each)
+        # print('Copying {:s} to {:s}'.format(src,dst))
         shutil.copyfile(src,dst)       
     
     # Temporary hack. Also copy the grid data file.
     src = os.path.join(GOTM_nml_path,grid_file)
-    dst = os.path.join(out_dir,grid_file)
-    print('Copying {:s} to {:s}'.format(src,dst))
+    dst = os.path.join(run_folder,grid_file)
+    # print('Copying {:s} to {:s}'.format(src,dst))
     shutil.copyfile(src,dst)
 
-    updatecfg(path=out_dir, **gotm_args)
+    updatecfg(path=run_folder, **gotm_args)
     return gotm_args
 
 def local_run(year,month,m,n,run,create=False,verbose=False,**gotm_user_args):
@@ -824,6 +826,8 @@ def local_run(year,month,m,n,run,create=False,verbose=False,**gotm_user_args):
     """
     from datetime import datetime
     from netCDF4 import Dataset, num2date
+    import shutil
+    
     lat, lon = get_lat_lon(m,n)
 #    local_folder = get_local_folder(lat,lon,run)
     local_folder = get_local_folder(m,n,create=create)
@@ -834,6 +838,8 @@ def local_run(year,month,m,n,run,create=False,verbose=False,**gotm_user_args):
     else:
         start = datetime(year,month,1);
         stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)
+
+    out_dir = local_folder if cache_folder is None else cache_folder
     if run in run_profiles.keys():
         # Should subclass an Exception to tell people what happened.
         if gotm_user_args != {}:
@@ -844,9 +850,10 @@ def local_run(year,month,m,n,run,create=False,verbose=False,**gotm_user_args):
             suffix = '-{:s}-{:d}'.format(run,year)
         else:
             suffix = '-{:s}-{:d}{:02d}'.format(run,year,month)
-
+        out_fn = 'results'+suffix
         gotm_args = prepare_run(start,stop,local_folder,lat=lat,lon=lon,
-                                out_fn='results'+suffix,
+                                out_fn=out_fn,
+                                out_dir=out_dir,
                                 daily_stat_fn='daily_stat'+suffix+'.dat',
                                 # assim_event_fn='assim_event-{:d}{:02d}.dat'.format(year,month),
                                 # sst_event_fn='sst_event-{:d}{:02d}.dat'.format(year,month),
@@ -854,19 +861,34 @@ def local_run(year,month,m,n,run,create=False,verbose=False,**gotm_user_args):
     else:
         print('Running without a pre-defined profile and creating new folder structures for {:s}...'.format(run))
         suffix = '-{:s}-{:d}{:02d}'.format(run,year,month)
+        out_fn = 'results'+suffix
         gotm_args = prepare_run(start,stop,local_folder,lat=lat,lon=lon,
-                                out_fn='results'+suffix,
+                                out_dir=out_dir,
+                                out_fn=out_fn,
                                 daily_stat_fn='daily_stat'+suffix+'.dat',
                                 # assim_event_fn='assim_event-{:d}{:02d}.dat'.format(year,month),
                                 # sst_event_fn='sst_event-{:d}{:02d}.dat'.format(year,month),
                                 **gotm_user_args)
+
     os.chdir(local_folder)
     stat = dict()
     try:
         tic()
-        print('GOTM running at ' + local_folder + '...')
         logfn = 'GOTM_' + print_ctime(sep='_') + '.log'
-        gotm(verbose=verbose, logfn=logfn, run_folder = local_folder, varsout = {})
+        print('GOTM running... ')
+        print('  Working from: {:s}...'.format(local_folder))
+        gotm(verbose=verbose,logfn=logfn)
+        print('  Results written to {:s}.nc...'.format(os.path.join(out_dir,out_fn)))
+
+        if cache_folder is not None:
+            src = os.path.join(out_dir,out_fn+'.nc')
+            dst = os.path.join(local_folder,out_fn+'.nc')
+            try:
+                print('Moving {:s} to {:s}...'.format(src,dst))
+                shutil.move(src,dst)
+            except:
+                raise
+            
         stat['elapsed'] = toc()
         # statfn = 'stat_{:d}{:02d}.dat'.format(year,month)
         statfn = 'run_stat_' + print_ctime(sep='_') + '.log'
