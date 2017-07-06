@@ -8,10 +8,10 @@ import numpy as np
 # If a change to the following is desired, do so right after loading the module and then call set_grid() and set_folders() in this order.
 ASM = 3 # This selects the GOTM extra parameters profile
 max_depth = 75 
-grid = '9x_4'
+grid = '144x'
 
 # This will also be in the name (as a suffix before the .nc extension) in the nc file per grid point.
-run = 'ASM3-75m-9x_4' # Will be reset when set_grid() is called.
+run = 'ASM3-75m-144x' # Will be reset when set_grid() is called.
 
 region = 'medsea' # practically just a prefix of filenames for now, the code is strongly tied to this assumption
 overwrite = True # True means running at the same grid point will overwrite files if already present (notably the *.inp etc...)
