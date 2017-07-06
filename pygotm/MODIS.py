@@ -3,18 +3,46 @@ from netCDF4 import Dataset
 from numpy.ma import masked_invalid, masked_outside
 import os, sys
 from scipy.interpolate import *
+from pygotm import medsea
 
-MODIS_folder = '/global/scratch/simontse/p_sossta/glo_MODIS/8days'
-data_folder = '/global/scratch/simontse'
+target_grid = '144x'
+medsea.set_grid(target_grid)
+medsea.set_folders()
 
-def fn(year,num):
+data_folder = medsea.data_folder
+p_sossta_folder = medsea.p_sossta_folder
+grid_lats = medsea.grid_lats
+grid_lons = medsea.grid_lons
+
+coverage_length = '8D'
+MODIS_folder = os.path.join(p_sossta_folder,'glo_MODIS',coverage_length)
+# usually treating one variable at a time, declare as module global variable to avoid passing the same arguments
+# over and over again
+obs_type = 'IOP'
+varname = 'a_488_giop'
+
+def fn(year, num):
+    """ 
+    The naming convention of MODIS data files seem to be the concatenation of the following pieces:
+    1. [A] -> MODIS-AQUA
+    2. [YYYYDDD] -> coverage start year & day of year (for 8day files)
+    3. [YYYYDDD] -> coverage end year & day of year 
+    4. .L3M (processing level)
+    5. _8D -> coverage time length
+    6. _IOP -> type of data (3 capital letters) (e.g. IOP, CHL)
+    7. _a_488_giop -> variable name inside the netCDF dataset (so that ds[varname] works if ds is a netCDF4.Dataset)
+    8. _9km -> approx. spatial resolution (1km / 4km / 9km)
+    9. .nc -> file extension.
+
+    """
     "num is the number of 8day periods elapsed, i.e. from 0 to 45 inclusive."
+
     assert isinstance(num,int) and num <= 45 and num >= 0
     start = 1+num*8
     yrdays = 366 if mod(year,4) == 0 else 365 
     end = yrdays if num == 45 else start+7
 #    print('year,start,end',year,start,end)
-    fn = os.path.join(MODIS_folder,'A{0:d}{1:03d}{0:d}{2:03d}.L3m_8D_CHL_chlor_a_9km.nc'.format(year,start,end))
+    fn = os.path.join(MODIS_folder,'A{0:d}{1:03d}{0:d}{2:03d}.L3m_8D_{3:s}_{4:s}_9km.nc'.format(year,start,end,obs_type,varname))
     if not(os.path.isfile(fn)):
         print('year,start,end',year,start,end)
         raise OSError(fn + 'not found.')
@@ -40,17 +68,17 @@ def coverage_midpoint(year=2014,num=4):
         
 def data(year,num):
     with Dataset(fn(year,num),'r') as nc:
-        modis_lat = nc['lat'][711:529:-1]
-        modis_lon = nc['lon'][2087:2593]
-        modis_chlo = masked_outside(nc['chlor_a'][711:529:-1,2087:2593],0,3)
-    return modis_lat, modis_lon, modis_chlo
+        modis_lats = nc['lat'][711:529:-1]
+        modis_lons = nc['lon'][2087:2593]
+        modis_data = masked_outside(nc[varname][711:529:-1,2087:2593],0,3)
+    return modis_lats, modis_lons, modis_data
 
-def plot(year,num, ax=None):
-    modis_lat, modis_lon, modis_chlo = data(year,num)
+def plot(year,num,ax=None):
+    modis_lats, modis_lons, modis_data = data(year,num)
     if ax is None:
         fig, ax = subplots(figsize=(10,3))
     fig = ax.get_figure()
-    im = ax.imshow(modis_chlo, extent=(modis_lon.min(), modis_lon.max(), modis_lat.min(), modis_lat.max()),
+    im = ax.imshow(modis_data, extent=(modis_lons.min(), modis_lons.max(), modis_lats.min(), modis_lats.max()),
                    interpolation='nearest', origin='lower', cmap=cm.coolwarm)
     cbar = fig.colorbar(im)
 #     ax.grid('on')
@@ -65,7 +93,7 @@ def animate(year):
 
     # Set up figure, axis and plot elements.
     fig, ax = subplots(figsize=(10,3))
-    im, cbar = plot(year,1, ax=ax)
+    im, cbar = plot(year,1,ax=ax)
     # ax.set_title('{:d}, 8-Day beginning on Day #{:003d}'.format(year,1))
 
     #Set up plot backgroudn
@@ -75,14 +103,15 @@ def animate(year):
     def animate(i):
         im.set_alpha(1)
         im.set_array(data(year,i)[2])
-        ax.set_title('{:d}, 8days mean beginning on day #{:003d}'.format(year,(i-1)*8+1))
+        ax.set_title('{:d}, 8days {:s} mean beginning on day #{:003d}'.format(year,varname,(i-1)*8+1))
         return im,
 
     anim = animation.FuncAnimation(fig, animate, #init_func=init,
                                    frames=range(1,47), interval=28, blit=True)
-
-    anim.save('{:d}_medsea_MODIS.gif'.format(year), writer='imagemagick', fps=3)
-    print('Animation saved to {:d}_medsea_MODIS.gif!'.format(year))
+    
+    gif_fn = '{:d}_medsea_MODIS_{:s}.gif'.format(year,varname)
+    anim.save(gif_fn, writer='imagemagick', fps=3)
+    print('Animation saved to {:s}!'.format(gif_fn))
     return anim
 # HTML(anim.to_html5_video())
 
@@ -94,8 +123,8 @@ def data_stat(years=[2013,2014,2015]):
         years = [years]
     for year in years:
         for i in range(46):
-            [lat,lon,chlo] = data(year+int(i/45),i%45)
-            val = sum(~chlo.mask)/(len(lat)*len(lon))
+            [lat,lon,modis_data] = data(year+int(i/45),i%45)
+            val = sum(~modis_data.mask)/(len(lat)*len(lon))
             cumsum += val
             if val < minval[0]:
                 minval = [val,year,i]
@@ -120,14 +149,6 @@ def mapcomp(z1,z2):
         ax.set_ylabel('latitude')
     fig.tight_layout()
 
-def get_REA_grid():
-    with Dataset('/global/scratch/simontse/p_sossta/medsea_rea/2013/20130101_TEMP_re-fv6.nc','r') as nc:
-        lat_rea = nc['lat'][:]
-        lon_rea = nc['lon'][:]
-        temp_rea = nc['votemper'][:]
-        is_sea = ~temp_rea[0,0,:].mask
-    return lat_rea, lon_rea, is_sea
-
 def interp(year,num,method='linear'):
     # Data
     y,x,z = data(year,num)
@@ -140,32 +161,31 @@ def interp(year,num,method='linear'):
         interpolant = NearestNDInterpolator(loc[~val.mask],val[~val.mask])
     
     # New grid
-    lat_rea, lon_rea, is_sea = get_REA_grid()
-    xx_rea, yy_rea = meshgrid(lon_rea,lat_rea)
-    zz_rea = ones(xx_rea.shape)
-    for m in range(len(lat_rea)):
-        for n in range(len(lon_rea)):
+    xx_new, yy_new = meshgrid(grid_lons,grid_lats)
+    zz_new = ones(xx_new.shape)
+    for m in range(len(grid_lats)):
+        for n in range(len(grid_lons)):
             if is_sea[m,n]:
-                zz_rea[m,n] = interpolant(xx_rea[m,n],yy_rea[m,n])
+                zz_new[m,n] = interpolant(xx_new[m,n],yy_new[m,n])
             else:
-                zz_rea[m,n] = nan     
-    return zz_rea
+                zz_new[m,n] = nan     
+    return zz_new
 
 def plot_interp(year,num, ax=None):
     from netCDF4 import Dataset
-    with Dataset(os.path.join(data_folder,'medsea_MODIS','medsea_MODIS_chlor_a_8D_{}.nc'.format(year))) as nc:
-        chlo = nc['chlor_a'][num,:]
+    with Dataset(os.path.join(data_folder,'medsea_MODIS','medsea_MODIS_{:s}_8D_{}.nc'.format(varname,year))) as nc:
+        modis_data = nc[varname][num,:]
     if ax is None:
         fig, ax = subplots(figsize=(10,3))
     fig = ax.get_figure()
-    im = ax.imshow(chlo, extent=(-6., 36.25, 30.75, 45.75),vmin=0,vmax=3,
+    im = ax.imshow(modis_data, extent=(-6., 36.25, 30.75, 45.75),vmin=0,vmax=3,
                    origin='lower',cmap=cm.coolwarm)
     cbar = fig.colorbar(im)
 #     ax.grid('on')
     ax.set_xlabel('longitude')
     ax.set_ylabel('latitude')
     fig.tight_layout()
-    return im, cbar, chlo
+    return im, cbar, modis_data
 
 def animate_interp(year):
     from matplotlib import animation
@@ -173,7 +193,7 @@ def animate_interp(year):
 
     # Set up figure, axis and plot elements.
     fig, ax = subplots(figsize=(10,3))
-    im, cbar, chlo = plot_interp(year,0,ax=ax)
+    im, cbar, modis_data = plot_interp(year,0,ax=ax)
     # ax.set_title('{:d}, 8-Day beginning on Day #{:003d}'.format(year,1))
 
     #Set up plot backgroudn
@@ -182,16 +202,16 @@ def animate_interp(year):
         return im,
     def animate(i):
         im.set_alpha(1)
-        with Dataset(os.path.join(data_folder,'medsea_MODIS','medsea_MODIS_chlor_a_8D_{}.nc'.format(year))) as nc:
-            chlo = nc['chlor_a'][i,:]
-        im.set_array(chlo)
+        with Dataset(os.path.join(data_folder,'medsea_MODIS','medsea_MODIS_{:s}_8D_{}.nc'.format(varname,year))) as nc:
+            modis_data = nc[varname][i,:]
+        im.set_array(modis_data)
         ax.set_title('{:d}, 8days mean beginning on day #{:003d}'.format(year,i*8+1))
         return im,
 
     anim = animation.FuncAnimation(fig, animate, #init_func=init,
                                    frames=range(46), interval=28, blit=True)
 
-    anim.save('{:d}_medsea_MODIS_rea.gif'.format(year), writer='imagemagick', fps=3)
+    anim.save('{:d}_medsea_MODIS_{:s}.gif'.format(year,grid), writer='imagemagick', fps=3)
     print('Animation saved to {:d}_medsea_MODIS_rea.gif!'.format(year))
     return anim
 # HTML(anim.to_html5_video())

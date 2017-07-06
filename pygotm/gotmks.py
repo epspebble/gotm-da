@@ -50,8 +50,10 @@ def run_command(cmd, output='PIPE'):
 
 # This function should be extended to output a simulation object, encapsulating the run options and the results in 
 # one class. This will in turn allow us to run continuation calls easily.
-def gotm(varsout = {}, run_folder = '.', verbose = False, logfn = 'gotm.log',
-         GOTM_executable = GOTM_executable, GOTM_nml_templates_path = None, inp_backup = False, **gotm_args):
+def gotm(run_folder = '.', verbose = False, logfn = 'gotm.log',
+         GOTM_executable = GOTM_executable, GOTM_nml_templates_path = None, inp_backup = False,
+         varsout = {}, # Deprecated
+         **gotm_args):
     """ Runs GOTM in with extra functions. """
     import os, shutil, time
     
@@ -65,12 +67,17 @@ def gotm(varsout = {}, run_folder = '.', verbose = False, logfn = 'gotm.log',
         os.chdir(run_folder)   
     else:
         raise IOError("The folder path: " + run_folder + " is invalid.")
+
+    # Store the full filenames of all generated files.
+    run_files = dict()
     
-    # Check for GOTM config namelists in the local run_folder.
-    #GOTM_nml_list = ['gotmrun.inp','gotmmean.inp','gotmturb.inp','airsea.inp','obs.inp'] # Moved to the top, as global var.
+    # Transfer GOTM config namelists in the local run_folder.
     for each in GOTM_nml_list:
-        if not(os.path.isfile(each)):
-            shutil.copyfile(os.path.join(GOTM_nml_templates_path,each),os.path.join(run_folder,each))
+        dst = os.path.join(run_folder,each)
+        if not(os.path.isfile(dst)):
+            src = os.path.join(GOTM_nml_templates_path,each)
+            shutil.copyfile(src,dst)
+        run_files[each] = dst
     
     # Update the config as well if user specified extra options.
     if gotm_args:
@@ -82,6 +89,8 @@ def gotm(varsout = {}, run_folder = '.', verbose = False, logfn = 'gotm.log',
     else:
         with open(logfn,'w') as logfile:
             run_command(GOTM_executable,output=logfile)
+        run_files['log'] = logfn
+        
     # Return to the original working directory.
     os.chdir(home)
     
@@ -94,28 +103,10 @@ def gotm(varsout = {}, run_folder = '.', verbose = False, logfn = 'gotm.log',
         nrec = len(results['time'])
         if nrec == 0:
             raise Exception("Invalid GOTM results! Time dimension is empty. GOTM failed?")
-        
-        #dims = set()
-        #varsout = set(varsout)
-        #for var in varsout:
-        #    dims = dims.union(results[var].dimensions)
-        # also save the dimension variables to output.
-        #varsout = varsout.union(dims)
-
-        #print(dims)
-        #print(varsout)
-
-        #dim_dict = dict()
-        #for dim in dims:
-        # print('Retrieving {}... with shape {}'.format(dim,shape(results[dim])))
-        #    dim_dict[dim] = results[dim][:]
-        #    
-        #var_dict = {var: {'values': results[var][:], 
-        #                  'dimensions': results[var].dimensions,
-        #                  'units': results[var].units} for var in list(varsout)}
-        # 
-        #return (dim_dict, var_dict) 
-    return
+        else:
+            print("GOTM run completed successfully at {!s}.".format(datetime.now()))
+            run_files['results'] = os.path.join(dr,fn)        
+    return run_files
       
 ## Treating f90 namelists used by GOTM 3.0.0
     
@@ -230,6 +221,10 @@ def toc():
 
 def print_ctime(dt=datetime.now(),sep=' '):
     return dt.strftime('%Y%m%d' + sep + '%H%M%S')
+
+def print_cdate(dt=datetime.now()):
+    return dt.strftime('%Y%m%d')
+
 
 def tz(lon):
     if lon > 0:
