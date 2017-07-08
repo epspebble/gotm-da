@@ -197,11 +197,11 @@ def get_grid():
 # Set default global values at the loading of this module.
 
 # For the grid info. Load from the file if it exists.
-if not(os.path.isfile(os.path.join(project_folder,'medsea_9x_test.npy'))):
+if not(os.path.isfile(os.path.join(project_folder,'medsea_grid_data.npy'))):
     subgrid_data = set_grid()
-    np.save(os.path.join(project_folder,'medsea_9x_test.npy'),subgrid_data)
+    np.save(os.path.join(project_folder,'medsea_grid_data.npy'),subgrid_data)
 else:
-    subgrid, rea_indices, grid_indices = np.load(os.path.join(project_folder,'medsea_9x_test.npy'))
+    subgrid, rea_indices, grid_indices = np.load(os.path.join(project_folder,'medsea_grid_data.npy'))
     grid_lats, grid_lons, medsea_flags, max_depth = subgrid
     medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth = rea_indices
     M, N, sea_mn, sea_m, sea_n = grid_indices
