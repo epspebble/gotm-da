@@ -116,32 +116,79 @@ def animate(year):
 # HTML(anim.to_html5_video())
 
 def data_stat(years=[2013,2014,2015]):
+    cumavail = 0
+    minavail = [1,2000,0]
+    maxavail = [0,2000,0]
+
+    minval = 1.e20
+    maxval = -1.e20
     cumsum = 0
-    minval = [1,2000,0]
-    maxval = [0,2000,0]
+    
     if isinstance(years,int):
         years = [years]
+
     for year in years:
         for i in range(46):
             [lat,lon,modis_data] = data(year+int(i/45),i%45)
-            val = sum(~modis_data.mask)/(len(lat)*len(lon))
-            cumsum += val
-            if val < minval[0]:
-                minval = [val,year,i]
-            if val > maxval[0]:
-                maxval = [val,year,i]
+
+            # Find the min, max and mean value.
+            new_min = modis_data.min()
+            if new_min < minval:
+                minval = new_min
+            new_max = modis_data.max()
+            if new_max > maxval:
+                maxval = new_max
+            cumsum += modis_data.mean()
+
+            # Finding the min and max coverage period.
+            avail = sum(~modis_data.mask)/(len(lat)*len(lon))
+            cumavail += avail
+            if avail < minavail[0]:
+                minavail = [avail,year,i]
+            if avail > maxavail[0]:
+                maxavail = [avail,year,i]
+                
+    avgavail = cumavail/(len(years)*46)
     avgval = cumsum/(len(years)*46)
-    print('Minimum coverage: {!s} at {:d} 8day-period #{:d}'.format(*minval))
-    print('Maximum coverage: {!s} at {:d} 8day-period #{:d}'.format(*maxval))
-    print('Average coverage: {!s}'.format(avgval))
-    return minval,maxval,avgval
+
+    print('Statistics for MODIS {:s} over {!s}...'.format(varname,years))
+    print('Value:')
+    print('  Min: {!s}'.format(minval))
+    print('  Max: {!s}'.format(maxval))
+    print('  Mean: {!s}'.format(avgval))
+    print('Availability:')
+    print('  Worst period: {:.4f} at {:d} 8day-period #{:d}'.format(*minavail))
+    print('  Best period: {:.4f} at {:d} 8day-period #{:d}'.format(*maxavail))
+    print('  Average: {:.2f}%'.format(avgavail*100))
+    return {'stat': (minval,maxval,avgval), 'avail': (minavail,maxavail,avgavail)}
+
+# Reference ranges of data for plotting over the medsea.
+def set_vmin_vmax():
+    global vmin, vmax
+    if varname == 'chlor_a':
+        # Max and min of Ohlmann et al.'s formulas for case 12.
+        vmin = 0
+        vmax = 3
+    if varname == 'a_488_giop':
+        # 2 sig fig from MODIS medsea data
+        vmin = 0.017
+        vmax = 1.3
+    if varname == 'bb_488_giop':
+        # 2 sig fig from MODIS medsea data
+        vmin = 0.0014
+        vmax = 0.017
 
 def mapcomp(z1,z2):
+    set_vmin_vmax()
+    
     fig, axes = subplots(1,2,figsize=(14,6))
     ax1, ax2 = axes
-    im1 = ax1.imshow(z1, extent=(-6,36.25,30.75,45.75), origin='lower', vmin=0,vmax=3, cmap=cm.coolwarm)
+    
+    im1 = ax1.imshow(z1, extent=(-6,36.25,30.75,45.75), origin='lower',
+                     vmin=vmin,vmax=vmax, cmap=cm.coolwarm)
     # cbar1 = fig.colorbar(im1)
-    im2 = ax2.imshow(z2, extent=(-6,36.25,30.75,45.75), origin='lower', vmin=0,vmax=3, cmap=cm.coolwarm)
+    im2 = ax2.imshow(z2, extent=(-6,36.25,30.75,45.75), origin='lower',
+                     vmin=vmin,vmax=vmax, cmap=cm.coolwarm)
     # cbar2 = fig.colorbar(im2)
     #     ax.grid('on')
     for ax in axes:
@@ -150,6 +197,9 @@ def mapcomp(z1,z2):
     fig.tight_layout()
 
 def interp(year,num,method='linear'):
+    from numpy.ma import masked_all
+
+    set_vmin_vmax()
     # Data
     y,x,z = data(year,num)
     xx, yy = np.meshgrid(x,y)
@@ -157,28 +207,27 @@ def interp(year,num,method='linear'):
     val = z.reshape(-1)
     if method == 'linear':
         interpolant = LinearNDInterpolator(loc[~val.mask],val[~val.mask])
-    else: # defaults to nearest:
+    else: # fallback to nearest:
         interpolant = NearestNDInterpolator(loc[~val.mask],val[~val.mask])
     
     # New grid
     xx_new, yy_new = meshgrid(grid_lons,grid_lats)
-    zz_new = ones(xx_new.shape)
-    for m in range(len(grid_lats)):
-        for n in range(len(grid_lons)):
-            if is_sea[m,n]:
-                zz_new[m,n] = interpolant(xx_new[m,n],yy_new[m,n])
-            else:
-                zz_new[m,n] = nan     
+    zz_new = masked_all(xx_new.shape)
+    for m,n in medsea.sea_mn:
+        zz_new[m,n] = interpolant(xx_new[m,n],yy_new[m,n])
     return zz_new
 
 def plot_interp(year,num, ax=None):
+
+    set_vmin_vmax()
     from netCDF4 import Dataset
     with Dataset(os.path.join(data_folder,'medsea_MODIS','medsea_MODIS_{:s}_8D_{}.nc'.format(varname,year))) as nc:
         modis_data = nc[varname][num,:]
     if ax is None:
         fig, ax = subplots(figsize=(10,3))
     fig = ax.get_figure()
-    im = ax.imshow(modis_data, extent=(-6., 36.25, 30.75, 45.75),vmin=0,vmax=3,
+    im = ax.imshow(modis_data, extent=(-6., 36.25, 30.75, 45.75),
+                   vmin=vmin,vmax=vmax,
                    origin='lower',cmap=cm.coolwarm)
     cbar = fig.colorbar(im)
 #     ax.grid('on')
