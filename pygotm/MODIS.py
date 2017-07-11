@@ -172,7 +172,7 @@ def set_vmin_vmax():
     if varname == 'a_488_giop':
         # 2 sig fig from MODIS medsea data
         vmin = 0.017
-        vmax = 1.3
+        vmax = 0.10
     if varname == 'bb_488_giop':
         # 2 sig fig from MODIS medsea data
         vmin = 0.0014
@@ -221,7 +221,7 @@ def plot_interp(year,num, ax=None):
 
     set_vmin_vmax()
     from netCDF4 import Dataset
-    with Dataset(os.path.join(data_folder,'medsea_MODIS','medsea_MODIS_{:s}_8D_{}.nc'.format(varname,year))) as nc:
+    with Dataset(os.path.join(data_folder,'medsea_MODIS','8days','medsea_MODIS_{:s}_8D_{:d}.nc'.format(varname,year))) as nc:
         modis_data = nc[varname][num,:]
     if ax is None:
         fig, ax = subplots(figsize=(10,3))
@@ -251,7 +251,7 @@ def animate_interp(year):
         return im,
     def animate(i):
         im.set_alpha(1)
-        with Dataset(os.path.join(data_folder,'medsea_MODIS','medsea_MODIS_{:s}_8D_{}.nc'.format(varname,year))) as nc:
+        with Dataset(os.path.join(data_folder,'medsea_MODIS','8days','medsea_MODIS_{:s}_8D_{}.nc'.format(varname,year))) as nc:
             modis_data = nc[varname][i,:]
         im.set_array(modis_data)
         ax.set_title('{:d}, 8days mean beginning on day #{:003d}'.format(year,i*8+1))
@@ -260,7 +260,8 @@ def animate_interp(year):
     anim = animation.FuncAnimation(fig, animate, #init_func=init,
                                    frames=range(46), interval=28, blit=True)
 
-    anim.save('{:d}_medsea_MODIS_{:s}.gif'.format(year,grid), writer='imagemagick', fps=3)
-    print('Animation saved to {:d}_medsea_MODIS_rea.gif!'.format(year))
+    fn = '{:d}_medsea_MODIS_{:s}.gif'.format(year,varname)
+    anim.save(fn, writer='imagemagick', fps=3)
+    print('Animation saved to {:s}!'.format(fn))
     return anim
 # HTML(anim.to_html5_video())
