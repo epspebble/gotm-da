@@ -265,3 +265,44 @@ def animate_interp(year):
     print('Animation saved to {:s}!'.format(fn))
     return anim
 # HTML(anim.to_html5_video())
+
+def format_modis_8days(year,outdir=os.path.join(data_folder,'medsea_MODIS','8days'),
+                       lat=MODIS.grid_lats,lon=MODIS.grid_lons):
+    from netCDF4 import Dataset, date2num
+    from numpy.ma import masked_invalid
+
+    epoch = 'seconds since 1981-01-01'
+
+    # Writing to an nc file.
+    outfn = os.path.join(outdir,'medsea_MODIS_{:s}_8D_{:d}.nc'.format(MODIS.obs_type,year))
+    print('Writing to {:s}...'.format(outfn))
+    mode = 'a' if os.path.isfile(outfn) else 'w'
+    with Dataset(outfn, mode, format='NETCDF3_CLASSIC') as new: 
+        if mode == 'w':
+            new.createDimension('time') # unlimited
+            new.createDimension('lat', size = len(lat)) 
+            new.createDimension('lon', size = len(lon)) 
+            print('Done creating dimensions.')
+
+            nctime = new.createVariable('time','f8',dimensions=('time',))
+            nctime.units = epoch
+            nclat = new.createVariable('lat','f8',dimensions=('lat',))
+            nclat.units = 'degrees north'
+            nclon = new.createVariable('lon','f8',dimensions=('lon',))
+            nclon.units = 'degrees east'
+
+        ncvar = new.createVariable(MODIS.varname,'f8',dimensions=('time','lat','lon'),
+                                   zlib=True, fill_value=nan) # Fill-value the same as in REA dataset.       
+        print('Done creating variables.')
+        
+        nclat[:] = lat
+        nclon[:] = lon
+        print('Done creating lat/lon grid.')
+
+        for i in range(46):
+            if mode == 'w':
+                nctime[i] = date2num(MODIS.coverage_midpoint(year,i),epoch)
+                
+            ncvar[i,:] = masked_invalid(MODIS.interp(year,i,method='linear'))
+
+        print("Done writing 'time' and '{:s}'.".format(MODIS.varname))
