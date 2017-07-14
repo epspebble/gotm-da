@@ -26,7 +26,7 @@ def set_folders():
 #    data_folder = os.path.join(userhome,'medsea_data', grid)
     data_folder = os.path.join(userhome,'medsea_data')
     while not(os.path.isdir(data_folder)):
-        print('The data folder ' + data_folder + 'is either not accessible or created.')
+        print('The data folder ' + data_folder + ' is either not accessible or created.')
         data_folder = input("Enter new data folder location.")
     base_folder = os.path.join(scratch_folder,'medsea_GOTM')
     while not(os.path.isdir(base_folder)):
