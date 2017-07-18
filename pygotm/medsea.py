@@ -24,7 +24,7 @@ def set_folders():
     scratch_folder = os.path.join(userhome,'scratch')
     # the grid subfolder is now part of the data_folder
 #    data_folder = os.path.join(userhome,'medsea_data', grid)
-    data_folder = os.path.join(userhome,'medsea_data')
+    data_folder = os.path.join(scratch_folder,'medsea_data')
     while not(os.path.isdir(data_folder)):
         print('The data folder ' + data_folder + ' is either not accessible or created.')
         data_folder = input("Enter new data folder location.")
@@ -274,10 +274,9 @@ def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','spr
             print('Error accessing {:s}.'.format(fn_dict[each]))
             raise
         except:
-            print(dat)
-            print(fn_dict)
-            print(ds_dict)
             print('Error accessing {:s}.'.format(fn_dict[each]))
+            print('Requested list of dat files: {!s}.'.format(dat))
+            print('Available built-in data sources: {!s}.'.format(fn_dict))
             raise
 
     if len(ds_dict.keys()) == 1:
@@ -730,7 +729,6 @@ def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
     if isinstance(dat,str):
         dat = [dat]
 
-
 # 20170621, we no longer create separate folders for different runs, but share the same set of subfolders named
 # by print_lat_lon(), to avoid creating too many files and draining disk quota too fast.
 
@@ -746,13 +744,18 @@ def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
     # ERA_tempfiles = [copyfile(fn,os.path.join(temp_folder,os.path.basename(fn))) for fn in ERA_files]
     # rea_tempfiles = [copyfile(fn,os.path.join(temp_folder,os.path.basename(fn))) for fn in rea_files]
 
-    print("Using nc files in " + data_folder + "...")
+    print("Looking for data sources from " + data_folder + "...")
     nc_dict = data_sources(dat=dat)
     if not(isinstance(nc_dict, dict)):
         nc_dict = {dat[0]: nc_dict} 
 
     for dat_fn, nc in nc_dict.items():
         ## Assume m, n are iterable and of the same length:
+        if isinstance(mm,int) and isinstance(nn,int):
+            mm = [mm]
+            nn = [nn]
+        else:
+            assert len(m) == len(n)
         try:
             for m, n in zip(mm, nn):
                 lat = grid_lats[m]
@@ -765,16 +768,18 @@ def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
                     
                 # Actually write.
                 write_dat(m,n,dat_fn,nc,local_folder)
-        except TypeError as te:
-            if isinstance(mm,int) and isinstance(nn,int):
-                m = mm
-                n = nn
-                # So the provided sequences are just a single pair of indices. Just write.
-                write_dat(m,n,dat_fn,nc,local_folder)
-            else:
+        except Exception:
                 print('mm',mm)
                 print('nn',nn)
-                print(te,'Given arguments do not work.')
+        
+        ## When m,n are integers, exception occurs at zip() instead, and it not a TypeError.
+        # except TypeError as te:
+        #     if isinstance(mm,int) and isinstance(nn,int):
+        #         m = mm
+        #         n = nn
+        #         # So the provided sequences are just a single pair of indices. Just write.
+        #         write_dat(m,n,dat_fn,nc,local_folder)
+        #    else:
 
 #        write_dat(m,n,dat_fn,nc,local_folder)
         
