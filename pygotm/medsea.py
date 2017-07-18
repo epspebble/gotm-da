@@ -884,7 +884,7 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
         startdayofyear = (start-datetime(start.year-1,12,31)).days # E.g. start is 2013-01-07, then it is 7.
         stopdayofyear = (stop-datetime(stop.year-1,12,31)).days # E.g. stop is 2013-12-31, then it is 365, if stop is 2014-01-01, then it is 1.
         suffix = '_' + \
-                 '{:04d}{:04d}{:04d{:04d}'.format(start.year,startdayofyear,stop.year,stopdayofyear) + \
+                 '{:04d}{:03d}{:04d}{:03d}'.format(start.year,startdayofyear,stop.year,stopdayofyear) + \
                  '_' + run 
         
     elif month is None: # Run for a year.
