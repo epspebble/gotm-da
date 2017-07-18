@@ -815,7 +815,7 @@ def prepare_run(start,stop,run_folder,out_dir='.',out_fn='results',m=None,n=None
     updatecfg(path=run_folder, **gotm_args)
     return gotm_args
 
-def local_run(year,month,m,n,run,create=False,verbose=False,**gotm_user_args):
+def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False,**gotm_user_args):
     """ 
     
     Generate GOTM results for the (m,n)-th grid point at the specified month. Only *.dat files are expected to be 
@@ -832,14 +832,29 @@ def local_run(year,month,m,n,run,create=False,verbose=False,**gotm_user_args):
 #    local_folder = get_local_folder(lat,lon,run)
     local_folder = get_local_folder(m,n,create=create)
 
-    if month is None:
+    # Argument handling
+    if year is None and month is None:
+        assert start is not None
+        assert stop is not None
+        def check(string):
+            if isinstance(string,str):
+                assert len(string) == 4+3+3+ 3+3+3 # 2013-01-01 00:00:00
+            else:
+                assert isinstance(string, datetime)
+        check(start)
+        check(stop)
+        
+    elif month is None:
         start = datetime(year,1,1)
         stop = datetime(year+1,1,1)
     else:
+        assert year is not None
         start = datetime(year,month,1);
         stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)
 
+    # Should GOTM write to the local folder or a cached folder?
     out_dir = local_folder if cache_folder is None else cache_folder
+
     if run in run_profiles.keys():
         # Should subclass an Exception to tell people what happened.
         if gotm_user_args != {}:
