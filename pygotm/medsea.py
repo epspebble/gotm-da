@@ -24,9 +24,9 @@ def set_folders():
     scratch_folder = os.path.join(userhome,'scratch')
     # the grid subfolder is now part of the data_folder
 #    data_folder = os.path.join(userhome,'medsea_data', grid)
-    data_folder = os.path.join(userhome,'medsea_data')
+    data_folder = os.path.join(scratch_folder,'medsea_data')
     while not(os.path.isdir(data_folder)):
-        print('The data folder ' + data_folder + 'is either not accessible or created.')
+        print('The data folder ' + data_folder + ' is either not accessible or created.')
         data_folder = input("Enter new data folder location.")
     base_folder = os.path.join(scratch_folder,'medsea_GOTM')
     while not(os.path.isdir(base_folder)):
@@ -261,8 +261,10 @@ def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','spr
     else:
         MODIS_suffix = '_{:d}.nc'
 
+    # Temporary special treatment just to make it work for new MODIS data.
     fn_dict.update(chlo = os.path.join(data_folder,region+'_MODIS','8days',region+'_MODIS_chlor_a_8D' + suffix)) 
-
+    fn_dict.update(iop = os.path.join(data_folder,region+'_MODIS','8days',region+'_MODIS_IOP_8D' + suffix))
+    
     assert all([each in fn_dict.keys() for each in dat]) # Check that the function is called correctly.
 
     for each in fn_dict.keys():
@@ -272,10 +274,9 @@ def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','spr
             print('Error accessing {:s}.'.format(fn_dict[each]))
             raise
         except:
-            print(dat)
-            print(fn_dict)
-            print(ds_dict)
             print('Error accessing {:s}.'.format(fn_dict[each]))
+            print('Requested list of dat files: {!s}.'.format(dat))
+            print('Available built-in data sources: {!s}.'.format(fn_dict))
             raise
 
     if len(ds_dict.keys()) == 1:
@@ -349,7 +350,14 @@ def chunk(c,k,fun,*args,**kwargs):
 def get_m_n(lat,lon):
     "Return the grid index (m,n) given latlong. Assume uniformly-spaced grid."
     spacing = grid_lats[1]-grid_lats[0]
-    return int((lat-grid_lats[0])/spacing), int((lon-grid_lons[0])/spacing)
+    m = (lat-grid_lats[0])/spacing
+    n = (lon-grid_lons[0])/spacing
+    if m%1 != 0. or n%1 != 0.:
+        print('Warning: given latlong ({!s},{!s}) does not correspond exactly to a point in the {:s} grid.'.format(lat,lon,grid))
+        m = int(round(m))
+        n = int(round(n))
+        print('Returning the indices to the closest grid point instead: ({!s},{!s}).'.format(grid_lats[m],grid_lons[n]))
+    return int(m), int(n)
 
 def get_lat_lon(m,n):
     "Return the latlong given the grid index (m,n)."
@@ -500,6 +508,9 @@ def write_dat(m,n,dat_fn,nc,outdir):
 
     from numpy.ma import is_masked
     from netCDF4 import Dataset, MFDataset
+
+    if outdir is None:
+        outdir = get_local_folder(m,n)
     if isinstance(nc,Dataset) or isinstance(nc,MFDataset):
         time = nc['time']
     elif os.path.isfile(nc):
@@ -520,6 +531,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
                 for j in range(len(nc_depth)):
                     line = ('{0:g} {1:g}\n').format(-nc['depth'][j],nc['votemper'][i,j,m,n])
                     f.write(line)
+            done = True
         elif dat_fn == 'sprof':
             for i in range(len(time)):
                 nc_depth = nc['depth']
@@ -527,6 +539,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
                 for j in range(len(nc_depth)):
                     line = ('{0:g} {1:g}\n').format(-nc['depth'][j],nc['vosaline'][i,j,m,n])
                     f.write(line)
+            done = True
         elif dat_fn == 'heat':
             col = [None for i in range(4)]
             # Temporary hack #1: repeat the first record if it starts at 03:00:00 so that the 
@@ -555,7 +568,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
                 except Exception:
                     print('col',col)
                     print('m,n',m,n)
-                    raise
+                    raise  
 
             # The following loop is hacked temporarily to accomodate GOTM Fortran code assumption,
             # reinterpreting the timsteamp to mean the beginning of 3-hourly periods.
@@ -612,10 +625,14 @@ def write_dat(m,n,dat_fn,nc,outdir):
             try:
                 line = ('{:s}' + ' {:g}'*3 + '\n').format(*col)
                 f.write(line)
+            # debug
             except Exception:
                 print('col',col)
                 print('m,n',m,n)
                 raise
+
+            # Complicated write. Finally done.
+            done = True
 
         elif dat_fn == 'met':
             col = [None for i in range(9)]
@@ -632,6 +649,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
                 col[8] = nc['snow'][0,m,n]
                 line = ('{:s}'+' {:g}'*8 + '\n').format(*col)
                 f.write(line)
+                done = True
             for i in range(len(time)):
                 col[0] = timestr(time,i)
                 col[1] = nc['u10m'][i,m,n]
@@ -644,10 +662,12 @@ def write_dat(m,n,dat_fn,nc,outdir):
                 col[8] = nc['snow'][i,m,n]
                 line = ('{:s}'+' {:g}'*8 + '\n').format(*col)
                 f.write(line)
+            done = True
         elif dat_fn == 'sst':
             for i in range(len(time)):
                 line = '{:s} {:g}\n'.format(timestr(time,i),nc['analysed_sst'][i,m,n])
                 f.write(line)
+            done = True
         elif dat_fn == 'chlo':
             count = 0
             for i in range(len(time)):
@@ -660,9 +680,13 @@ def write_dat(m,n,dat_fn,nc,outdir):
                     continue
                 line = '{:s} {:g}\n'.format(timestr(time,i),nc['chlor_a'][i,m,n])
                 f.write(line)
-            if count > 3:
+            if count > 4:
                 print('WARNING: {:d} consecutive nan values.'.format(count))
-#                raise Exception("3 consecutive nan values.")
+                #raise Exception("3 consecutive nan values.")
+                done = False
+            else:
+                done = True
+                
         elif dat_fn == 'iop':
             count = 0
             for i in range(len(time)):
@@ -675,13 +699,21 @@ def write_dat(m,n,dat_fn,nc,outdir):
                     continue
                 line = '{:s} {:g} {:g}\n'.format(timestr(time,i),nc['a_488_giop'][i,m,n],nc['bb_488_giop'][i,m,n])
                 f.write(line)
-            if count > 3:
+            if count > 4:
                 print('WARNING: {:d} consecutive nan values.'.format(count))
-#                raise Exception("3 consecutive nan values.")                
+                #raise Exception("3 consecutive nan values.")
+                done = False
+            else:
+                done = True
         else:
             raise Exception("Requested {}.dat has no recipes defined in core_dat()".format(dat_fn))
 
-    print('Done writing {}.\n'.format(fn))
+    if done:
+        print('Done writing {}.\n'.format(fn))
+    else:
+        if os.path.isfile(fn):
+            print('Writing failed. Deleting {:s}... '.format(fn))
+            os.remove(fn)
 
 def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
     """
@@ -696,7 +728,6 @@ def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
     
     if isinstance(dat,str):
         dat = [dat]
-
 
 # 20170621, we no longer create separate folders for different runs, but share the same set of subfolders named
 # by print_lat_lon(), to avoid creating too many files and draining disk quota too fast.
@@ -713,13 +744,18 @@ def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
     # ERA_tempfiles = [copyfile(fn,os.path.join(temp_folder,os.path.basename(fn))) for fn in ERA_files]
     # rea_tempfiles = [copyfile(fn,os.path.join(temp_folder,os.path.basename(fn))) for fn in rea_files]
 
-    print("Using nc files in " + data_folder + "...")
+    print("Looking for data sources from " + data_folder + "...")
     nc_dict = data_sources(dat=dat)
     if not(isinstance(nc_dict, dict)):
         nc_dict = {dat[0]: nc_dict} 
 
     for dat_fn, nc in nc_dict.items():
         ## Assume m, n are iterable and of the same length:
+        if isinstance(mm,int) and isinstance(nn,int):
+            mm = [mm]
+            nn = [nn]
+        else:
+            assert len(m) == len(n)
         try:
             for m, n in zip(mm, nn):
                 lat = grid_lats[m]
@@ -732,16 +768,18 @@ def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
                     
                 # Actually write.
                 write_dat(m,n,dat_fn,nc,local_folder)
-        except TypeError as te:
-            if isinstance(mm,int) and isinstance(nn,int):
-                m = mm
-                n = nn
-                # So the provided sequences are just a single pair of indices. Just write.
-                write_dat(m,n,dat_fn,nc,local_folder)
-            else:
+        except Exception:
                 print('mm',mm)
                 print('nn',nn)
-                print(te,'Given arguments do not work.')
+        
+        ## When m,n are integers, exception occurs at zip() instead, and it not a TypeError.
+        # except TypeError as te:
+        #     if isinstance(mm,int) and isinstance(nn,int):
+        #         m = mm
+        #         n = nn
+        #         # So the provided sequences are just a single pair of indices. Just write.
+        #         write_dat(m,n,dat_fn,nc,local_folder)
+        #    else:
 
 #        write_dat(m,n,dat_fn,nc,local_folder)
         
@@ -1112,72 +1150,74 @@ def combine_run(year, month, run,
         print('Finished combining GOTM results after {0:.0f}s'.format(elapsed))
     return outfn
 
-def combine_stat(run,year,month,format='NETCDF3_CLASSIC', indices=sea_mn):
+## This function has not been updated after folder structure change (the 'run' string does not name a folder but a substring in output filenames)
 
-    from numpy import loadtxt
-    from numpy import ma
+# def combine_stat(run,year,month,format='NETCDF3_CLASSIC', indices=sea_mn):
 
-    print('Combining GOTM daily statistics for {:d}-{:02d}...'.format(year,month))
-    outfn = os.path.join(base_folder,run,'medsea_GOTM_daily_stat_{:d}{:02d}.nc'.format(year,month))
+#     from numpy import loadtxt
+#     from numpy import ma
 
-    print('Writing dimensions and metadata...')
-    elapsed = 0
-    tic()
+#     print('Combining GOTM daily statistics for {:d}-{:02d}...'.format(year,month))
+#     outfn = os.path.join(base_folder,run,'medsea_GOTM_daily_stat_{:d}{:02d}.nc'.format(year,month))
 
-    with Dataset(outfn,'w',format=format) as nc:
+#     print('Writing dimensions and metadata...')
+#     elapsed = 0
+#     tic()
 
-        # Dimensions
-        nc.createDimension('day_of_year')
-        nc.createDimension('lat', size = len(grid_lats))
-        nc.createDimension('lon', size = len(grid_lons))
+#     with Dataset(outfn,'w',format=format) as nc:
+
+#         # Dimensions
+#         nc.createDimension('day_of_year')
+#         nc.createDimension('lat', size = len(grid_lats))
+#         nc.createDimension('lon', size = len(grid_lons))
         
-        # Dimension variables.
-        ncday = nc.createVariable('day_of_year','i4',dimensions=('day_of_year',))
-        ncday.units = "number of days since last new year's eve"
-        nclat = nc.createVariable('lat','f4',dimensions=('lat',))
-        nclat.units = 'degrees north'
-        nclon = nc.createVariable('lon','f4',dimensions=('lon',))
-        nclon.units = 'degrees east'
-        nclat[:] = grid_lats
-        nclon[:] = grid_lons
-        print('Done initializing dimensions.')
+#         # Dimension variables.
+#         ncday = nc.createVariable('day_of_year','i4',dimensions=('day_of_year',))
+#         ncday.units = "number of days since last new year's eve"
+#         nclat = nc.createVariable('lat','f4',dimensions=('lat',))
+#         nclat.units = 'degrees north'
+#         nclon = nc.createVariable('lon','f4',dimensions=('lon',))
+#         nclon.units = 'degrees east'
+#         nclat[:] = grid_lats
+#         nclon[:] = grid_lons
+#         print('Done initializing dimensions.')
         
-        nc_assim_time = nc.createVariable('assim_time','i4',dimensions=('day_of_year','lat','lon'))
-        nc_assim_time.units = 'number of seconds since midnight in local time'
-        nc_SST_max = nc.createVariable('SST_max','f4',dimensions=('day_of_year','lat','lon'))
-        nc_SST_max.units = 'degree Celsius'
-        nc_SST_min_day = nc.createVariable('SST_min_day','f4',dimensions=('day_of_year','lat','lon'))
-        nc_SST_min_day.units = 'degree Celsius'
-        nc_SST_min_night = nc.createVariable('SST_min_night','f4',dimensions=('day_of_year','lat','lon'))
-        nc_SST_min_night.units = 'degree Celsius'
-        nc_SST_max_time = nc.createVariable('SST_max_time','i4',dimensions=('day_of_year','lat','lon'))
-        nc_SST_max_time.units = 'number of seconds since midnight in local time'
-        nc_SST_min_day_time = nc.createVariable('SST_min_day_time','i4',dimensions=('day_of_year','lat','lon'))
-        nc_SST_min_day_time.units = 'number of seconds since midnight in local time'
-        nc_SST_min_night_time = nc.createVariable('SST_min_night_time','i4',dimensions=('day_of_year','lat','lon'))
-        nc_SST_min_night_time.units = 'number of seconds since midnight in local time'
-        print('Done creating variables')
+#         nc_assim_time = nc.createVariable('assim_time','i4',dimensions=('day_of_year','lat','lon'))
+#         nc_assim_time.units = 'number of seconds since midnight in local time'
+#         nc_SST_max = nc.createVariable('SST_max','f4',dimensions=('day_of_year','lat','lon'))
+#         nc_SST_max.units = 'degree Celsius'
+#         nc_SST_min_day = nc.createVariable('SST_min_day','f4',dimensions=('day_of_year','lat','lon'))
+#         nc_SST_min_day.units = 'degree Celsius'
+#         nc_SST_min_night = nc.createVariable('SST_min_night','f4',dimensions=('day_of_year','lat','lon'))
+#         nc_SST_min_night.units = 'degree Celsius'
+#         nc_SST_max_time = nc.createVariable('SST_max_time','i4',dimensions=('day_of_year','lat','lon'))
+#         nc_SST_max_time.units = 'number of seconds since midnight in local time'
+#         nc_SST_min_day_time = nc.createVariable('SST_min_day_time','i4',dimensions=('day_of_year','lat','lon'))
+#         nc_SST_min_day_time.units = 'number of seconds since midnight in local time'
+#         nc_SST_min_night_time = nc.createVariable('SST_min_night_time','i4',dimensions=('day_of_year','lat','lon'))
+#         nc_SST_min_night_time.units = 'number of seconds since midnight in local time'
+#         print('Done creating variables')
 
-        for m,n in indices:
-            stat_fn = os.path.join(get_local_folder(m,n,run),'daily_stat-{:d}{:02d}.dat'.format(year,month))
-            assert os.path.isfile(stat_fn)
-            try:
-                tmp = loadtxt(stat_fn)
-            except ValueError:
-                print('Problematic location: ' + print_lat_lon(*get_lat_lon(m,n)))
-                raise
+#         for m,n in indices:
+#             stat_fn = os.path.join(get_local_folder(m,n),'daily_stat-{:d}{:02d}.dat'.format(year,month))
+#             assert os.path.isfile(stat_fn)
+#             try:
+#                 tmp = loadtxt(stat_fn)
+#             except ValueError:
+#                 print('Problematic location: ' + print_lat_lon(*get_lat_lon(m,n)))
+#                 raise
             
-            ncday[:] = tmp[:,0]
-            nc_assim_time[:,m,n] = ma.masked_equal(tmp[:,1],0)
-            nc_SST_min_day_time[:,m,n] = ma.masked_equal(tmp[:,2],0)
-            nc_SST_min_day[:,m,n] = ma.masked_equal(tmp[:,3],99.)
-            nc_SST_max_time[:,m,n] = ma.masked_equal(tmp[:,4],0)
-            nc_SST_max[:,m,n] = ma.masked_equal(tmp[:,5],-99.)
-            nc_SST_min_night_time[:,m,n] = ma.masked_equal(tmp[:,6],0)
-            nc_SST_min_night[:,m,n] = ma.masked_equal(tmp[:,7],99.)
+#             ncday[:] = tmp[:,0]
+#             nc_assim_time[:,m,n] = ma.masked_equal(tmp[:,1],0)
+#             nc_SST_min_day_time[:,m,n] = ma.masked_equal(tmp[:,2],0)
+#             nc_SST_min_day[:,m,n] = ma.masked_equal(tmp[:,3],99.)
+#             nc_SST_max_time[:,m,n] = ma.masked_equal(tmp[:,4],0)
+#             nc_SST_max[:,m,n] = ma.masked_equal(tmp[:,5],-99.)
+#             nc_SST_min_night_time[:,m,n] = ma.masked_equal(tmp[:,6],0)
+#             nc_SST_min_night[:,m,n] = ma.masked_equal(tmp[:,7],99.)
           
-        print("Done creating " + outfn)
-        elapsed += toc()        
+#         print("Done creating " + outfn)
+#         elapsed += toc()        
 
 ## Medsea results visualization toolbox
 
