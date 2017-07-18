@@ -882,23 +882,25 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
         check(start)
         check(stop)
         startdayofyear = (start-datetime(start.year-1,12,31)).days # E.g. start is 2013-01-07, then it is 7.
-        stopdayofyear = startdayofyear + (stop-start).days # E.g. stop is 2013-12-31, then it is 365, if stop is 2014-01-01, then it is 366.
-        suffix = '-' + run + '-' + '{:04d}{:04d}{:04d}'.format(start.year,startdayofyear,stopdayofyear)
+        stopdayofyear = (stop-datetime(stop.year-1,12,31)).days # E.g. stop is 2013-12-31, then it is 365, if stop is 2014-01-01, then it is 1.
+        suffix = '_' + \
+                 '{:04d}{:04d}{:04d{:04d}'.format(start.year,startdayofyear,stop.year,stopdayofyear) + \
+                 '_' + run 
         
     elif month is None: # Run for a year.
         start = datetime(year,1,1)
         stop = datetime(year+1,1,1)
-        suffix = '-' + run + '-' + '{:04d}'.format(start.year)
+        suffix = '_' + run + '_' + '{:04d}'.format(start.year)
         
     else: # Run for a month
         assert year is not None
         start = datetime(year,month,1);
         stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)
-        suffix = '-' + run + '-' + '{:04d}{:02d}'.format(start.year, start.month)
+        suffix = '_' + run + '_' + '{:04d}{:02d}'.format(start.year, start.month)
 
     # Should GOTM write to the local folder or a cached folder?
     out_dir = local_folder if cache_folder is None else cache_folder
-    out_fn = 'results'+suffix
+    out_fn = 'results' + suffix
 
     if run in run_profiles.keys():
         # Should subclass an Exception to tell people what happened.
