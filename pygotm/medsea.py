@@ -871,7 +871,7 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
     local_folder = get_local_folder(m,n,create=create)
 
     # Argument handling
-    if year is None and month is None:
+    if year is None and month is None: # Run for a specific period.
         assert start is not None
         assert stop is not None
         def check(string):
@@ -881,17 +881,24 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
                 assert isinstance(string, datetime)
         check(start)
         check(stop)
+        startdayofyear = (start-datetime(start.year-1,12,31)).days # E.g. start is 2013-01-07, then it is 7.
+        stopdayofyear = startdayofyear + (stop-start).days # E.g. stop is 2013-12-31, then it is 365, if stop is 2014-01-01, then it is 366.
+        suffix = '-' + run + '-' + '{:04d}{:04d}{:04d}'.format(start.year,startdayofyear,stopdayofyear)
         
-    elif month is None:
+    elif month is None: # Run for a year.
         start = datetime(year,1,1)
         stop = datetime(year+1,1,1)
-    else:
+        suffix = '-' + run + '-' + '{:04d}'.format(start.year)
+        
+    else: # Run for a month
         assert year is not None
         start = datetime(year,month,1);
         stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)
+        suffix = '-' + run + '-' + '{:04d}{:02d}'.format(start.year, start.month)
 
     # Should GOTM write to the local folder or a cached folder?
     out_dir = local_folder if cache_folder is None else cache_folder
+    out_fn = 'results'+suffix
 
     if run in run_profiles.keys():
         # Should subclass an Exception to tell people what happened.
@@ -899,28 +906,17 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
             print(('{:s} = {!s}' * len(gotm_user_args)).format(*(gotm_user_args.items())))
             raise Exception("A recorded run profile {:s} is specified, rejecting all user arguments for GOTM.\n")
         print('Using pre-defined profile: {:s}...'.format(run))
-        if month is None:
-            suffix = '-{:s}-{:d}'.format(run,year)
-        else:
-            suffix = '-{:s}-{:d}{:02d}'.format(run,year,month)
-        out_fn = 'results'+suffix
         gotm_args = prepare_run(start,stop,local_folder,lat=lat,lon=lon,
                                 out_fn=out_fn,
                                 out_dir=out_dir,
                                 daily_stat_fn='daily_stat'+suffix+'.dat',
-                                # assim_event_fn='assim_event-{:d}{:02d}.dat'.format(year,month),
-                                # sst_event_fn='sst_event-{:d}{:02d}.dat'.format(year,month),
                                 **run_profiles[run])
     else:
         print('Running without a pre-defined profile and creating new folder structures for {:s}...'.format(run))
-        suffix = '-{:s}-{:d}{:02d}'.format(run,year,month)
-        out_fn = 'results'+suffix
         gotm_args = prepare_run(start,stop,local_folder,lat=lat,lon=lon,
                                 out_dir=out_dir,
                                 out_fn=out_fn,
                                 daily_stat_fn='daily_stat'+suffix+'.dat',
-                                # assim_event_fn='assim_event-{:d}{:02d}.dat'.format(year,month),
-                                # sst_event_fn='sst_event-{:d}{:02d}.dat'.format(year,month),
                                 **gotm_user_args)
 
     os.chdir(local_folder)
