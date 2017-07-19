@@ -850,6 +850,33 @@ def prepare_run(start,stop,run_folder,out_dir='.',out_fn='results',m=None,n=None
     # print('Copying {:s} to {:s}'.format(src,dst))
     shutil.copyfile(src,dst)
 
+    # Check that the dat files exists and are of nonzero size.
+
+    # Create a list of dat files we expect to see.
+    dat_list = ['tprof','sprof','heat','met']
+    if ('extinct_method' in gotm_user_args):
+        em = gotm_user_args['extinct_method']
+        if em == 12:
+            dat_list.append('chlo')
+        elif em == 13:
+            dat_list.append('iop')
+        else:
+            raise NotImplementedError('Not implemented for extinct_method={:d} yet.'.format(em))
+
+    # Now whether each dat file exists and has nonzero size (not just 'touched' by an erroneous read by GOTM)
+    for each in dat_list:
+        datfn = os.path.join(run_folder,each+'.dat')
+        try:
+            assert os.path.getsize(datfn) > 0
+        except:
+            print('{:s} is not found or of size 0, regenerating...'.format(datfn))
+            local_dat(m,n,dat=each)
+            try:
+                assert os.path.getsize(datfn) > 0
+            except:
+                print('{:s} regeneration failed.'.format(datfn))
+                raise
+    
     updatecfg(path=run_folder, **gotm_args)
     return gotm_args
 
@@ -889,13 +916,15 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
         
     elif month is None: # Run for a year.
         start = datetime(year,1,1)
-        stop = datetime(year+1,1,1)
+        stop = datetime(year,12,31) # Avoid data boundary for now. 
+        #stop = datetime(year+1,1,1) 
         suffix = '_' + run + '_' + '{:04d}'.format(start.year)
         
     else: # Run for a month
         assert year is not None
         start = datetime(year,month,1);
-        stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)
+        stop = datetime(year,month+1,1) if month < 12 else datetime(year,12,31) # Avoid data boundary for now
+        #stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)        
         suffix = '_' + run + '_' + '{:04d}{:02d}'.format(start.year, start.month)
 
     # Should GOTM write to the local folder or a cached folder?
