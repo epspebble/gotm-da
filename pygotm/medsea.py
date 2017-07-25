@@ -7,11 +7,12 @@ import numpy as np
 
 # If a change to the following is desired, do so right after loading the module and then call set_grid() and set_folders() in this order.
 ASM = 3 # This selects the GOTM extra parameters profile
-max_depth = 75 
+max_depth = 75
+nlev = 122 # Number of levels in the truncated grid for up to 75m.
 grid = '144x'
 
 # This will also be in the name (as a suffix before the .nc extension) in the nc file per grid point.
-run = 'ASM3-75m-144x' # Will be reset when set_grid() is called.
+run = 'ASM3-75m' # Will be reset when set_grid() is called.
 
 region = 'medsea' # practically just a prefix of filenames for now, the code is strongly tied to this assumption
 overwrite = True # True means running at the same grid point will overwrite files if already present (notably the *.inp etc...)
@@ -72,14 +73,14 @@ def set_grid(new_grid=grid,
  
        Returns three tuples:
             subgrid = (grid_lats, grid_lons, medsea_flags, max_depth)
-            rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth)
+            rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth)
             grid_indices = (M, N, sea_mn, sea_m, sea_n) 
     """
     print('Initializing grid...')
     # Declaring global is necessary for modifying them interactively after importing this module.
     global run, grid, max_depth, ASM 
     global grid_lats, grid_lons, medsea_flags, max_depth
-    global medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth 
+    global medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth 
     global M, N, sea_mn, sea_m, sea_n
 
     # Override the global variables using values passed from function call.
@@ -87,7 +88,7 @@ def set_grid(new_grid=grid,
     max_depth = new_max_depth
 
     # Update the run name
-    run = 'ASM{:d}-{:d}m-{:s}'.format(ASM,max_depth,grid)
+    run = 'ASM{:d}-{:d}m'.format(ASM,max_depth)
 
     # Set up the slices for the subgrid using the name.
     if new_grid in ['9x_{:d}'.format(i) for i in range(16)]:
@@ -121,10 +122,13 @@ def set_grid(new_grid=grid,
         temp_rea = ds['votemper'][:]
         depth_rea = ds['depth'][:]
 
-    ndepth = sum(depth_rea<max_depth)+1
+    # Without the 'safety' of adding one more level, we can get more grid points...
+    #medsea_rea_ndepth = sum(depth_rea<max_depth)
+    
+    medsea_rea_ndepth = sum(depth_rea<max_depth)+1
  
     # 2 means deeper than max_depth, 1 means less than max_depth, 0 means land
-    loc_type = 0 + ~temp_rea[0,0,:].mask + ~temp_rea[0,ndepth,:].mask
+    loc_type = 0 + ~temp_rea[0,0,:].mask + ~temp_rea[0,medsea_rea_ndepth,:].mask
         
     # Setting values to global names.
     grid_lats = lat_rea[subindices[0]]
@@ -174,7 +178,7 @@ def set_grid(new_grid=grid,
           
     # These values have been written directly to global variables as well.
     subgrid = (grid_lats, grid_lons, medsea_flags, max_depth)
-    rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth)
+    rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth)
     grid_indices = (M, N, sea_mn, sea_m, sea_n) 
     return subgrid, rea_indices, grid_indices
 
@@ -183,15 +187,15 @@ def get_grid():
     A simple getter for the global variables, returning three tuples.
 
     subgrid = (grid_lats, grid_lons, medsea_flags, max_depth)
-    rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth)
+    rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth)
     grid_indices = (M, N, sea_mn, sea_m, sea_n) 
     """
 
     global grid_lats, grid_lons, medsea_flags, max_depth
-    global medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth 
+    global medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth 
     global M, N, sea_mn, sea_m, sea_n
     return (grid_lats, grid_lons, medsea_flags, max_depth), \
-        (medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth), \
+        (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth), \
         (M, N, sea_mn, sea_m, sea_n)
 
 # Set default global values at the loading of this module.
@@ -203,7 +207,7 @@ if not(os.path.isfile(os.path.join(project_folder,'medsea_grid_data.npy'))):
 else:
     subgrid, rea_indices, grid_indices = np.load(os.path.join(project_folder,'medsea_grid_data.npy'))
     grid_lats, grid_lons, medsea_flags, max_depth = subgrid
-    medsea_rea_lat_ind, medsea_rea_lon_ind, ndepth = rea_indices
+    medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth = rea_indices
     M, N, sea_mn, sea_m, sea_n = grid_indices
 
 # For the folders.
@@ -483,25 +487,26 @@ def get_local_folder(*args, new_lats=None,new_lons=None,create=False):
             raise IOError("The local folder {:s} is not found. Have you run local_dat()?".format(local_folder))
     return local_folder
 
-def get_core_folder(year,month,lat,lon):
-    """ Create folder structure initially or mid-way (if not yet done). 
-        The innermost subfolder, which is called 'core_folder' is 
-        where a GOTM run is executed for one grid point per time period.  
-        It contains settings (*.inp), input data (*.dat) and output data (*.nc) """
-    # Temporary hack, be forgiving if the provided lat, lon are actually indices of our medsea grid.
-    if isinstance(lat,int):
-        lat = grid_lats[lat]
-    if isinstance(lon,int):
-        lon = grid_lons[lon]
+# # Deprecated
+# def get_core_folder(year,month,lat,lon):
+#     """ Create folder structure initially or mid-way (if not yet done). 
+#         The innermost subfolder, which is called 'core_folder' is 
+#         where a GOTM run is executed for one grid point per time period.  
+#         It contains settings (*.inp), input data (*.dat) and output data (*.nc) """
+#     # Temporary hack, be forgiving if the provided lat, lon are actually indices of our medsea grid.
+#     if isinstance(lat,int):
+#         lat = grid_lats[lat]
+#     if isinstance(lon,int):
+#         lon = grid_lons[lon]
         
-    monthly_folder = os.path.join(run_folder,'{:d}{:02d}'.format(year,month))
-    if not(os.path.isdir(monthly_folder)):
-        os.mkdir(monthly_folder)
-    latlong = print_lat_lon(lat,lon)
-    core_folder = os.path.join(monthly_folder,latlong)
-    if not(os.path.isdir(core_folder)):
-        os.mkdir(core_folder)
-    return core_folder 
+#     monthly_folder = os.path.join(run_folder,'{:d}{:02d}'.format(year,month))
+#     if not(os.path.isdir(monthly_folder)):
+#         os.mkdir(monthly_folder)
+#     latlong = print_lat_lon(lat,lon)
+#     core_folder = os.path.join(monthly_folder,latlong)
+#     if not(os.path.isdir(core_folder)):
+#         os.mkdir(core_folder)
+#     return core_folder 
 
 def write_dat(m,n,dat_fn,nc,outdir):
     " Write dat files for each lat/lon in grid_lats/grid_lons from a given netCDF Dataset or MFDataset."
@@ -786,26 +791,27 @@ def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
     for nc in nc_dict.values():
         nc.close()
 
-def core_dat(year,month,m,n,**nc_dict):
-    """
-    Generate *.dat files for each core folder, by months. 
-    The critical keyword argument 'nc_dict' provides dat filename to nc Dataset
-    handle correspondance, e.g. {'heat': heat_nc} where 
-                   heat_nc = Dataset('ERA_heat_yyyymm.nc','r') 
-    has been run before calling this function. The file 'heat.dat' would be generated by
-    using information from 'ERA_heat_yyyymm.nc', and recipe defined in an inner function.
-    """
+# # Deprecated.
+# def core_dat(year,month,m,n,**nc_dict):
+#     """
+#     Generate *.dat files for each core folder, by months. 
+#     The critical keyword argument 'nc_dict' provides dat filename to nc Dataset
+#     handle correspondance, e.g. {'heat': heat_nc} where 
+#                    heat_nc = Dataset('ERA_heat_yyyymm.nc','r') 
+#     has been run before calling this function. The file 'heat.dat' would be generated by
+#     using information from 'ERA_heat_yyyymm.nc', and recipe defined in an inner function.
+#     """
 
-    # Get the location of the core_folder.
-    lat = grid_lats[m]
-    lon = grid_lons[n]
-    # latlong = print_lat_lon(lat,lon)
-    core_folder = get_core_folder(year,month,lat,lon) 
+#     # Get the location of the core_folder.
+#     lat = grid_lats[m]
+#     lon = grid_lons[n]
+#     # latlong = print_lat_lon(lat,lon)
+#     core_folder = get_core_folder(year,month,lat,lon) 
     
-    for dat_fn, nc in nc_dict.items():
-        # print(dat_fn)
-        write_dat(m,n,dat_fn,nc,core_folder)
-    return
+#     for dat_fn, nc in nc_dict.items():
+#         # print(dat_fn)
+#         write_dat(m,n,dat_fn,nc,core_folder)
+#     return
 
 def prepare_run(start,stop,run_folder,out_dir='.',out_fn='results',m=None,n=None,lat=None,lon=None, **gotm_user_args):
     "Transfer config files and GOTM executable to the folder in which GOTM will be run."
@@ -856,7 +862,9 @@ def prepare_run(start,stop,run_folder,out_dir='.',out_fn='results',m=None,n=None
     dat_list = ['tprof','sprof','heat','met']
     if ('extinct_method' in gotm_user_args):
         em = gotm_user_args['extinct_method']
-        if em == 12:
+        if em == 9:
+            pass
+        elif em == 12:
             dat_list.append('chlo')
         elif em == 13:
             dat_list.append('iop')
@@ -897,10 +905,24 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
 #    local_folder = get_local_folder(lat,lon,run)
     local_folder = get_local_folder(m,n,create=create)
 
-    # Argument handling
-    if year is None and month is None: # Run for a specific period.
+    # Argument handling, at tht end 'start', 'stop', 'suffix' should all be defined. 
+    if year is not None:
+        if month is None: # Run for a year.
+            start = datetime(year,1,1)
+            stop = datetime(year,12,31) # Avoid data boundary for now. 
+            #stop = datetime(year+1,1,1) 
+            suffix = '_' + run + '_' + '{:04d}'.format(start.year)
+        else: # Run for a month
+            assert start is None
+            assert stop is None
+            start = datetime(year,month,1);
+            stop = datetime(year,month+1,1) if month < 12 else datetime(year,12,31) # Avoid data boundary for now
+            #stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)        
+            suffix = '_' + run + '_' + '{:04d}{:02d}'.format(start.year, start.month)
+    else: # Run for a specific period.
         assert start is not None
         assert stop is not None
+
         def check(string):
             if isinstance(string,str):
                 assert len(string) == 4+3+3+ 3+3+3 # 2013-01-01 00:00:00
@@ -910,26 +932,13 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
         check(stop)
         startdayofyear = (start-datetime(start.year-1,12,31)).days # E.g. start is 2013-01-07, then it is 7.
         stopdayofyear = (stop-datetime(stop.year-1,12,31)).days # E.g. stop is 2013-12-31, then it is 365, if stop is 2014-01-01, then it is 1.
-        suffix = '_' + \
-                 '{:04d}{:03d}{:04d}{:03d}'.format(start.year,startdayofyear,stop.year,stopdayofyear) + \
-                 '_' + run 
-        
-    elif month is None: # Run for a year.
-        start = datetime(year,1,1)
-        stop = datetime(year,12,31) # Avoid data boundary for now. 
-        #stop = datetime(year+1,1,1) 
-        suffix = '_' + run + '_' + '{:04d}'.format(start.year)
-        
-    else: # Run for a month
-        assert year is not None
-        start = datetime(year,month,1);
-        stop = datetime(year,month+1,1) if month < 12 else datetime(year,12,31) # Avoid data boundary for now
-        #stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)        
-        suffix = '_' + run + '_' + '{:04d}{:02d}'.format(start.year, start.month)
+        suffix = '_{:04d}{:03d}{:04d}{:03d}_'.format(start.year,startdayofyear,stop.year,stopdayofyear) + run
 
-    # Should GOTM write to the local folder or a cached folder?
-    out_dir = local_folder if cache_folder is None else cache_folder
+    # Now we can set the filename in each grid point subfolder.
     out_fn = 'results' + suffix
+        
+    # Check global name cache_folder is set of not.
+    out_dir = local_folder if cache_folder is None else cache_folder
 
     if run in run_profiles.keys():
         # Should subclass an Exception to tell people what happened.
@@ -1000,182 +1009,183 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
         raise
     return stat
 
-def core_run(year,month,m=None,n=None,lat=None,lon=None,verbose=False,**gotm_user_args):
-    """ Generate GOTM results for the (m,n)-th grid point for a specified month in the MxN (lat,long) medsea grid. 
+## Deprecated
+# def core_run(year,month,m=None,n=None,lat=None,lon=None,verbose=False,**gotm_user_args):
+#     """ Generate GOTM results for the (m,n)-th grid point for a specified month in the MxN (lat,long) medsea grid. 
     
-        All necessary files (*.inp, *.dat) are assumed to be present in `core_folder` (see get_core_folder(year,month,m,n)), 
-        except the GOTM executable. The program changes directory into the core folder to run and the log and results are 
-        both saved in core_folder. """
-    from datetime import datetime
-    import os, shutil
+#         All necessary files (*.inp, *.dat) are assumed to be present in `core_folder` (see get_core_folder(year,month,m,n)), 
+#         except the GOTM executable. The program changes directory into the core folder to run and the log and results are 
+#         both saved in core_folder. """
+#     from datetime import datetime
+#     import os, shutil
 
-    ## Setup GOTM arguments for this run.
-    start = datetime(year,month,1,0,0)
-    stop = datetime(year,month+1,1,0,0) if month < 12 else datetime(year+1,1,1,0,0)
-    if not m is None:
-        lat = grid_lats[m]
-    if not n is None:
-        lon = grid_lons[n]
-    latlong = print_lat_lon(lat,lon)
-    run_name = 'medsea_GOTM, #(m,n)=({1:d},{2:d})'.format(latlong,m,n)
-    core_folder = get_core_folder(year,month,lat,lon)    
+#     ## Setup GOTM arguments for this run.
+#     start = datetime(year,month,1,0,0)
+#     stop = datetime(year,month+1,1,0,0) if month < 12 else datetime(year+1,1,1,0,0)
+#     if not m is None:
+#         lat = grid_lats[m]
+#     if not n is None:
+#         lon = grid_lons[n]
+#     latlong = print_lat_lon(lat,lon)
+#     run_name = 'medsea_GOTM, #(m,n)=({1:d},{2:d})'.format(latlong,m,n)
+#     core_folder = get_core_folder(year,month,lat,lon)    
     
-    # NOTE 1: The default values for out_fn, t_prof_file, s_prof_file, heatflux_file, meteo_file, extinct_file, sst_file
-    # are set in the template namelist files in the base_folder, but not here. Same for the values of heights of measurements
-    # wind_h, rh_h, airt_h adapted for use of our medsea dataset.
-    # NOTE 2: Explicit cast types to avoid ValueError in f90nml, which only supports the fundmental data types.
-    gotm_args = dict(name = run_name,
-                     start = str(start), stop = str(stop), 
-                     latitude = float(lat), longitude = float(lon), out_dir = str(core_folder))
+#     # NOTE 1: The default values for out_fn, t_prof_file, s_prof_file, heatflux_file, meteo_file, extinct_file, sst_file
+#     # are set in the template namelist files in the base_folder, but not here. Same for the values of heights of measurements
+#     # wind_h, rh_h, airt_h adapted for use of our medsea dataset.
+#     # NOTE 2: Explicit cast types to avoid ValueError in f90nml, which only supports the fundmental data types.
+#     gotm_args = dict(name = run_name,
+#                      start = str(start), stop = str(stop), 
+#                      latitude = float(lat), longitude = float(lon), out_dir = str(core_folder))
     
-    gotm_args.update(**gotm_user_args) 
-    #print(gotm_args) # Debug
+#     gotm_args.update(**gotm_user_args) 
+#     #print(gotm_args) # Debug
     
-    ## Prepare the core folder.
-    # Symlink the executable.
-    if not(os.path.exists(GOTM_executable)):
-        os.symlink(GOTM_executable,os.path.join(core_folder,'gotm'))    
-    for each in GOTM_nml_list:
-        # All config files are overwritten every time GOTM is run.
-        shutil.copyfile(os.path.join(GOTM_nml_path,each),os.path.join(core_folder,each))
-    # NOTE: The actual updates of the namelists are currently done in the gotm() call.
+#     ## Prepare the core folder.
+#     # Symlink the executable.
+#     if not(os.path.exists(GOTM_executable)):
+#         os.symlink(GOTM_executable,os.path.join(core_folder,'gotm'))    
+#     for each in GOTM_nml_list:
+#         # All config files are overwritten every time GOTM is run.
+#         shutil.copyfile(os.path.join(GOTM_nml_path,each),os.path.join(core_folder,each))
+#     # NOTE: The actual updates of the namelists are currently done in the gotm() call.
 
-    # Actual GOTM run.
-    os.chdir(core_folder)   
-    try:
-        print('GOTM run: ' + run_name + '...')
-        logfn = 'GOTM_' + print_ctime(sep='_') + '.log'
-        gotm(verbose=verbose, logfn=logfn, run_folder = core_folder, varsout = {}, **gotm_args)
-    except:
-        os.chdir(base_folder)
-        raise # Maybe we should define some sort of exception if GOTM fails.
+#     # Actual GOTM run.
+#     os.chdir(core_folder)   
+#     try:
+#         print('GOTM run: ' + run_name + '...')
+#         logfn = 'GOTM_' + print_ctime(sep='_') + '.log'
+#         gotm(verbose=verbose, logfn=logfn, run_folder = core_folder, varsout = {}, **gotm_args)
+#     except:
+#         os.chdir(base_folder)
+#         raise # Maybe we should define some sort of exception if GOTM fails.
         
-    os.chdir(base_folder)
+#     os.chdir(base_folder)
 
 ## Deprecated
-def combine_run(year, month, run,
-                varsout = None, # The subset of variables to output, defaults to all available variables
-                format = 'NETCDF3_CLASSIC', # Do not store in HDF5 format unless we know our collaborators use tools that are compatible.
-                cleanup = False): # If number or sizes of files generated is a concern... maybe True here.
-    " Combine GOTM results nc files from each grid point into a single monthly nc file. "
-    from netCDF4 import Dataset
-    from numpy.ma import masked_all, zeros
+# def combine_run(year, month, run,
+#                 varsout = None, # The subset of variables to output, defaults to all available variables
+#                 format = 'NETCDF3_CLASSIC', # Do not store in HDF5 format unless we know our collaborators use tools that are compatible.
+#                 cleanup = False): # If number or sizes of files generated is a concern... maybe True here.
+#     " Combine GOTM results nc files from each grid point into a single monthly nc file. "
+#     from netCDF4 import Dataset
+#     from numpy.ma import masked_all, zeros
     
-    if month is None:
-        start = datetime(year,1,1)
-        stop = datetime(year+1,1,1)
-        print('Combining medsea GOTM results for {:s}-{:d}...'.format(year,run))
-        outfn = 'medsea_GOTM_{:s}-{:d}.nc'.format(run,year)
+#     if month is None:
+#         start = datetime(year,1,1)
+#         stop = datetime(year+1,1,1)
+#         print('Combining medsea GOTM results for {:s}-{:d}...'.format(year,run))
+#         outfn = 'medsea_GOTM_{:s}-{:d}.nc'.format(run,year)
 
-    else:
-        start = datetime(year,month,1);
-        stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)
-        print('Combining medsea GOTM results for {:s}-{:d}-{:02d}...'.format(run,year,month))
-        # Try a monthly file first.
-        outfn = 'medsea_GOTM_{:s}-{:d}{:02d}.nc'.format(run,year,month)
-        if not(os.path.isfile(os.path.join(get_local_folder(sea_m[0],sea_n[0]),outfn))):
-            # Assume a yearly run was done instead.
-            outfn = 'medsea_GOTM_{:s}-{:d}.nc'.format(run,year)
-            assert os.path.isfile(os.path.join(get_local_folder(sea_m[0],sea_n[0]),outfn)), print(outfn) 
+#     else:
+#         start = datetime(year,month,1);
+#         stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)
+#         print('Combining medsea GOTM results for {:s}-{:d}-{:02d}...'.format(run,year,month))
+#         # Try a monthly file first.
+#         outfn = 'medsea_GOTM_{:s}-{:d}{:02d}.nc'.format(run,year,month)
+#         if not(os.path.isfile(os.path.join(get_local_folder(sea_m[0],sea_n[0]),outfn))):
+#             # Assume a yearly run was done instead.
+#             outfn = 'medsea_GOTM_{:s}-{:d}.nc'.format(run,year)
+#             assert os.path.isfile(os.path.join(get_local_folder(sea_m[0],sea_n[0]),outfn)), print(outfn) 
 
-    print('Writing dimensions and metadata...')
-    elapsed = 0
-    tic()
+#     print('Writing dimensions and metadata...')
+#     elapsed = 0
+#     tic()
 
-    with Dataset(outfn,'w',format=format) as nc:
-        # Default dimensions for medsea
-        nctime, nclat, nclon = create_dimensions(nc, *grid)
+#     with Dataset(outfn,'w',format=format) as nc:
+#         # Default dimensions for medsea
+#         nctime, nclat, nclon = create_dimensions(nc, *grid)
         
-        # Having precomputed the sea locations, and use the first point (30.75N,18.75E) in our 21 x 57 medsea grid. Still works
-        # for finer grids as long as the sea_locaions global variable is updated.
-        fn = os.path.join(base_folder,print_lat_lon(*sea_locations[0]),'results-{0:d}{1:02d}.nc'.format(year,month))
+#         # Having precomputed the sea locations, and use the first point (30.75N,18.75E) in our 21 x 57 medsea grid. Still works
+#         # for finer grids as long as the sea_locaions global variable is updated.
+#         fn = os.path.join(base_folder,print_lat_lon(*sea_locations[0]),'results-{0:d}{1:02d}.nc'.format(year,month))
 
-        # Transfer units, dimensions and create the nc variables.
-        with Dataset(fn,'r') as first:
-            # Is there any need for these? We did put units when calling create_dimesions()
-            #nclat.units = first['lat'].units 
-            #nclon.units = first['lon'].units
+#         # Transfer units, dimensions and create the nc variables.
+#         with Dataset(fn,'r') as first:
+#             # Is there any need for these? We did put units when calling create_dimesions()
+#             #nclat.units = first['lat'].units 
+#             #nclon.units = first['lon'].units
             
-            # Create the depth dimension, save the depth levels by reversing order and sign of the GOTM z variable.
-            nz = len(first['z'])
-            nc.createDimension('depth', size = nz)
-            ncdepth = nc.createVariable('depth','f4',dimensions=('depth',))
-            ncdepth.units = first['z'].units
-            ncdepth[:] = -first['z'][::-1]
+#             # Create the depth dimension, save the depth levels by reversing order and sign of the GOTM z variable.
+#             nz = len(first['z'])
+#             nc.createDimension('depth', size = nz)
+#             ncdepth = nc.createVariable('depth','f4',dimensions=('depth',))
+#             ncdepth.units = first['z'].units
+#             ncdepth[:] = -first['z'][::-1]
 
-            nctime[:] = first['time'][:] 
-            nctime.units = first['time'].units # Small danger, here we are overwriting the units set in create_dimensions()
+#             nctime[:] = first['time'][:] 
+#             nctime.units = first['time'].units # Small danger, here we are overwriting the units set in create_dimensions()
 
-            # Test outputs
-            # for var in ds.variables:
-            #     if len(ds[var].dimensions) > 1:
-            #         print(var,ds[var].units,ds[var].dimensions)
+#             # Test outputs
+#             # for var in ds.variables:
+#             #     if len(ds[var].dimensions) > 1:
+#             #         print(var,ds[var].units,ds[var].dimensions)
 
-            # DEPRECATED. Create adaptively using the first sea location results nc file instead...
-            # Create nc variables for each GOTM output variable specified.
-            # ncvar3d = {name: create_variable(nc,name,'f8', dimensions=('time','lat','lon')) for name in var3dnames}
-            # ncvar4d = {name: create_variable(nc,name,'f8',dimensions=('time','depth','lat','lon')) for name in var4dnames}
-            # for name in var3dnames:
-            #     ncvar3d[name].units = first[name].units
-            # for name in var4dnames:
-            #     ncvar4d[name].units = first[name].units
+#             # DEPRECATED. Create adaptively using the first sea location results nc file instead...
+#             # Create nc variables for each GOTM output variable specified.
+#             # ncvar3d = {name: create_variable(nc,name,'f8', dimensions=('time','lat','lon')) for name in var3dnames}
+#             # ncvar4d = {name: create_variable(nc,name,'f8',dimensions=('time','depth','lat','lon')) for name in var4dnames}
+#             # for name in var3dnames:
+#             #     ncvar3d[name].units = first[name].units
+#             # for name in var4dnames:
+#             #     ncvar4d[name].units = first[name].units
             
-            # New verison. 2017-04-15
-            var3d_nc = dict()
-            var4d_nc = dict()
-            for var in first.variables:
-                var_dim = first[var].dimensions
-                if var_dim == ('time','lat','lon'): # Make very sure we're talking about the same things.
-                    var3d_nc[var] = create_variable(nc,var,'f8', dimensions=('time','lat','lon'))
-                    var3d_nc[var].units = first[var].units
-                if var_dim == ('time','z','lat','lon'): # For this we need to replace z by depth.
-                    var4d_nc[var] = create_variable(nc,var,'f8',dimensions=('time','depth','lat','lon'))
-                    var4d_nc[var].units = first[var].units
-        elapsed += toc()
+#             # New verison. 2017-04-15
+#             var3d_nc = dict()
+#             var4d_nc = dict()
+#             for var in first.variables:
+#                 var_dim = first[var].dimensions
+#                 if var_dim == ('time','lat','lon'): # Make very sure we're talking about the same things.
+#                     var3d_nc[var] = create_variable(nc,var,'f8', dimensions=('time','lat','lon'))
+#                     var3d_nc[var].units = first[var].units
+#                 if var_dim == ('time','z','lat','lon'): # For this we need to replace z by depth.
+#                     var4d_nc[var] = create_variable(nc,var,'f8',dimensions=('time','depth','lat','lon'))
+#                     var4d_nc[var].units = first[var].units
+#         elapsed += toc()
         
-        print('Begin reading data into memory...')
-        tic()
+#         print('Begin reading data into memory...')
+#         tic()
 
-        # Initialize temp arrays to store data.
-        var3d_data = dict()
-        var4d_data = dict()
-        if month == 12:
-            num_hr = (datetime(year+1,1,1)-datetime(year,month,1)).days*24;
-        else:
-            num_hr = (datetime(year,month+1,1)-datetime(year,month,1)).days*24;
-        for var in var3d_nc.keys():
-            var3d_data[var] = masked_array(zeros((num_hr,M,N)),mask=True)
-        for var in var4d_nc.keys():
-            var4d_data[var] = masked_array(zeros((num_hr,nz,M,N)),mask=True) # Danger, here the dimensions depends on a preselected grid.
+#         # Initialize temp arrays to store data.
+#         var3d_data = dict()
+#         var4d_data = dict()
+#         if month == 12:
+#             num_hr = (datetime(year+1,1,1)-datetime(year,month,1)).days*24;
+#         else:
+#             num_hr = (datetime(year,month+1,1)-datetime(year,month,1)).days*24;
+#         for var in var3d_nc.keys():
+#             var3d_data[var] = masked_array(zeros((num_hr,M,N)),mask=True)
+#         for var in var4d_nc.keys():
+#             var4d_data[var] = masked_array(zeros((num_hr,nz,M,N)),mask=True) # Danger, here the dimensions depends on a preselected grid.
             
-        # Now proceed to read from each GOTM result nc file.
-        for m, n in indices:
-            fn = os.path.join(base_folder,run,print_lat_lon(*get_lat_lon(m,n)),'results-{0:d}{1:02d}.nc'.format(year,month))
-            if not(os.path.isfile(fn)):
-                print(fn, ' not found. Skipping this grid point...')
-                continue
-            with Dataset(fn,'r') as each:
-                for var in var3d_nc.keys():
-                    # print(each[var][:,0,0].shape)
-                    # print(var3d_data[var][:,m,n].shape)
-                    var3d_data[var][:,m,n] = each[var][:,0,0]
-                for var in var4d_nc.keys():
-                    # Make sure the depth axis is reversed.
-                    var4d_data[var][:,::-1,m,n] = each[var][:,:,0,0] 
-            if cleanup:
-                os.remove(fn)        
-        elapsed += toc()
+#         # Now proceed to read from each GOTM result nc file.
+#         for m, n in indices:
+#             fn = os.path.join(base_folder,run,print_lat_lon(*get_lat_lon(m,n)),'results-{0:d}{1:02d}.nc'.format(year,month))
+#             if not(os.path.isfile(fn)):
+#                 print(fn, ' not found. Skipping this grid point...')
+#                 continue
+#             with Dataset(fn,'r') as each:
+#                 for var in var3d_nc.keys():
+#                     # print(each[var][:,0,0].shape)
+#                     # print(var3d_data[var][:,m,n].shape)
+#                     var3d_data[var][:,m,n] = each[var][:,0,0]
+#                 for var in var4d_nc.keys():
+#                     # Make sure the depth axis is reversed.
+#                     var4d_data[var][:,::-1,m,n] = each[var][:,:,0,0] 
+#             if cleanup:
+#                 os.remove(fn)        
+#         elapsed += toc()
 
-        print('Begin writing to {}'.format(outfn))
-        tic()
-        for var in var3d_nc.keys():
-            var3d_nc[var][:] = var3d_data[var]
-        for var in var4d_nc.keys():
-            var4d_nc[var][:] = var4d_data[var]
-        elapsed += toc()
+#         print('Begin writing to {}'.format(outfn))
+#         tic()
+#         for var in var3d_nc.keys():
+#             var3d_nc[var][:] = var3d_data[var]
+#         for var in var4d_nc.keys():
+#             var4d_nc[var][:] = var4d_data[var]
+#         elapsed += toc()
 
-        print('Finished combining GOTM results after {0:.0f}s'.format(elapsed))
-    return outfn
+#         print('Finished combining GOTM results after {0:.0f}s'.format(elapsed))
+#     return outfn
 
 ## This function has not been updated after folder structure change (the 'run' string does not name a folder but a substring in output filenames)
 
