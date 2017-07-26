@@ -225,5 +225,4 @@ realclean: clean
 	-rm -f gotm 
 
 %.o: %.f90
-	echo "Using $(FC)..."
 	$(FC) $(FFLAGS) -c $< -o $@
