@@ -568,7 +568,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
 
                 col[3] = nc['lwrd'][0,m,n]
                 try:
-                    line = ('{:s}' + ' {:g}'*3 + '\n').format(*col)
+                    line = ('{:s}' + ' {:10.5g}'*3 + '\n').format(*col)
                     f.write(line)
                 except Exception:
                     print('col',col)
@@ -598,7 +598,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
 
                 col[3] = nc['lwrd'][i+1,m,n]
                 try:
-                    line = ('{:s}' + ' {:g}'*3 + '\n').format(*col)
+                    line = ('{:s}' + ' {:10.5g}'*3 + '\n').format(*col)
                     f.write(line)
                 except Exception:
                     print('col',col)
@@ -628,7 +628,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
             #col[2] = 1 if 'cloud_factor' not in nc.variables else nc['cloud_factor'][-1,m,n]
             col[3] = nc['lwrd'][-1,m,n]
             try:
-                line = ('{:s}' + ' {:g}'*3 + '\n').format(*col)
+                line = ('{:s}' + ' {:10.5g}'*3 + '\n').format(*col)
                 f.write(line)
             # debug
             except Exception:
@@ -652,7 +652,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
                 col[6] = 0 # "cloud" value?
                 col[7] = nc['precip'][0,m,n]
                 col[8] = nc['snow'][0,m,n]
-                line = ('{:s}'+' {:g}'*8 + '\n').format(*col)
+                line = ('{:s}'+' {:10.5g}'*8 + '\n').format(*col)
                 f.write(line)
                 done = True
             for i in range(len(time)):
@@ -665,12 +665,12 @@ def write_dat(m,n,dat_fn,nc,outdir):
                 col[6] = 0 # "cloud" value?
                 col[7] = nc['precip'][i,m,n]
                 col[8] = nc['snow'][i,m,n]
-                line = ('{:s}'+' {:g}'*8 + '\n').format(*col)
+                line = ('{:s}'+' {:10.5g}'*8 + '\n').format(*col)
                 f.write(line)
             done = True
         elif dat_fn == 'sst':
             for i in range(len(time)):
-                line = '{:s} {:g}\n'.format(timestr(time,i),nc['analysed_sst'][i,m,n])
+                line = '{:s} {:10.5g}\n'.format(timestr(time,i),nc['analysed_sst'][i,m,n])
                 f.write(line)
             done = True
         elif dat_fn == 'chlo':
@@ -683,7 +683,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
                     #print(timestr(time,i))
                     count +=1
                     continue
-                line = '{:s} {:g}\n'.format(timestr(time,i),nc['chlor_a'][i,m,n])
+                line = '{:s} {:10.5g}\n'.format(timestr(time,i),nc['chlor_a'][i,m,n])
                 f.write(line)
             if count > 4:
                 print('WARNING: {:d} consecutive nan values.'.format(count))
@@ -702,7 +702,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
                     #print(timestr(time,i))
                     count +=1
                     continue
-                line = '{:s} {:g} {:g}\n'.format(timestr(time,i),nc['a_488_giop'][i,m,n],nc['bb_488_giop'][i,m,n])
+                line = '{:s} {:10.5g} {:10.5g}\n'.format(timestr(time,i),nc['a_488_giop'][i,m,n],nc['bb_488_giop'][i,m,n])
                 f.write(line)
             if count > 4:
                 print('WARNING: {:d} consecutive nan values.'.format(count))
