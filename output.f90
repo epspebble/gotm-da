@@ -223,7 +223,8 @@
 
 !kbk     call write_time_string(julianday,secondsofday,ts)
 !kbk     call ss_nn_obs 
-      write(0,*) '       ', 'Saving....',ts
+      write(0,137) '       ', 'Saving......',ts
+137   format(TL38,A7,A12,A19,$) ! 38=7+12+19
       secs = nint(n*timestep)
       select case (out_fmt)
          case (1)
