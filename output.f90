@@ -223,7 +223,11 @@
 
 !kbk     call write_time_string(julianday,secondsofday,ts)
       !kbk     call ss_nn_obs
-      write(0,*) '       ', 'Saving......',ts,'\r'
+!WT Don't print too many lines of "Saving......"
+!       flush(6)
+!       write(0,137,advance='no') '       ', 'Saving......',ts
+!       flush(6)
+! 137   format(A7,A12,A19,38('\b'))
       secs = nint(n*timestep)
       select case (out_fmt)
          case (1)
