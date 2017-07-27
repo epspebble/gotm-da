@@ -124,8 +124,7 @@
       else if (chlo .lt. 0.03) then
          chlo = 0.03
       end if
-      
-      
+            
    case (IOP_A_BB) !WT New case by HX, 20170512
       abp_coe = obs(1)
       bb = obs(2)
@@ -133,7 +132,7 @@
    case (WIP) !WT 201707026 A new work in progress by HX, 20170616
       ! Expect something new here. Update case (WIP) above as well.
       
-   case default !WT Original code in Rev1.4 (kbk) follows.
+   case default !WT Original code in Rev1.4 (kbk) follows, which is case 0.
       A = obs(1)
       g1 = obs(2)
       g2 = obs(3)
