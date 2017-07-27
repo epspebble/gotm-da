@@ -44,17 +44,17 @@ run_profiles = {
     'ASM0': dict(assimilation_type=0, extinct_method=9),
     'ASM1': dict(assimilation_type=0, extinct_method=12),
     'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9),
-    'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12),
+    'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat',),
 
     # Alternative vertical grid runs.
     # Maybe we should dynamically calculate 'nlev' and 'depth' from number of lines in the 'grid.dat' files.
-    'ASM3-100m': dict(assimilation_type=2, assim_window=1, extinct_method=12,
+    'ASM3-100m': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat',
                       depth = 99.282236525788903, nlev = 132,
                       grid_method = 2, grid_file = 'grid_100m.dat'), 
-    'ASM3-75m': dict(assimilation_type=2, assim_window=1, extinct_method=12, 
+    'ASM3-75m': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat', 
                      depth = 74.539324233308434, nlev = 122,
                      grid_method = 2, grid_file = 'grid_75m.dat'),
-    'ASM3-MFC-75m': dict(assimilation_type=2, assim_window=1, extinct_method=12, 
+    'ASM3-MFC-75m': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat', 
                          depth = 74.389762997627258, nlev = 15,
                          grid_method = 2, grid_file = 'grid_MFC_75m.dat'),
     
@@ -62,10 +62,16 @@ run_profiles = {
     'ASM0-75m': dict(assimilation_type=0, extinct_method=9, 
                      depth = 74.539324233308434, nlev = 122,
                      grid_method = 2, grid_file = 'grid_75m.dat'),
-    'ASM1-75m': dict(assimilation_type=0, extinct_method=12, 
+    'ASM1-75m': dict(assimilation_type=0, extinct_method=12,
                      depth = 74.539324233308434, nlev = 122,
                      grid_method = 2, grid_file = 'grid_75m.dat'),
     'ASM2-75m': dict(assimilation_type=2, assim_window=1, extinct_method=9, 
+                     depth = 74.539324233308434, nlev = 122,
+                     grid_method = 2, grid_file = 'grid_75m.dat'),
+
+    # 20170727 New test runs
+    'ASM4-75m': dict(assimilation_type=2, assim_window=1,
+                     extinct_method=13, extinct_file='iop.dat', 
                      depth = 74.539324233308434, nlev = 122,
                      grid_method = 2, grid_file = 'grid_75m.dat'),
 }
