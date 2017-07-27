@@ -150,7 +150,7 @@ libobservations.a(get_vel_profile.o)	\
 libobservations.a(get_w_adv.o)	\
 libobservations.a(get_zeta.o)	\
 libobservations.a(read_extinction.o)	\
-libobservations.a(read_chlo.o)	\
+#libobservations.a(read_chlo.o)	\
 
 
 LIBS	=	libairsea.a		\

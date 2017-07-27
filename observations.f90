@@ -66,6 +66,8 @@
 !  Parameters for water classification - default Jerlov type I
    double precision, public          :: A=0.58,g1=0.35,g2=23.0
    double precision, public          :: chlo      !SP 20/02/06
+   double precision, public          :: abp_coe,bb      !HX 11/05/2017 
+   double precision, public          :: Trans_1
 !HK/SH
 !  Parameters for absorption of solar energy - Paulson and Simpson 1981
 !  Clear water - Defant,A. 1961. - SH 07/11/02!
@@ -490,11 +492,6 @@
 
 !  The light extinction profiles
    select case (extinct_method)
-      case (0)
-         open(extinct_unit,file=extinct_file,status='unknown',err=105)
-         write(0,*) '       ', 'Reading extinction data from:'
-         write(0,*) '           ', trim(extinct_file)
-         call read_extinction(extinct_unit,julday,secs)
       case (1)
          A=0.58;g1=0.35;g2=23.0
       case (2)
@@ -509,20 +506,46 @@
          A=0.78;g1=1.40;g2=7.9
       case (7)
          A=0.7;g1=0.40;g2=8.0 ! Adolf Stips - Lago Maggiore
-      case (12)
+
+!!!!!!WT Case (0), (12), (13), (14) temporarily moved to case default.
+      ! case (12)
+      !    open(extinct_unit,file=extinct_file,status='unknown',err=105)
+      !    write(0,*) '       ', 'Reading chlorophyll-a data from:'
+      !    write(0,*) '           ', trim(extinct_file)
+      !    call read_chlo(extinct_unit,julday,secs)
+      !    !SP 22/02/06  The parameterisation holds for values of chlorophyll between 0.03 and 3.0
+      !    IF(chlo.gt.3.0) THEN
+      !       chlo=3.0
+      !    END IF
+      !    IF (chlo.lt.0.03) THEN
+      !       chlo=0.03
+      !    END IF
+
+      ! case(13)  !HX 12/May/2017
+      !    open(extinct_unit,file=extinct_file,status='unknown',err=105)
+      !    write(1,*) '       ', 'Reading absorption-c data from:'
+      !    write(1,*) '           ', trim(extinct_file)
+      !    call read_IOP(extinct_unit,julday,secs)  
+      !    open(extinct_unit,file=extinct_file,status='unknown',err=105)
+      !    write(2,*) '       ', 'Reading backscattering-c data from:'
+      !    write(2,*) '           ', trim(extinct_file)
+      !    call read_IOP(extinct_unit,julday,secs)  
+        
+      !  case (14) !HX 16/June/2017
+      !    open(extinct_unit,file=extinct_file,status='unknown',err=105)
+      !    write(0,*) '       ', 'Reading chlorophyll-a data from:'
+      !    write(0,*) '           ', trim(extinct_file)
+      !    call read_chlo(extinct_unit,julday,secs)
+         
+       case default
          open(extinct_unit,file=extinct_file,status='unknown',err=105)
-         write(0,*) '       ', 'Reading chlorophyll-a data from:'
+         write(0,*) '       ', 'Reading extinction data from:'
          write(0,*) '           ', trim(extinct_file)
-         call read_chlo(extinct_unit,julday,secs)
-         !SP 22/02/06  The parameterisation holds for values of chlorophyll between 0.03 and 3.0
-         IF(chlo.gt.3.0) THEN
-            chlo=3.0
-         END IF
-         IF (chlo.lt.0.03) THEN
-            chlo=0.03
-         END IF
-         print*, 'chlo assimilated'
-      case default
+         call read_extinction(extinct_unit,julday,secs,extinct_method)
+
+         !WT 20170726, postprocessing code (e.g. imposes 0.03 .lt. chlo .lt. 3.0)
+         ! reloacted to read_extinct.f90
+         
    end select
    
 
@@ -669,7 +692,12 @@
     if(extinct_method .eq. 12) then
         call read_chlo(extinct_unit,julday,secs)
     end if
-
+    if(extinct_method .eq. 13) then
+        call read_IOP(extinct_unit,julday,secs)
+    end if
+    if(extinct_method .eq. 14) then
+        call read_chlo(extinct_unit,julday,secs)
+    end if
    call get_w_adv(w_adv_method,w_adv_unit,julday,secs)
 
    call get_zeta(zeta_method,zeta_unit,julday,secs)
