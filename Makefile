@@ -27,9 +27,11 @@ endif
 # Use ifort if available.
 ifneq (,$(shell which ifort)) # if `which ifort` does not return nothing, assume that's the right one to use
 FC=ifort
+FFLAGS=-assume bscc # To use '\n', '\r' etc...
 else
 # Fallback to gfortran if ifort is unavailable.
 FC=gfortran
+FFLAGS=-fbackslash # To use '\n', '\r' etc...
 endif
 NETCDFLIB = libnetcdf.a # Build it and copy it to our working folder
 
