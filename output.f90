@@ -222,9 +222,10 @@
       end if
 
 !kbk     call write_time_string(julianday,secondsofday,ts)
-!kbk     call ss_nn_obs 
-      write(0,137) '       ', 'Saving......',ts
-137   format(TL38,A7,A12,A19,$) ! 38=7+12+19
+      !kbk     call ss_nn_obs
+      open(6,carriagereturn='fortran')
+      write(6,'(+,A7,A12,A19)') '       ', 'Saving......',ts
+!137   format(TL38,A7,A12,A19,$) ! 38=7+12+19
       secs = nint(n*timestep)
       select case (out_fmt)
          case (1)
