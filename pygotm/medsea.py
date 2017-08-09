@@ -668,11 +668,13 @@ def write_dat(m,n,dat_fn,nc,outdir):
                 line = ('{:s}'+' {:10.5g}'*8 + '\n').format(*col)
                 f.write(line)
             done = True
+            
         elif dat_fn == 'sst':
             for i in range(len(time)):
                 line = '{:s} {:10.5g}\n'.format(timestr(time,i),nc['analysed_sst'][i,m,n])
                 f.write(line)
             done = True
+            
         elif dat_fn == 'chlo':
             count = 0
             for i in range(len(time)):
@@ -683,10 +685,12 @@ def write_dat(m,n,dat_fn,nc,outdir):
                     #print(timestr(time,i))
                     count +=1
                     continue
-                line = '{:s} {:10.5g}\n'.format(timestr(time,i),nc['chlor_a'][i,m,n])
-                f.write(line)
+                else:
+                    count = 0
+                    line = '{:s} {:10.5g}\n'.format(timestr(time,i),nc['chlor_a'][i,m,n])
+                    f.write(line)
             if count > 4:
-                print('WARNING: {:d} consecutive nan values.'.format(count))
+                print('WARNING: {:d} consecutive nan values while writing {:s}.'.format(count,outfn))
                 #raise Exception("3 consecutive nan values.")
                 done = False
             else:
@@ -702,10 +706,12 @@ def write_dat(m,n,dat_fn,nc,outdir):
                     #print(timestr(time,i))
                     count +=1
                     continue
-                line = '{:s} {:10.5g} {:10.5g}\n'.format(timestr(time,i),nc['a_488_giop'][i,m,n],nc['bb_488_giop'][i,m,n])
-                f.write(line)
+                else:
+                    count = 0
+                    line = '{:s} {:10.5g} {:10.5g}\n'.format(timestr(time,i),nc['a_488_giop'][i,m,n],nc['bb_488_giop'][i,m,n])
+                    f.write(line)
             if count > 4:
-                print('WARNING: {:d} consecutive nan values.'.format(count))
+                print('WARNING: {:d} consecutive nan values while writing {:s}.'.format(count,outfn))
                 #raise Exception("3 consecutive nan values.")
                 done = False
             else:
@@ -752,7 +758,8 @@ def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
     print("Looking for data sources from " + data_folder + "...")
     nc_dict = data_sources(dat=dat)
     if not(isinstance(nc_dict, dict)):
-        nc_dict = {dat[0]: nc_dict} 
+        nc_dict = {dat[0]: nc_dict}
+    print(nc_dict)
 
     for dat_fn, nc in nc_dict.items():
         ## Assume m, n are iterable and of the same length:
