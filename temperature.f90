@@ -268,6 +268,7 @@
                    END IF
                 END DO
              END IF
+             ! 'trans' includes albedo implicitly due to Ohlmann, check whether I_0 includes albedo as well
              rad(i)=I_0*trans/(rho_0*cp)
       END IF    
        case default 
