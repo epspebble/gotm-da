@@ -58,29 +58,29 @@ def set_grid(new_grid=grid,
              subindices=None,
              plot = False, stat = False,
              ):
-    """ Obtain the 1/16 degree grid used in medsea_rea, and classify each grid points according to 'max_depth'. 
+    """ Obtain the 1/16 degree grid used in medsea_rea, and classify each grid points according to 'max_depth'.
         A sub-grid is set to the global variables in the module, and also returned by specifying 'subindices':
-            ** 9x test grid (the only one with both lat and lon being multiples of 0.25): 
+            ** 9x test grid (the only one with both lat and lon being multiples of 0.25):
                     subindices=(slice(1,None,4), slice(0,None,4))
-            ** 9x grids (16 of them, including the 9x test grid above): 
-                    subindices=(slice(i,None,4), slice(j,None,4)) 
+            ** 9x grids (16 of them, including the 9x test grid above):
+                    subindices=(slice(i,None,4), slice(j,None,4))
                for (i,j) in {0,1,2,3} x {0,1,2,3}
             ** 1x grid that is co-locational with ERA data grid:
                     subindices=(slice(9,None,12), slice(None,None,12))
             ** a mini grid with only 23 sea locations with depth >= 75 that can be used for testing:
                     subindices=(slice(1,None,48), slice(None,None,48))
                NOTE: In medsea_ERA dataset, the latitudes are arranged, exceptionally, in descending order.
- 
+
        Returns three tuples:
             subgrid = (grid_lats, grid_lons, medsea_flags, max_depth)
             rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth)
-            grid_indices = (M, N, sea_mn, sea_m, sea_n) 
+            grid_indices = (M, N, sea_mn, sea_m, sea_n)
     """
     print('Initializing grid...')
     # Declaring global is necessary for modifying them interactively after importing this module.
-    global run, grid, max_depth, ASM 
+    global run, grid, max_depth, ASM
     global grid_lats, grid_lons, medsea_flags, max_depth
-    global medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth 
+    global medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth
     global M, N, sea_mn, sea_m, sea_n
 
     # Override the global variables using values passed from function call.
@@ -103,13 +103,13 @@ def set_grid(new_grid=grid,
 
     if new_grid == '144x':
         subindices = (slice(None,None,None),slice(None,None,None))
-        
+
     if new_grid == '1x':
         subindices = (slice(9,None,12), slice(None,None,12))
 
     if new_grid == 'mini':
         subindices=(slice(1,None,48), slice(None,None,48))
-        
+
     medsea_rea_lat_ind = subindices[0]
     medsea_rea_lon_ind = subindices[1]
     #print(medsea_rea_lat_ind)
@@ -124,12 +124,12 @@ def set_grid(new_grid=grid,
 
     # Without the 'safety' of adding one more level, we can get more grid points...
     #medsea_rea_ndepth = sum(depth_rea<max_depth)
-    
+
     medsea_rea_ndepth = sum(depth_rea<max_depth)+1
- 
+
     # 2 means deeper than max_depth, 1 means less than max_depth, 0 means land
     loc_type = 0 + ~temp_rea[0,0,:].mask + ~temp_rea[0,medsea_rea_ndepth,:].mask
-        
+
     # Setting values to global names.
     grid_lats = lat_rea[subindices[0]]
     grid_lons = lon_rea[subindices[1]]
@@ -149,7 +149,7 @@ def set_grid(new_grid=grid,
             grid_lats.size,grid_lons.size,grid_lats.min(),grid_lats.max(),grid_lons.min(),grid_lons.max()))
     if stat:
         # The following are for the current subgrid.
-        def print_stat(bl_array):  
+        def print_stat(bl_array):
             drei = bl_array.size
             zwei = (bl_array == 2).sum()
             ein = (bl_array == 1).sum()
@@ -157,7 +157,7 @@ def set_grid(new_grid=grid,
             assert null+ein+zwei == drei
             print('\t' + 'sea (>{!s}m) locations: {!s}'.format(max_depth,zwei) + ', {:4.2f}% out of {!s}'.format(zwei*100/drei,drei))
             print('\t' + 'sea (<{!s}m) locations: {!s}'.format(max_depth,ein) + ', {:4.2f}% out of {!s}'.format(ein*100/drei,drei))
-            print('\t' + 'land locations: {!s}'.format(null) + ', {:4.2f}% out of {!s}'.format(null*100/drei,drei))        
+            print('\t' + 'land locations: {!s}'.format(null) + ', {:4.2f}% out of {!s}'.format(null*100/drei,drei))
 
         print('In the current grid:')
         print_stat(medsea_flags)
@@ -175,24 +175,24 @@ def set_grid(new_grid=grid,
         for ax in axes:
             ax.set_xlabel('longitude')
             ax.set_ylabel('latitude')
-          
+
     # These values have been written directly to global variables as well.
     subgrid = (grid_lats, grid_lons, medsea_flags, max_depth)
     rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth)
-    grid_indices = (M, N, sea_mn, sea_m, sea_n) 
+    grid_indices = (M, N, sea_mn, sea_m, sea_n)
     return subgrid, rea_indices, grid_indices
 
 def get_grid():
-    """ 
+    """
     A simple getter for the global variables, returning three tuples.
 
     subgrid = (grid_lats, grid_lons, medsea_flags, max_depth)
     rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth)
-    grid_indices = (M, N, sea_mn, sea_m, sea_n) 
+    grid_indices = (M, N, sea_mn, sea_m, sea_n)
     """
 
     global grid_lats, grid_lons, medsea_flags, max_depth
-    global medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth 
+    global medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth
     global M, N, sea_mn, sea_m, sea_n
     return (grid_lats, grid_lons, medsea_flags, max_depth), \
         (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth), \
@@ -216,21 +216,21 @@ set_folders()
 
 # GOTM dat files' netCDF reformatted dataset sources.
 def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','sprof','chlo']):
-    """ 
-    Return the netCDF4 Dataset (or MFDataset) handles for the data source. 
+    """
+    Return the netCDF4 Dataset (or MFDataset) handles for the data source.
     Calling data_sources() returns MFDataset of all available data for dat = ['heat','met','tprof','sprof']
     by default in read-only mode.
-    
+
     """
     from netCDF4 import Dataset, MFDataset
     import os
 
     if (year is None) or (month is None):
-        MF = True 
+        MF = True
         # Need to use MFDataset
         NCDataset = MFDataset
     else:
-        # When both year and month is given, we can specifically return handle to our reformatted datasets 
+        # When both year and month is given, we can specifically return handle to our reformatted datasets
         # organized by months.
         NCDataset = Dataset
 
@@ -238,9 +238,9 @@ def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','spr
         # if only one type is requested, still make it into a list so that list comprehension still works.
         dat = [dat]
 
-    # nc_dict = dict(heat = MFDataset(os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_*.nc')), 
-    #                met = MFDataset(os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_*.nc')), 
-    #                tprof = MFDataset(os.path.join(data_folder,'medsea_rea','medsea_rea_votemper_*.nc')), 
+    # nc_dict = dict(heat = MFDataset(os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_*.nc')),
+    #                met = MFDataset(os.path.join(data_folder,'medsea_ERA-INTERIM','medsea_ERA_*.nc')),
+    #                tprof = MFDataset(os.path.join(data_folder,'medsea_rea','medsea_rea_votemper_*.nc')),
     #                sprof = MFDataset(os.path.join(data_folder,'medsea_rea','medsea_rea_vosaline_*.nc')))
 
     suffix = '_'
@@ -266,9 +266,9 @@ def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','spr
         MODIS_suffix = '_{:d}.nc'
 
     # Temporary special treatment just to make it work for new MODIS data.
-    fn_dict.update(chlo = os.path.join(data_folder,region+'_MODIS','8days',region+'_MODIS_chlor_a_8D' + suffix)) 
+    fn_dict.update(chlo = os.path.join(data_folder,region+'_MODIS','8days',region+'_MODIS_chlor_a_8D' + suffix))
     fn_dict.update(iop = os.path.join(data_folder,region+'_MODIS','8days',region+'_MODIS_IOP_8D' + suffix))
-    
+
     assert all([each in fn_dict.keys() for each in dat]) # Check that the function is called correctly.
 
     for each in fn_dict.keys():
@@ -284,8 +284,8 @@ def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','spr
             raise
 
     if len(ds_dict.keys()) == 1:
-        # If only one dataset requested, return the netcdf dataset unwrapped from the dict. 
-        return ds_dict[dat[0]] 
+        # If only one dataset requested, return the netcdf dataset unwrapped from the dict.
+        return ds_dict[dat[0]]
     else:
         # Else return a dictionary of datasets.
         return ds_dict
@@ -323,11 +323,11 @@ def change_base(new_base_folder):
     global base_folder, run_folder
     if not(os.path.isdir(new_base_folder)):
         raise IOError('The base folder: ' + new_base_folder + ' is either not accessible or created.')
-    base_folder = new_base_folder    
+    base_folder = new_base_folder
     run_folder=os.path.join(base_folder,run)
     if not(os.path.isdir(run_folder)):
         os.mkdir(run_folder)
-       
+
 def print_lat_lon(lat,lon,fmt_str='g'):
     "Helper function for printing (lat,lon) as 10.5N2.1E etc. "
 
@@ -337,7 +337,7 @@ def print_lat_lon(lat,lon,fmt_str='g'):
     #     raise Exception("`lon` is of type " + str(type(lon)))
     lat = float(lat)
     lon = float(lon)
-    
+
     template = '{:' + fmt_str + '}'
     lat_str = template.format(lat) + 'N' if lat>=0 else template.format(-lat) + 'S'
     lon_str = template.format(lon) + 'E' if lon>=0 else template.format(-lon) + 'W'
@@ -346,7 +346,7 @@ def print_lat_lon(lat,lon,fmt_str='g'):
 
 def chunk(c,k,fun,*args,**kwargs):
     """
-    calls fun() for the c-th chunk with k grid points (c-1)*10, (c-1)*10+1, ... (c-1)*10+9. 
+    calls fun() for the c-th chunk with k grid points (c-1)*10, (c-1)*10+1, ... (c-1)*10+9.
     This partitions the 390 grid points on sea into 30 chunks.
     """
 
@@ -374,7 +374,7 @@ def create_dimensions(nc, lat=grid_lats, lon=grid_lons):
     nc.createDimension('time') # unlimited
     nc.createDimension('lat', size = len(lat))
     nc.createDimension('lon', size = len(lon))
-    
+
     # Dimension variables.
     nctime = nc.createVariable('time','i4',dimensions=('time',))
     nctime.units = 'hours since ' + str(epoch) # epoch is to be set in global config, and loaded by importing .config
@@ -405,7 +405,7 @@ def prepare_engine():
     dv.execute("userhome = os.getenv('HOME')")
     dv.execute('from gotm import *')
 
-    # Push all possibly changed folder locations from local namesapce to each engine. 
+    # Push all possibly changed folder locations from local namesapce to each engine.
     dv.execute("project_folder=" + project_folder)
     dv.push(dict(project_folder = project_folder,
                  data_folder = data_folder,
@@ -423,15 +423,15 @@ def prepare_engine():
 #def get_local_folder(m=None,n=None,new_run=None,i=None,new_lats=None,new_lons=None,create=False):
 def get_local_folder(*args, new_lats=None,new_lons=None,create=False):
     """
-    Return the corresponding local folder for given grid point indices (m,n) or linear index i of the 
+    Return the corresponding local folder for given grid point indices (m,n) or linear index i of the
     index arrays sea_m and sea_n.
- 
+
     Defaults to the run_folder set by the module 'run' global variable, and 'run_folder' generated by
     set_folders(). If not desired, pass a new_run keyword argument to get a different run's local folder.
-    
+
     TODO: It will be convenient that this function be overloaded by argument type and number (single/multiple
-    dispatch). We want get_local_folder(i) and get_local_folder(m,n) or get_local_folder((m,n)) to both work. 
-    Oh well, that's an overkill. Just use *args and count the number for now, that single dispatch thing is 
+    dispatch). We want get_local_folder(i) and get_local_folder(m,n) or get_local_folder((m,n)) to both work.
+    Oh well, that's an overkill. Just use *args and count the number for now, that single dispatch thing is
     better if we need to distinguish by the type of argument.
     """
     # # Temporary hack, be forgiving if the provided lat, lon are actually indices of our medsea grid.
@@ -454,7 +454,7 @@ def get_local_folder(*args, new_lats=None,new_lons=None,create=False):
 
     if args is None:
         print('No grid indices given, defaulting to the favourite grid point (lat, lon) = (36.00, 25.50) near buoy 61277...')
-        m, n = get_m_n(36.,25.5) 
+        m, n = get_m_n(36.,25.5)
         print('m =',m,'n =',n)
     elif len(args) == 1:
         i = args[0]
@@ -475,7 +475,7 @@ def get_local_folder(*args, new_lats=None,new_lons=None,create=False):
     lon = new_lons[n]
     latlong = print_lat_lon(lat,lon)
 
-    # 20170524 Need to be reviewed after the new folder structure considerations. 
+    # 20170524 Need to be reviewed after the new folder structure considerations.
     #local_folder = os.path.join(base_folder,new_run,latlong)
     local_folder = os.path.join(base_folder,latlong)
 
@@ -489,16 +489,16 @@ def get_local_folder(*args, new_lats=None,new_lons=None,create=False):
 
 # # Deprecated
 # def get_core_folder(year,month,lat,lon):
-#     """ Create folder structure initially or mid-way (if not yet done). 
-#         The innermost subfolder, which is called 'core_folder' is 
-#         where a GOTM run is executed for one grid point per time period.  
+#     """ Create folder structure initially or mid-way (if not yet done).
+#         The innermost subfolder, which is called 'core_folder' is
+#         where a GOTM run is executed for one grid point per time period.
 #         It contains settings (*.inp), input data (*.dat) and output data (*.nc) """
 #     # Temporary hack, be forgiving if the provided lat, lon are actually indices of our medsea grid.
 #     if isinstance(lat,int):
 #         lat = grid_lats[lat]
 #     if isinstance(lon,int):
 #         lon = grid_lons[lon]
-        
+
 #     monthly_folder = os.path.join(run_folder,'{:d}{:02d}'.format(year,month))
 #     if not(os.path.isdir(monthly_folder)):
 #         os.mkdir(monthly_folder)
@@ -506,7 +506,7 @@ def get_local_folder(*args, new_lats=None,new_lons=None,create=False):
 #     core_folder = os.path.join(monthly_folder,latlong)
 #     if not(os.path.isdir(core_folder)):
 #         os.mkdir(core_folder)
-#     return core_folder 
+#     return core_folder
 
 def write_dat(m,n,dat_fn,nc,outdir):
     " Write dat files for each lat/lon in grid_lats/grid_lons from a given netCDF Dataset or MFDataset."
@@ -521,10 +521,24 @@ def write_dat(m,n,dat_fn,nc,outdir):
     elif os.path.isfile(nc):
         nc = Dataset(nc,'r')
         time = nc['time']
+
+    # FIXME: If the (m,n) indices of the same latlong of the current grid
+    # defined by (grid_lats[m], grid_lons[n]) do not match with nc['lat'][m]
+    # and nc['lon'][n], we get into trouble. The following is a temporary
+    # hack to reconcile them.
+
+    lat = grid_lats[m]
+    lon = grid_lons[n]
+
+    if lat != nc['lat'][m] or lon != nc['lon'][n]:
+        print("(m,n) indices mismatch. Recalculating from saved 'lat', 'lon' in \
+        variables in the nc files.")
+        # 20170809. What I plan to do is to find the indices by simple arithmetic.
+
     fn = os.path.join(outdir,dat_fn+'.dat')
     if os.path.isfile(fn) and not overwrite:
         print(fn + " exists, skipping.\n")
-        return    
+        return
 
     with open(fn,'w') as f:
         # Recipes for each type of dat file.
@@ -547,7 +561,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
             done = True
         elif dat_fn == 'heat':
             col = [None for i in range(4)]
-            # Temporary hack #1: repeat the first record if it starts at 03:00:00 so that the 
+            # Temporary hack #1: repeat the first record if it starts at 03:00:00 so that the
             # simulation can start at midnight instead. Otherwise, GOTM will generate a
             # plethora of nan values.
             if timestr(time,0)[-8:] == '03:00:00':
@@ -573,7 +587,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
                 except Exception:
                     print('col',col)
                     print('m,n',m,n)
-                    raise  
+                    raise
 
             # The following loop is hacked temporarily to accomodate GOTM Fortran code assumption,
             # reinterpreting the timsteamp to mean the beginning of 3-hourly periods.
@@ -583,7 +597,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
 
                 I_0_obs = nc['swrd'][i+1,m,n]
                 col[1] = I_0_obs
-                
+
                 # Let's not use cloud_factor, some values got accidentally masked.
                 if 'swrd_clear_sky' not in nc.variables:
                     col[2] = 1
@@ -604,9 +618,9 @@ def write_dat(m,n,dat_fn,nc,outdir):
                     print('col',col)
                     print('m,n',m,n)
                     raise
-        
+
             # Temporary hack #3: include the last line being first day next month midnight, whose
-            # value should not be used because of the new interpretation of timing. However, for some 
+            # value should not be used because of the new interpretation of timing. However, for some
             # reason GOTM halted at the last hour of time. So let's just repeat the value 3 hours earlier
             # at 21:00:00 last day of month.
             assert timestr(time,-1)[-8:] == '00:00:00' # The last record is at midnight.
@@ -614,7 +628,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
 
             I_0_obs = nc['swrd'][-1,m,n]
             col[1] = I_0_obs
-            
+
             # Let's not use cloud_factor, some values got accidentally masked.
             if 'swrd_clear_sky' not in nc.variables:
                 col[2] = 1
@@ -668,13 +682,13 @@ def write_dat(m,n,dat_fn,nc,outdir):
                 line = ('{:s}'+' {:10.5g}'*8 + '\n').format(*col)
                 f.write(line)
             done = True
-            
+
         elif dat_fn == 'sst':
             for i in range(len(time)):
                 line = '{:s} {:10.5g}\n'.format(timestr(time,i),nc['analysed_sst'][i,m,n])
                 f.write(line)
             done = True
-            
+
         elif dat_fn == 'chlo':
             count = 0
             for i in range(len(time)):
@@ -695,7 +709,7 @@ def write_dat(m,n,dat_fn,nc,outdir):
                 done = False
             else:
                 done = True
-                
+
         elif dat_fn == 'iop':
             count = 0
             for i in range(len(time)):
@@ -736,7 +750,7 @@ def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
     from tempfile import mkdtemp
     from shutil import copyfile
     from glob import glob
-    
+
     if isinstance(dat,str):
         dat = [dat]
 
@@ -750,7 +764,7 @@ def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
 #        os.mkdir(run_folder)
 
     # temp_folder = mkdtemp(prefix=temp_base_folder)
-    # ERA_files = glob(os.path.join(data_folder,'medsea_ERA-INTERIM','*.nc')) 
+    # ERA_files = glob(os.path.join(data_folder,'medsea_ERA-INTERIM','*.nc'))
     # rea_files = glob(os.path.join(data_folder,'medsea_rea','*.nc'))
     # ERA_tempfiles = [copyfile(fn,os.path.join(temp_folder,os.path.basename(fn))) for fn in ERA_files]
     # rea_tempfiles = [copyfile(fn,os.path.join(temp_folder,os.path.basename(fn))) for fn in rea_files]
@@ -777,13 +791,13 @@ def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
                 local_folder = os.path.join(run_folder,print_lat_lon(lat,lon))
                 if not(os.path.isdir(local_folder)):
                     os.mkdir(local_folder)
-                    
+
                 # Actually write.
                 write_dat(m,n,dat_fn,nc,local_folder)
         except Exception:
                 print('mm',mm)
                 print('nn',nn)
-        
+
         ## When m,n are integers, exception occurs at zip() instead, and it not a TypeError.
         # except TypeError as te:
         #     if isinstance(mm,int) and isinstance(nn,int):
@@ -794,17 +808,17 @@ def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
         #    else:
 
 #        write_dat(m,n,dat_fn,nc,local_folder)
-        
+
     for nc in nc_dict.values():
         nc.close()
 
 # # Deprecated.
 # def core_dat(year,month,m,n,**nc_dict):
 #     """
-#     Generate *.dat files for each core folder, by months. 
+#     Generate *.dat files for each core folder, by months.
 #     The critical keyword argument 'nc_dict' provides dat filename to nc Dataset
-#     handle correspondance, e.g. {'heat': heat_nc} where 
-#                    heat_nc = Dataset('ERA_heat_yyyymm.nc','r') 
+#     handle correspondance, e.g. {'heat': heat_nc} where
+#                    heat_nc = Dataset('ERA_heat_yyyymm.nc','r')
 #     has been run before calling this function. The file 'heat.dat' would be generated by
 #     using information from 'ERA_heat_yyyymm.nc', and recipe defined in an inner function.
 #     """
@@ -813,8 +827,8 @@ def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
 #     lat = grid_lats[m]
 #     lon = grid_lons[n]
 #     # latlong = print_lat_lon(lat,lon)
-#     core_folder = get_core_folder(year,month,lat,lon) 
-    
+#     core_folder = get_core_folder(year,month,lat,lon)
+
 #     for dat_fn, nc in nc_dict.items():
 #         # print(dat_fn)
 #         write_dat(m,n,dat_fn,nc,core_folder)
@@ -830,14 +844,14 @@ def prepare_run(start,stop,run_folder,out_dir='.',out_fn='results',m=None,n=None
         (lat,lon) = get_lat_lon(m,n)
     assert not(m is None or n is None or lat is None or lon is None), 'Either a (m,n) or (lat,lon) should be specified.'
 
-    run_name = 'medsea_GOTM, {:s} grid, #(m,n)=({:d},{:d})'.format(grid,m,n)    
+    run_name = 'medsea_GOTM, {:s} grid, #(m,n)=({:d},{:d})'.format(grid,m,n)
 
     # Set up GOTM arguments.
     gotm_args = dict(name = run_name,
-                     start = str(start), stop = str(stop), 
-                     latitude = float(lat), longitude = float(lon), 
+                     start = str(start), stop = str(stop),
+                     latitude = float(lat), longitude = float(lon),
                      out_dir = str(out_dir), out_fn = out_fn)
-    gotm_args.update(**gotm_user_args) 
+    gotm_args.update(**gotm_user_args)
 
     # Get the externally specified sea level widths if method is 2.
     #print(gotm_user_args.keys())
@@ -849,14 +863,14 @@ def prepare_run(start,stop,run_folder,out_dir='.',out_fn='results',m=None,n=None
 
     # Copy over GOTM executable and config files, the latter to be updated when gotm() is called.
     if not(os.path.exists(GOTM_executable)):
-        os.symlink(GOTM_executable,os.path.join(folder,'gotm'))    
+        os.symlink(GOTM_executable,os.path.join(folder,'gotm'))
     for each in GOTM_nml_list:
         # All config files are overwritten every time GOTM is run.
         src = os.path.join(GOTM_nml_path,each)
         dst = os.path.join(run_folder,each)
         # print('Copying {:s} to {:s}'.format(src,dst))
-        shutil.copyfile(src,dst)       
-    
+        shutil.copyfile(src,dst)
+
     # Temporary hack. Also copy the grid data file.
     src = os.path.join(GOTM_nml_path,grid_file)
     dst = os.path.join(run_folder,grid_file)
@@ -891,15 +905,15 @@ def prepare_run(start,stop,run_folder,out_dir='.',out_fn='results',m=None,n=None
             except:
                 print('{:s} regeneration failed.'.format(datfn))
                 raise
-    
+
     updatecfg(path=run_folder, **gotm_args)
     return gotm_args
 
 def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False,**gotm_user_args):
-    """ 
-    
-    Generate GOTM results for the (m,n)-th grid point at the specified month. Only *.dat files are expected to be 
-    in the local folder. The config file, GOTM run time will be generated or copied over. 
+    """
+
+    Generate GOTM results for the (m,n)-th grid point at the specified month. Only *.dat files are expected to be
+    in the local folder. The config file, GOTM run time will be generated or copied over.
 
     Temporary hack: pass None to month to run for the whole year.
 
@@ -907,24 +921,24 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
     from datetime import datetime
     from netCDF4 import Dataset, num2date
     import shutil
-    
+
     lat, lon = get_lat_lon(m,n)
 #    local_folder = get_local_folder(lat,lon,run)
     local_folder = get_local_folder(m,n,create=create)
 
-    # Argument handling, at tht end 'start', 'stop', 'suffix' should all be defined. 
+    # Argument handling, at tht end 'start', 'stop', 'suffix' should all be defined.
     if year is not None:
         if month is None: # Run for a year.
             start = datetime(year,1,1)
-            stop = datetime(year,12,31) # Avoid data boundary for now. 
-            #stop = datetime(year+1,1,1) 
+            stop = datetime(year,12,31) # Avoid data boundary for now.
+            #stop = datetime(year+1,1,1)
             suffix = '_' + run + '_' + '{:04d}'.format(start.year)
         else: # Run for a month
             assert start is None
             assert stop is None
             start = datetime(year,month,1);
             stop = datetime(year,month+1,1) if month < 12 else datetime(year,12,31) # Avoid data boundary for now
-            #stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)        
+            #stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)
             suffix = '_' + run + '_' + '{:04d}{:02d}'.format(start.year, start.month)
     else: # Run for a specific period.
         assert start is not None
@@ -943,7 +957,7 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
 
     # Now we can set the filename in each grid point subfolder.
     out_fn = 'results' + suffix
-        
+
     # Check global name cache_folder is set of not.
     out_dir = local_folder if cache_folder is None else cache_folder
 
@@ -984,7 +998,7 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
                 shutil.move(src,dst)
             except:
                 raise
-            
+
         stat['elapsed'] = toc()
         # statfn = 'stat_{:d}{:02d}.dat'.format(year,month)
         statfn = 'run_stat_' + print_ctime(sep='_') + '.log'
@@ -1018,10 +1032,10 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
 
 ## Deprecated
 # def core_run(year,month,m=None,n=None,lat=None,lon=None,verbose=False,**gotm_user_args):
-#     """ Generate GOTM results for the (m,n)-th grid point for a specified month in the MxN (lat,long) medsea grid. 
-    
-#         All necessary files (*.inp, *.dat) are assumed to be present in `core_folder` (see get_core_folder(year,month,m,n)), 
-#         except the GOTM executable. The program changes directory into the core folder to run and the log and results are 
+#     """ Generate GOTM results for the (m,n)-th grid point for a specified month in the MxN (lat,long) medsea grid.
+
+#         All necessary files (*.inp, *.dat) are assumed to be present in `core_folder` (see get_core_folder(year,month,m,n)),
+#         except the GOTM executable. The program changes directory into the core folder to run and the log and results are
 #         both saved in core_folder. """
 #     from datetime import datetime
 #     import os, shutil
@@ -1035,30 +1049,30 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
 #         lon = grid_lons[n]
 #     latlong = print_lat_lon(lat,lon)
 #     run_name = 'medsea_GOTM, #(m,n)=({1:d},{2:d})'.format(latlong,m,n)
-#     core_folder = get_core_folder(year,month,lat,lon)    
-    
+#     core_folder = get_core_folder(year,month,lat,lon)
+
 #     # NOTE 1: The default values for out_fn, t_prof_file, s_prof_file, heatflux_file, meteo_file, extinct_file, sst_file
 #     # are set in the template namelist files in the base_folder, but not here. Same for the values of heights of measurements
 #     # wind_h, rh_h, airt_h adapted for use of our medsea dataset.
 #     # NOTE 2: Explicit cast types to avoid ValueError in f90nml, which only supports the fundmental data types.
 #     gotm_args = dict(name = run_name,
-#                      start = str(start), stop = str(stop), 
+#                      start = str(start), stop = str(stop),
 #                      latitude = float(lat), longitude = float(lon), out_dir = str(core_folder))
-    
-#     gotm_args.update(**gotm_user_args) 
+
+#     gotm_args.update(**gotm_user_args)
 #     #print(gotm_args) # Debug
-    
+
 #     ## Prepare the core folder.
 #     # Symlink the executable.
 #     if not(os.path.exists(GOTM_executable)):
-#         os.symlink(GOTM_executable,os.path.join(core_folder,'gotm'))    
+#         os.symlink(GOTM_executable,os.path.join(core_folder,'gotm'))
 #     for each in GOTM_nml_list:
 #         # All config files are overwritten every time GOTM is run.
 #         shutil.copyfile(os.path.join(GOTM_nml_path,each),os.path.join(core_folder,each))
 #     # NOTE: The actual updates of the namelists are currently done in the gotm() call.
 
 #     # Actual GOTM run.
-#     os.chdir(core_folder)   
+#     os.chdir(core_folder)
 #     try:
 #         print('GOTM run: ' + run_name + '...')
 #         logfn = 'GOTM_' + print_ctime(sep='_') + '.log'
@@ -1066,7 +1080,7 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
 #     except:
 #         os.chdir(base_folder)
 #         raise # Maybe we should define some sort of exception if GOTM fails.
-        
+
 #     os.chdir(base_folder)
 
 ## Deprecated
@@ -1077,7 +1091,7 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
 #     " Combine GOTM results nc files from each grid point into a single monthly nc file. "
 #     from netCDF4 import Dataset
 #     from numpy.ma import masked_all, zeros
-    
+
 #     if month is None:
 #         start = datetime(year,1,1)
 #         stop = datetime(year+1,1,1)
@@ -1093,7 +1107,7 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
 #         if not(os.path.isfile(os.path.join(get_local_folder(sea_m[0],sea_n[0]),outfn))):
 #             # Assume a yearly run was done instead.
 #             outfn = 'medsea_GOTM_{:s}-{:d}.nc'.format(run,year)
-#             assert os.path.isfile(os.path.join(get_local_folder(sea_m[0],sea_n[0]),outfn)), print(outfn) 
+#             assert os.path.isfile(os.path.join(get_local_folder(sea_m[0],sea_n[0]),outfn)), print(outfn)
 
 #     print('Writing dimensions and metadata...')
 #     elapsed = 0
@@ -1102,7 +1116,7 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
 #     with Dataset(outfn,'w',format=format) as nc:
 #         # Default dimensions for medsea
 #         nctime, nclat, nclon = create_dimensions(nc, *grid)
-        
+
 #         # Having precomputed the sea locations, and use the first point (30.75N,18.75E) in our 21 x 57 medsea grid. Still works
 #         # for finer grids as long as the sea_locaions global variable is updated.
 #         fn = os.path.join(base_folder,print_lat_lon(*sea_locations[0]),'results-{0:d}{1:02d}.nc'.format(year,month))
@@ -1110,9 +1124,9 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
 #         # Transfer units, dimensions and create the nc variables.
 #         with Dataset(fn,'r') as first:
 #             # Is there any need for these? We did put units when calling create_dimesions()
-#             #nclat.units = first['lat'].units 
+#             #nclat.units = first['lat'].units
 #             #nclon.units = first['lon'].units
-            
+
 #             # Create the depth dimension, save the depth levels by reversing order and sign of the GOTM z variable.
 #             nz = len(first['z'])
 #             nc.createDimension('depth', size = nz)
@@ -1120,7 +1134,7 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
 #             ncdepth.units = first['z'].units
 #             ncdepth[:] = -first['z'][::-1]
 
-#             nctime[:] = first['time'][:] 
+#             nctime[:] = first['time'][:]
 #             nctime.units = first['time'].units # Small danger, here we are overwriting the units set in create_dimensions()
 
 #             # Test outputs
@@ -1136,7 +1150,7 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
 #             #     ncvar3d[name].units = first[name].units
 #             # for name in var4dnames:
 #             #     ncvar4d[name].units = first[name].units
-            
+
 #             # New verison. 2017-04-15
 #             var3d_nc = dict()
 #             var4d_nc = dict()
@@ -1149,7 +1163,7 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
 #                     var4d_nc[var] = create_variable(nc,var,'f8',dimensions=('time','depth','lat','lon'))
 #                     var4d_nc[var].units = first[var].units
 #         elapsed += toc()
-        
+
 #         print('Begin reading data into memory...')
 #         tic()
 
@@ -1164,7 +1178,7 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
 #             var3d_data[var] = masked_array(zeros((num_hr,M,N)),mask=True)
 #         for var in var4d_nc.keys():
 #             var4d_data[var] = masked_array(zeros((num_hr,nz,M,N)),mask=True) # Danger, here the dimensions depends on a preselected grid.
-            
+
 #         # Now proceed to read from each GOTM result nc file.
 #         for m, n in indices:
 #             fn = os.path.join(base_folder,run,print_lat_lon(*get_lat_lon(m,n)),'results-{0:d}{1:02d}.nc'.format(year,month))
@@ -1178,9 +1192,9 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
 #                     var3d_data[var][:,m,n] = each[var][:,0,0]
 #                 for var in var4d_nc.keys():
 #                     # Make sure the depth axis is reversed.
-#                     var4d_data[var][:,::-1,m,n] = each[var][:,:,0,0] 
+#                     var4d_data[var][:,::-1,m,n] = each[var][:,:,0,0]
 #             if cleanup:
-#                 os.remove(fn)        
+#                 os.remove(fn)
 #         elapsed += toc()
 
 #         print('Begin writing to {}'.format(outfn))
@@ -1214,7 +1228,7 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
 #         nc.createDimension('day_of_year')
 #         nc.createDimension('lat', size = len(grid_lats))
 #         nc.createDimension('lon', size = len(grid_lons))
-        
+
 #         # Dimension variables.
 #         ncday = nc.createVariable('day_of_year','i4',dimensions=('day_of_year',))
 #         ncday.units = "number of days since last new year's eve"
@@ -1225,7 +1239,7 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
 #         nclat[:] = grid_lats
 #         nclon[:] = grid_lons
 #         print('Done initializing dimensions.')
-        
+
 #         nc_assim_time = nc.createVariable('assim_time','i4',dimensions=('day_of_year','lat','lon'))
 #         nc_assim_time.units = 'number of seconds since midnight in local time'
 #         nc_SST_max = nc.createVariable('SST_max','f4',dimensions=('day_of_year','lat','lon'))
@@ -1250,7 +1264,7 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
 #             except ValueError:
 #                 print('Problematic location: ' + print_lat_lon(*get_lat_lon(m,n)))
 #                 raise
-            
+
 #             ncday[:] = tmp[:,0]
 #             nc_assim_time[:,m,n] = ma.masked_equal(tmp[:,1],0)
 #             nc_SST_min_day_time[:,m,n] = ma.masked_equal(tmp[:,2],0)
@@ -1259,9 +1273,9 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
 #             nc_SST_max[:,m,n] = ma.masked_equal(tmp[:,5],-99.)
 #             nc_SST_min_night_time[:,m,n] = ma.masked_equal(tmp[:,6],0)
 #             nc_SST_min_night[:,m,n] = ma.masked_equal(tmp[:,7],99.)
-          
+
 #         print("Done creating " + outfn)
-#         elapsed += toc()        
+#         elapsed += toc()
 
 ## Medsea results visualization toolbox
 
@@ -1277,7 +1291,7 @@ def medsea_heatmap(data, # The only necessary argument: a netCDF Dataset to be o
     from matplotlib.pyplot import subplots
     if not(isinstance(data,Dataset)):
         raise Exception('First argument must be a netCDF4 Dataset.')
-    
+
     # Load essential data
     lat = data['lat'][:]
     lon = data['lon'][:]
@@ -1288,12 +1302,12 @@ def medsea_heatmap(data, # The only necessary argument: a netCDF Dataset to be o
     # Evaluate data to be plotted.
     varargin = [data[each] for each in varnames]
     val = fun(varargin)
-    
+
     # Create figures / axis if not provided.
     if ax is None:
         fig, ax = subplots(figsize=(11,8.5)) # Full letter landscape size.
     fig = ax.get_figure()
-    
+
     # Generate heatmap
     if vlim is None:
         im = ax.imshow(val, extent=(lon.min(), lon.max(), lat.min(), lat.max()),
@@ -1302,13 +1316,13 @@ def medsea_heatmap(data, # The only necessary argument: a netCDF Dataset to be o
         im = ax.imshow(val, extent=(lon.min(), lon.max(), lat.min(), lat.max()),
                         vmin = vlim[0], vmax = vlim[1],
                         interpolation='nearest', origin='lower', cmap=cmap)
-        
+
     if draw_colorbar:
         cbar = fig.colorbar(im)
-    
+
     ax.grid('on')
     ax.axis('tight')
-    
+
     return fig, ax, im # Return them for further annotations.
 
 def medsea_plot_mean(varname='sst', ax=None, cmap = cm.coolwarm,
@@ -1326,11 +1340,11 @@ def medsea_plot_mean(varname='sst', ax=None, cmap = cm.coolwarm,
     # Save the figure
     fig_fn = '{}_{}_mean_{:d}{:02d}.png'.format(fig_fn_prefix,varname,year,month)
     print('Saving {}...'.format(fig_fn))
-    fig.savefig(fig_fn)                   
-    
+    fig.savefig(fig_fn)
+
     if not(show_fig):
         close(fig)
-    
+
     # Remember to close the file.
     data.close()
 
@@ -1348,15 +1362,15 @@ def sst_range_ASM0(time,lon,sst):
             h1 = 11 - offset + day*24
             h2 = 21 - offset + day*24
             sst_max[day,m,n] = max(sst[h1:h2,m,n])
-            
-            
+
+
             h3 = 3 - offset + day*24 # We increased the starting hour from 1 (HCMR ppt) to 3 to avoid going to the previous day.
             h4 = 12 - offset + day*24
             #sst_min[day,m,n] = min(sst[h1:h2,m,n]) # OH NO! TYPO! The min was taken from the same range as in taking max!!! That means we're measuring the amount of cooling, but it's not all the way to the coolest point yet...
             sst_min[day,m,n] = min(sst[h3:h4,m,n])
     sst_range = sst_max - sst_min
     return sst_range
-    
+
 def sst_range_ASM2(time,lon,sst,swr):
     import numpy
     nday = int(time[-1]/86400)
@@ -1372,24 +1386,24 @@ def sst_range_ASM2(time,lon,sst,swr):
             h1 = 11 - offset + day*24
             h2 = 21 - offset + day*24
             sst_max[day,m,n] = max(sst[h1:h2,m,n])
-            
+
             swr_hourly_today = swr[day*24:(day+1)*24,m,n] # This could be a masked array! So find could return empty array.
             if size(find(swr_hourly_today)) == 0:
                 swr_first_nonzero = -1000 # So that max(3-offset,swr_first_nonzero)=3-offset
             else:
                 swr_first_nonzero = find(swr_hourly_today)[0]
             # Without taking the max of swr_first_nonzero, it could cover a jagged portion of sunrise assim.
-            h3 = max([3-offset,swr_first_nonzero]) + day*24 
+            h3 = max([3-offset,swr_first_nonzero]) + day*24
             h4 = 12 - offset + day*24
             sst_min[day,m,n] = min(sst[h3:h4,m,n])
     sst_range = sst_max - sst_min
     return sst_range
 
-def medsea_monthly_mean_heatmaps(assim = 0, show_fig = False, save_fig = True, 
+def medsea_monthly_mean_heatmaps(assim = 0, show_fig = False, save_fig = True,
                                  months = [(2013,each) for each in range(1,13)] + [(2014,each) for each in range(1,13)],
                                  fig_folder = 'fig/monthly_means'):
     """ assim = 0 (none), 1 (local midnight), 2 (swr onset after midnight, i.e. sunrise) """
-    
+
     # Choose the right subfolder of nc files by the assim argument.
     if assim == 0:
         nc_folder = 'results/p_sossta/no_assim'
@@ -1399,7 +1413,7 @@ def medsea_monthly_mean_heatmaps(assim = 0, show_fig = False, save_fig = True,
         nc_folder = 'results/p_sossta/assim_sunrise'
     else:
         raise Exception('assim = 0/1/2')
-        
+
     for year,month in months:
         data = medsea_data(year=year,month=month,nc_folder=nc_folder)
 
@@ -1412,8 +1426,8 @@ def medsea_monthly_mean_heatmaps(assim = 0, show_fig = False, save_fig = True,
                 print('Saving ' + format(fig_fn) + '...')
                 fig.savefig(fig_fn)
             if not(show_fig):
-                close(fig) 
-                
+                close(fig)
+
         # Mean values of "sea surface variables", i.e. those with dimensions time, lat, lon but not depth.
         for varname in data.variables:
             if data[varname].dimensions == ('time','lat','lon'):
@@ -1428,7 +1442,7 @@ def medsea_monthly_mean_heatmaps(assim = 0, show_fig = False, save_fig = True,
                    varnames=['sst','skint'],
                    fun=lambda args: mean(args[0][:]-args[1][:],axis=0),
                    cmap=cm.cool)
-        
+
         # Mean diurnal warming amount
         if assim == 0:
             varnames = ['time','lon','sst']
@@ -1438,18 +1452,18 @@ def medsea_monthly_mean_heatmaps(assim = 0, show_fig = False, save_fig = True,
             fun = lambda args: mean(sst_range_ASM2(args[0][:],args[1][:],args[2][:],args[3][:]),axis=0)
         else:
             raise Exception('Assim = 1 not implemented.')
-            
+
         do_heatmap('mean diural warming amount in SST',
                    'medsea_mean_SST_range',
                    varnames=varnames, fun=fun,
                    cmap=cm.hot)
         data.close()
-        
+
 def buoy_comparisons(ax=None,year=2014,month=4,station='61277',plot_GOTM_SST=False):
     import os
     home = os.getcwd()
     os.chdir(base_folder)
-    
+
     if ax is None:
         fig, ax = subplots()
 
@@ -1467,7 +1481,7 @@ def buoy_comparisons(ax=None,year=2014,month=4,station='61277',plot_GOTM_SST=Fal
         buoy_lat = (float(buoy_data.geospatial_lat_max) + float(buoy_data.geospatial_lat_min))/2
         buoy_lon = (float(buoy_data.geospatial_lon_max) + float(buoy_data.geospatial_lon_min))/2
         depth_buoy = buoy_data['DEPH'][0,ind]
-        
+
     data = list()
     if os.path.isfile(buoy_fn):
         with Dataset(buoy_fn,'r') as buoy_data:
@@ -1477,7 +1491,7 @@ def buoy_comparisons(ax=None,year=2014,month=4,station='61277',plot_GOTM_SST=Fal
             time_buoy = buoy_data['TIME']
             date_buoy = num2date(time_buoy[:],time_buoy.units)
             ax.plot(date_buoy,temp_buoy,'red',
-                    label='{} at {} ({:d}m)'.format(station,print_lat_lon(buoy_lat,buoy_lon),int(depth_buoy)))    
+                    label='{} at {} ({:d}m)'.format(station,print_lat_lon(buoy_lat,buoy_lon),int(depth_buoy)))
             data.append((date_buoy,temp_buoy))
 
     # GOTM - ASM0
@@ -1490,14 +1504,14 @@ def buoy_comparisons(ax=None,year=2014,month=4,station='61277',plot_GOTM_SST=Fal
         #medsea_sst = medsea_data['sst']
         time_GOTM = medsea_data['time']
         date_GOTM = num2date(time_GOTM[:],time_GOTM.units)
-        
+
         # Plot GOTM SST
         if plot_GOTM_SST:
             sst_GOTM = medsea_data['temp'][:,0,m,n]
             ax.plot(date_GOTM, sst_GOTM,'gray',linestyle='dashed',label='GOTM ASM0 SST at ' + \
                     print_lat_lon(medsea_lat[m],medsea_lon[n]))
-            data.append((date_GOTM,sst_GOTM))       
-        
+            data.append((date_GOTM,sst_GOTM))
+
         # 2016-12-19, temporary solution for plotting GOTM TEMP at buoy depth.
         from scipy.interpolate import RectBivariateSpline as interp
         depth_GOTM = medsea_data['depth'][:]
@@ -1508,9 +1522,9 @@ def buoy_comparisons(ax=None,year=2014,month=4,station='61277',plot_GOTM_SST=Fal
         ax.plot(date_GOTM, temp_GOTM_at_buoy_depth,'gray', linestyle='solid',
                 label='GOTM ASM0 TEMP ({0:d}m) '.format(int(depth_buoy)) + \
                 print_lat_lon(medsea_lat[m],medsea_lon[n]))
-        data.append((date_GOTM,temp_GOTM_at_buoy_depth))                            
-            
-    # GOTM - ASM2 
+        data.append((date_GOTM,temp_GOTM_at_buoy_depth))
+
+    # GOTM - ASM2
     with Dataset(os.path.join('results/p_sossta/assim_sunrise','medsea_GOTM_{:d}{:02d}.nc'.format(year,month)),'r') as medsea_data:
         medsea_lat = medsea_data['lat'][:]
         medsea_lon = medsea_data['lon'][:]
@@ -1520,14 +1534,14 @@ def buoy_comparisons(ax=None,year=2014,month=4,station='61277',plot_GOTM_SST=Fal
         #medsea_sst = medsea_data['sst']
         time_GOTM = medsea_data['time']
         date_GOTM = num2date(time_GOTM[:],time_GOTM.units)
-        
+
         # Plot GOTM SST
         if plot_GOTM_SST:
             sst_GOTM = medsea_data['temp'][:,0,m,n]
             ax.plot(date_GOTM, sst_GOTM,'blue',linestyle='dashed',label='GOTM ASM2 SST at ' + \
                     print_lat_lon(medsea_lat[m],medsea_lon[n]))
             data.append((date_GOTM,sst_GOTM))
-        
+
         # 2016-12-19,  temporary solution for plotting GOTM TEMP at buoy depth.
         from scipy.interpolate import RectBivariateSpline as interp
         depth_GOTM = medsea_data['depth'][:]
@@ -1539,7 +1553,7 @@ def buoy_comparisons(ax=None,year=2014,month=4,station='61277',plot_GOTM_SST=Fal
                 label='GOTM ASM2 TEMP ({0:d}m) '.format(int(depth_buoy)) + \
                 print_lat_lon(medsea_lat[m],medsea_lon[n]))
         data.append((date_GOTM,temp_GOTM_at_buoy_depth))
-        
+
     # REA
     with Dataset(os.path.join('profiles','medsea_rea_votemper_{:d}{:02d}.nc'.format(year,month)),'r') as rea_data:
         votemper = rea_data['votemper']
@@ -1550,7 +1564,7 @@ def buoy_comparisons(ax=None,year=2014,month=4,station='61277',plot_GOTM_SST=Fal
             print('Possible land location!')
         elif votemper[0,-1,m,n] > 1e10: # the first (1st index) temperature record at deepest depth (2nd index)
             print('Possible shallow water location!')
-        
+
         depth_REA = rea_data['depth'][0]
         ax.plot(date_rea,temp_REA,'green', label='REA ({:.2f}m) at '.format(depth_REA) + \
                 print_lat_lon(rea_data['lat'][m],rea_data['lon'][n]))
@@ -1563,7 +1577,7 @@ def buoy_comparisons_full_year(year=2014,station='61277',showfig=True,fig_folder
     fig, axes = subplots(ncols=1,nrows=12,figsize=(17,22))
     for i,ax in enumerate(axes):
         buoy_comparisons(ax=ax,year=year,month=i+1,station=station)
-    
+
     # 1.4721m is the shallowest depth in REA data
     suptitle('GOTM-ASM0 SST (gray), GOTM-ASM2 SST (blue), Buoy data (red) vs REA at 1.4721m (green) for near {}'.format(station),fontsize=16,y=0.92)
     fig_fn = os.path.join(base_folder,fig_folder,'SST_GOTM_vs_REA_near_{}_{:d}.png'.format(station,year))
@@ -1581,12 +1595,12 @@ def SST_monthly_comparisons(year=2013,month=2,m=7,n=42,runs=['ASM0','ASM2'],colo
 
     if ax is None:
         fig, ax = subplots(figsize=(16,4))
-        
+
     if colors is None:
         cfun = cm.rainbow
         ax.set_prop_cycle('color',[cfun(x) for x in linspace(0,1,len(runs))]) # Extra "run" for rea data
         colors = [cfun(i/len(runs)) for i in range(len(runs))]
-        
+
     data = list()
     # GOTM runs
     for i, run in enumerate(runs):
@@ -1604,7 +1618,7 @@ def SST_monthly_comparisons(year=2013,month=2,m=7,n=42,runs=['ASM0','ASM2'],colo
         time_rea = rea_data['time']
         date_rea = num2date(time_rea[:],time_rea.units)
         temp_REA = votemper[:,0,m,n]
-        
+
         if votemper[0,0,m,n] > 1e10: # the first (1st index) temperature record at shallowest depth (2nd index)
             print('Possible land location!')
         elif votemper[0,-1,m,n] > 1e10: # the first (1st index) temperature record at deepest depth (2nd index)
@@ -1613,19 +1627,19 @@ def SST_monthly_comparisons(year=2013,month=2,m=7,n=42,runs=['ASM0','ASM2'],colo
         depth_REA = rea_data['depth'][0]
         ax.plot(date_rea,temp_REA,color='black',linewidth=2,label='REA'.format(depth_REA))
         ax.set_xlim(left=date_rea[0],right=date_rea[-1])
-        ax.set_xticks(date_rea,minor=False) 
+        ax.set_xticks(date_rea,minor=False)
         ax.set_xticklabels([date.day for date in date_rea])
         if output_data:
             data.append({'rea': (date_rea,temp_REA)})
 
     fig = ax.get_figure()
     if pretty:
-        # fig.autofmt_xdate()            
+        # fig.autofmt_xdate()
         ax.set_title('SST comparisons at {} for {:d}-{:02d}'.format(print_lat_lon(*get_lat_lon(m,n)),year,month))
         ax.grid('on')
         ax.legend()
     if output_data:
-        return fig, ax, data 
+        return fig, ax, data
     else:
         return fig, ax
 
