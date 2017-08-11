@@ -215,11 +215,14 @@ set_folders()
 
 
 # GOTM dat files' netCDF reformatted dataset sources.
-def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','sprof','chlo']):
+def data_sources(year=None, month=None, mode='r', region='medsea',
+                 dat=['heat','met','tprof','sprof','chlo','iop']):
     """
     Return the netCDF4 Dataset (or MFDataset) handles for the data source.
-    Calling data_sources() returns MFDataset of all available data for dat = ['heat','met','tprof','sprof']
-    by default in read-only mode.
+    Omitting month returns yearly data, omitting both year and month returns
+    all available data.
+
+    The dataset returns in read-only mode.
 
     """
     from netCDF4 import Dataset, MFDataset
@@ -243,34 +246,53 @@ def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','spr
     #                tprof = MFDataset(os.path.join(data_folder,'medsea_rea','medsea_rea_votemper_*.nc')),
     #                sprof = MFDataset(os.path.join(data_folder,'medsea_rea','medsea_rea_vosaline_*.nc')))
 
-    suffix = '_'
-    if (year is not None):
-        suffix += '{:d}'.format(year)
-    else:
-        suffix += '*'
-    if (month is not None):
-        suffix += '{:02d}'.format(month)
-    else:
-        suffix += '*'
-    suffix += '.nc'
+    def src(name):
+        "Data source name for each 'name'.dat file."
+        assert isinstance(name,str)
 
-    fn_dict = {'heat' : os.path.join(data_folder,region+'_ERA-INTERIM',region+'_ERA_heat' + suffix),
-               'met'  : os.path.join(data_folder,region+'_ERA-INTERIM',region+'_ERA_met' + suffix),
-               'tprof': os.path.join(data_folder,region+'_rea',region+'_rea_votemper' + suffix),
-               'sprof': os.path.join(data_folder,region+'_rea',region+'_rea_vosaline' + suffix),
-               'sst'  : os.path.join(data_folder,region+'_OSTIA',region+'_OSTIA_sst' + suffix)}
+        if name == 'heat' or name == 'met':
+            return 'ERA'
+        elif name == 'tprof' or name == 'sprof':
+            return 'rea'
+        elif name == 'chlo' or name == 'iop':
+            return 'MODIS'
+        else:
+            raise NotImplementedError('Data source unknown for ' + name)
+        return None
 
-    if year is None:
-        MODIS_suffix = '*.nc'
-    else:
-        MODIS_suffix = '_{:d}.nc'
+    def fullfn(name, subfolder=None):
+        '''
+        Return full absolute path to the nc file. Specify a subfolder for
+        flexility of referring to different versions of the datasets.
+        '''
+        folder = os.path.join(data_folder, region + '_' + src(name))
 
-    # Temporary special treatment just to make it work for new MODIS data.
-    fn_dict.update(chlo = os.path.join(data_folder,region+'_MODIS','8days',region+'_MODIS_chlor_a_8D' + suffix))
-    fn_dict.update(iop = os.path.join(data_folder,region+'_MODIS','8days',region+'_MODIS_IOP_8D' + suffix))
+        # Building the suffix that decreases the time range of coverage, use
+        # wildcards if necessary.
+        if year is not None:
+            if month is None:
+                # Both *_2013.nc and *_201301.nc through *201312.nc will be
+                # caught be this pattern. Be careful in the folder content.
+                suffix = '_{:d}*.nc'.format(year)
+            else:
+                suffix = '_{:d}{:02d}.nc'.format(year,month)
+        else: # So, 'year' is None
+            assert month is None
+            # Hopefully, the time units of each nc file in the folder has
+            # the same unit and epoch, so that MFDataset opens them properly.
+            suffix = '_*.nc'
 
-    assert all([each in fn_dict.keys() for each in dat]) # Check that the function is called correctly.
+        fn = region + '_' + src(name) + '_' + name + suffix
 
+        if subfolder:
+            fn = os.path.join(subfolder,fn)
+
+        return os.path.join(folder,fn)
+
+    # Building up the dictionary to map the appropriate filenames.
+    fn_dict = {name: fullfn(name) for name in dat}
+
+    # Now we atta
     for each in fn_dict.keys():
         try:
             ds_dict = {each : NCDataset(fn_dict[each],mode) for each in dat}
@@ -284,15 +306,13 @@ def data_sources(year=None, month=None, mode='r', dat=['heat','met','tprof','spr
             raise
 
     if len(ds_dict.keys()) == 1:
-        # If only one dataset requested, return the netcdf dataset unwrapped from the dict.
+        # If only one dataset requested, return the netcdf dataset unwrapped.
         return ds_dict[dat[0]]
     else:
         # Else return a dictionary of datasets.
         return ds_dict
 
 # Global setting for the core_dat() routines (and possibly the ERA routines as well)
-
-
 
 # 2017-05-20 First time doing this, let's be safe.
 #assert all(grid_lats == np.arange(30.25,45.75+0.25,0.25))
