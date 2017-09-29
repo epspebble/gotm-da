@@ -929,7 +929,7 @@ def prepare_run(start,stop,run_folder,out_dir='.',out_fn='results',m=None,n=None
     updatecfg(path=run_folder, **gotm_args)
     return gotm_args
 
-def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False,**gotm_user_args):
+def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False,plotvars=None,**gotm_user_args):
     """
 
     Generate GOTM results for the (m,n)-th grid point at the specified month. Only *.dat files are expected to be
@@ -941,6 +941,7 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
     from datetime import datetime
     from netCDF4 import Dataset, num2date
     import shutil
+    from os.path import join
 
     lat, lon = get_lat_lon(m,n)
 #    local_folder = get_local_folder(lat,lon,run)
@@ -1048,7 +1049,39 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
             f.write('--------------------------------------------------------------\n')
     except:
         raise
-    return stat
+
+    if plotvars:
+        from os.path import join
+        from netCDF4 import num2date
+        from matplotlib.pyplot import subplots
+         
+        assert isinstance(plotvars,list)
+        ds = Dataset(out_fn+'.nc','r')
+        time = num2date(ds['time'][:],ds['time'].units)
+
+        # Read in data for plotting.
+        var = dict()
+        for varname in plotvars:
+            # Some checking
+            assert varname in ds.variables, 'Invalid variable specified: {!s}'.format(varname)
+            assert len(time) == ds[varname].shape[0], 'Time dimension of variable: {!s} does not match with the time vector.'.format(varname)
+            if len(ds[varname].shape) != 3:
+                print('Skipping the variable: {!s} that depends on depth (for now...)'.format(varaname))
+                continue
+
+            # Now assuming we only plot against time.
+            var[varname] = ds[varname][:,0,0]
+
+        fig, axes = subplots(len(var),1,sharex=True)
+        for i,(name, val) in enumerate(var.items()):
+            ax = axes[i]
+            ax.plot(time,val,label=name)
+            ax.set_title(name)
+            ax.grid('on')
+        fig.autofmt_xdate()
+        return stat, var
+    else:
+        return stat
 
 ## Deprecated
 # def core_run(year,month,m=None,n=None,lat=None,lon=None,verbose=False,**gotm_user_args):
