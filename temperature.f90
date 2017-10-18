@@ -72,9 +72,9 @@
    use meanflow, only: h,ho,u,v,T,avh,w,grid_method,w_grid
    use observations, only: dtdx,dtdy,t_adv,w_adv,w_adv_discr
    use observations, only: tprof,TRelaxTau,w_adv_method
-   use airsea, only:cloud,coszen
+   use airsea, only:cloud,coszen,albedo
 ! Sh 03/12/2003
-   use observations, only: A,g1,g2,chlo
+   use observations, only: A,g1,g2,chlo,abp_coe,bb
    use observations, only: extinct_method
    use observations, only: fsen,zdeta
 ! enable this routine to know local time - for relaxation purposes
@@ -133,7 +133,8 @@
    double precision          :: Tup,Tdw,z
    logical                   :: surf_flux,bott_flux
    double precision		:: absfac_dir=0.,absfac_diff=0.
-   double precision		:: trans,para_A,para_K
+   double precision		:: trans,para_A,para_K,K_ir,K_vis,K1,K2,K3,K4,A1,A2,B1,B2,F_theta,G_CI,Trans_1 !HX
+   double precision          ::Tr 
    double precision                  :: C1(16) = &
                  (/.026,-.009,-.015,-.003,.063,.278,3.91,16.64, &
                    .033,-.01,-.019,-.006,.066,.396,7.68,51.27/)
@@ -242,6 +243,9 @@
 
 ! case 12 is the solar radiation transmission through the upper ocean based on the parameterisation developed from Ohlmann and Siegel, J. Phys. Oceangr. 2000
 ! it uses satellite derived chlorophyll cencentrations, cloud amount and solar zenith angle.
+
+     !WT Due to HX/SP, extra factor of Trans_1/(1-albedo) to remove the albedo factor I_0, and apply the implicit albedo in Ohlmann's formulas.
+     rad(nlev)=I_0*Trans_1/(rho_0*cp*(1-albedo))
      IF (I_0.le.0) then 
         rad(i)=0
      ElSE      
@@ -268,9 +272,80 @@
                    END IF
                 END DO
              END IF
-             ! 'trans' includes albedo implicitly due to Ohlmann, check whether I_0 includes albedo as well
-             rad(i)=I_0*trans/(rho_0*cp)
+              !WT Due to HX/SP, removes the extra albedo application outside of Ohlmann's formulation.
+              rad(i)=(I_0/(1-albedo))*trans/(rho_0*cp)
+              
       END IF    
+        
+ !       print*, trans
+
+
+	case (13)   !HX 12/05/2017
+!   this calcualtion is defined for theta_a = acos(coszen) varies from 0-60 degrees; however, appplying adaption seems does not make much difference with 61277.dat  
+!    IF (coszen.ge.0.5) then
+!---------------------------
+!    IF (coszen.gt.0.9848) then 
+!        coszen = 0.9848
+!    End if 
+!    If (coszen.lt.0.5) then  
+!        coszen = 0.5
+!    end if 
+!---------------------------angle does not affect much    
+    IF (I_0 .le. 0) then 
+       rad(i) = 0
+    ELSE 
+    K1 = (-0.057+0.482*sqrt(abp_coe)+4.221*bb)*(1+0.09*sin(acos(coszen)))
+    K2 = (0.183+0.702*abp_coe-2.567*bb)*(1.465-0.667*coszen) 
+    K_vis = K1+K2/sqrt(1+z)
+    K_ir = (0.560+2.304/(0.001+z)**0.65)*(1+0.002*acos(coszen)*180/(3.1415926))
+        IF (z.gt. 3.0) then  ! E_IR is absorbed within the layer of top 3m.   
+            trans = 0.424*exp(-K_vis*z)            
+        ELSE
+            trans = 0.576*exp(-K_ir*z)+0.424*exp(-K_vis*z)  
+                     
+        END IF   
+    END If
+!    ELSE
+    !coszen = 0.5   
+!    K1 = -0.057+0.482*sqrt(abp_coe)+4.221*bb*(1+0.09*sin(acos(coszen)))
+!    K2 = (0.183+0.702*abp_coe-2.567*bb)*(1.465-0.667*coszen) 
+!    K_vis = K1+K2/(1+z)**0.5
+!    K_ir = (0.560+2.304/(0.001+z)**0.65)*(1+0.002*acos(coszen)*180/3.1415926)
+      
+!       IF (z.lt.-3) then
+!            trans = 0.424*exp(-K_vis*z)            
+!        ELSE
+!            trans = 0.576*exp(-K_ir*z)+0.424*exp(-K_vis*z)            
+!        END IF 
+
+!    END IF
+!     print*, trans
+     rad(i)=I_0*trans/(rho_0*cp)                    
+      
+      
+
+     
+      case (14)  !HX 16/06/2017
+      A1 = 0.0268*log(chlo) + 0.5581                 !version for including albedo
+      A2 = -0.017*log(chlo) + 0.2246
+!      B1 = -0.0184*chlo**2 + 0.1141*chlo+0.042
+!      B2 = 0.5641*chlo**0.13
+
+
+!     A1 = 0.571+0.025*log(0.149*chlo)               !version for not including albedo
+!     A2 = 0.223+0.010*log(2.329*chlo)
+     B1 = 0.015+0.176*sqrt(0.462*chlo)
+     B2 = 0.688+0.060*log(0.125*chlo)
+     Tr = A1*exp(-B1*z) + A2*exp(-B2*z)
+     F_theta = 0.42*coszen-0.34
+     IF (cloud.gt. 0.1) then
+        G_CI = 0
+     ELSE 
+        G_CI = 1  
+     END IF
+     trans = Tr*(1+F_theta*G_CI)
+     rad(i)=I_0*trans/(rho_0*cp)  
+   
        case default 
 ! extinct_methods 1-7 - these are defined in observations.f90
 ! leave out diffuse / direct discrimination
