@@ -266,19 +266,18 @@
 ! case 12 is the solar radiation transmission through the upper ocean based on the parameterisation developed from Ohlmann and Siegel, J. Phys. Oceangr. 2000
 ! it uses satellite derived chlorophyll cencentrations, cloud amount and solar zenith angle.
 
-     !Due to HX, extra factor of Trans_1/(1-albedo) to remove the albedo factor I_0, and apply the implicit albedo in Ohlmann's formulas.
+     !WT Due to HX/SP, extra factor of Trans_1/(1-albedo) to remove the albedo factor I_0, and apply the implicit albedo in Ohlmann's formulas.
      rad(nlev)=I_0*Trans_1/(rho_0*cp*(1-albedo))
      IF (I_0.le.0) then 
         rad(i)=0
-        
      ElSE      
              trans=0.0
-             IF(cloud.gt. 0.1) then
+             IF(cloud.gt.0.1) then
+             !revised SP 20/06/17 setting clear sky limit as 0.1 following Table 1 in Ohlmann&Siegel(2000)
                 DO j=1,4
                    para_A=C1(j)*chlo+C2(j)*cloud+C4(j)
                    para_K=C1(j+4)*chlo+C2(j+4)*cloud+C4(j+4)
-                   trans=trans+para_A*exp(-para_K*z)  
-                                 
+                   trans=trans+para_A*exp(-para_K*z)
                 END DO
              ELSE
                 DO j=9,12
@@ -292,9 +291,8 @@
                    trans=trans+para_A*exp(-para_K*z)
                                      
                 END DO
-             
              END IF
-              ! Due to HX, removes the extra albedo application outside of Ohlmann's formulation.
+              !WT Due to HX/SP, removes the extra albedo application outside of Ohlmann's formulation.
               rad(i)=(I_0/(1-albedo))*trans/(rho_0*cp)
               
       END IF    
@@ -374,16 +372,12 @@
  
 !       rad(i)=I_0*(A*exp(-z/g1)+(1-A)*exp(-z/g2))/(rho_0*cp)
 !PRINT*,A*exp(-z/g1)+(1-A)*exp(-z/g2)
-         
-         
-
    end select
    avh(i)=nuh(i)+avmolT 
    end do
 
    do i=1,nlev
-
-      Q_source(i)=(rad(i)-rad(i-1))/h(i)           !SP 16/05/05      
+      Q_source(i)=(rad(i)-rad(i-1))/h(i)           !SP 16/05/05
       !include advection source
       Q_source(i)=Q_source(i)+advect(i)                    !SP 08/05/05
       if (t_adv) Q_source(i)=Q_source(i)-u(i)*dtdx(i)-v(i)*dtdy(i) 
