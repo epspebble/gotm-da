@@ -152,7 +152,7 @@ subroutine temperature(nlev,dt,cnpar,I_0,heat,advect,qdir_frac,qdiff_frac,cosr,n
   
   !WT What does 'delta' mean in the previous comments below?
   ! Is it the depth of top level? Is it z(nlev) (i.e. h(nlev))?  
-
+  !
   !PREVIOUS COMMENTS:
   ! could argue here that adjustment must be made for delta??
   ! add delta to z??
@@ -253,7 +253,6 @@ subroutine temperature(nlev,dt,cnpar,I_0,heat,advect,qdir_frac,qdiff_frac,cosr,n
 
 
      case(12)
-        
         ! case 12 is the solar radiation transmission through the upper ocean
         ! based on the parameterisation developed from
         ! Ohlmann and Siegel, J. Phys. Oceangr. 2000
@@ -264,21 +263,21 @@ subroutine temperature(nlev,dt,cnpar,I_0,heat,advect,qdir_frac,qdiff_frac,cosr,n
            rad(i)=0
         ElSE
            !WT Read comments for the top layer.
-           rad(i) = I_0/(1-albedo)*trans(z,extinct_method)
+           rad(i) = I_0/(1-albedo)*trans(z,extinct_method)/(rho_0*cp)
         END IF
         
      case (13) !HX 12/05/2017
         if (I_0 .le. 0) then
            rad(i) = 0
         else
-           rad(i)=I_0*trans(z,extinct_method)/(rho_0*cp)                    
+           rad(i) = I_0*trans(z,extinct_method)/(rho_0*cp)                    
         end if
 
      case (14) !HX 16/06/2017
         if (I_0 .le. 0) then
            rad(i) = 0
         else
-           rad(i)=I_0*trans(z,extinct_method)/(rho_0*cp)                    
+           rad(i) = I_0*trans(z,extinct_method)/(rho_0*cp)                    
         end if
        
      case default 
@@ -330,8 +329,12 @@ double precision function trans(z,extinct_method)
   ! ! Description
   ! Solar transmission rate for extinct_method = 12, 13, 14
   !
-  ! For extinct_method = 12, see eq(5a,b) and table 5 in
+  ! For extinct_method 12, see eq(5a,b) and table 5 in
   !   Ohlmann and Siegel, J. Phys. Oceangr. 2000
+  ! For extinct_method 13, see eq(5) in
+  !   Lee et al, J. Geophysical Research (110), 2005
+  ! For exintct_method 14, see eq(5), eq(6a,b,c,d), eq(7) in
+  !   Ohlmann, J. Climate (16), 2003
   !
   ! WT 2017-10-19
 
@@ -352,19 +355,19 @@ double precision function trans(z,extinct_method)
        (/.366,.207,.188,.169,.082,1.02,16.62,736.56, &
        .419,.231,.195,.154,.066,.886,17.81,665.19/)
 
-  ! Parameters for extinct_method = 12
+  ! Parameters for extinct_method 12
   double precision		:: para_A,para_K
 
-  ! Parameters for extinct_method = 13
+  ! Parameters for extinct_method 13
   double precision              :: K_ir,K_vis,K1,K2
 
-  ! Parameters for extinct_method = 14
+  ! Parameters for extinct_method 14
   double precision              :: A1,A2,B1,B2,Tr,F_theta,G_CI
 
 
   select case (extinct_method)
-  case(12)
 
+  case(12)
      !WT The below keep 'coszen' away from zero before taking reciprocal
      ! in O-S.'s formula below (valid up to 75 degress).
 
@@ -377,25 +380,25 @@ double precision function trans(z,extinct_method)
      END IF
 
      ! Begin summing for the tranmission coefficient.
-     OS_trans=0.0
+     trans=0.0
      IF(cloud.gt.0.1) then
         !SP revised 20/06/17 setting clear sky limit as 0.1 following Table 1 in Ohlmann&Siegel(2000)
         DO j=1,4
            para_A=C1(j)*chlo+C2(j)*cloud+C4(j)
            para_K=C1(j+4)*chlo+C2(j+4)*cloud+C4(j+4)
-           OS_trans=OS_trans+para_A*exp(-para_K*z)
+           trans=trans+para_A*exp(-para_K*z)
            !WT For z=0, i.e. i=nlev, above is equivalent to:
            !para_A=C1(j)*chlo+C2(j)*cloud+C4(j)               
-           !OS_trans = OS_trans+para_A
+           !trans = trans+para_A
         END DO
      ELSE
         DO j=9,12
            para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
            para_K=C1(j+4)*chlo+(C3(j+4)/coszen)+C4(j+4)
-           OS_trans=OS_trans+para_A*exp(-para_K*z)
+           trans=trans+para_A*exp(-para_K*z)
            !WT For z=0, i.e. i=nlev, above is equivalent to:
            !para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
-           !OS_trans = OS_trans+para_A
+           !trans = trans+para_A
         END DO
      END IF
 
