@@ -94,6 +94,7 @@ subroutine temperature(nlev,dt,cnpar,I_0,heat,advect,qdir_frac,qdiff_frac,cosr,n
   ! !OUTPUT PARAMETERS:
   double precision       :: rad(0:nlev)
   !HK/SH added Qsour here for output to ncdf for output 22/10/2003 @ 15:00
+  !WT Q_source not an output of this subroutine, but is used when calling yevol()
   double precision       :: Q_source(0:nlev)
   !SH - 03/12/2003 - added tprofdum to assimilate tprof and smootprof below TRelaxSmoo
   !
