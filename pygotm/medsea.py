@@ -104,6 +104,10 @@ def set_grid(new_grid=grid,
     if new_grid == '144x':
         subindices = (slice(None,None,None),slice(None,None,None))
 
+    # 2017-10-24
+    if new_grid == '36x':
+        subindices = (slice(None,None,2), slice(None,None,2))
+
     if new_grid == '1x':
         subindices = (slice(9,None,12), slice(None,None,12))
 
