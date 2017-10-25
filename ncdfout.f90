@@ -1383,7 +1383,7 @@
    ! integer, private          :: ostia_seviri_sq_diff_id,ostia_amsre_sq_diff_id,ostia_tmi_sq_diff_id
    integer, private          :: sst_id,sss_id,skint_id,cloud_id
    integer, private          :: x_taus_id,y_taus_id
-   integer, private          :: swr_id,heat_id,total_id,lwr_id,sens_id,latent_id
+   integer, private          :: swr_id,albedo_id,heat_id,total_id,lwr_id,sens_id,latent_id
    integer, private          :: int_sw_id,int_hf_id,int_total_id,int_cs_id
    integer, private          :: u_taus_id,u_taub_id
    integer, private          :: h_id
@@ -1546,6 +1546,11 @@
    call check_err(iret)
    iret = nf_def_var(ncid,'swr',NF_REAL,3,dims, swr_id)
    call check_err(iret)
+
+   ! WT 20171024
+   iret = nf_def_var(ncid,'albedo',NF_REAL,3,dims, albedo_id)
+   call check_err(iret)
+   
    iret = nf_def_var(ncid,'heat',NF_REAL,3,dims, heat_id)
    call check_err(iret)
    iret = nf_def_var(ncid,'total',NF_REAL,3,dims, total_id)
@@ -1688,6 +1693,8 @@
    iret = set_attributes(ncid,x_taus_id,units='N/m2',long_name='x-wind stress')
    iret = set_attributes(ncid,y_taus_id,units='N/m2',long_name='y-wind stress')
    iret = set_attributes(ncid,swr_id,units='W/m2',long_name='short wave radiation')
+   ! WT 20171024
+   iret = set_attributes(ncid,albedo_id,units='dimensionless',long_name='sea surface albedo')
    iret = set_attributes(ncid,heat_id,units='W/m2',long_name='surface heat flux')
    iret = set_attributes(ncid,total_id,units='W/m2',long_name='total surface heat exchange')
    iret = set_attributes(ncid,lwr_id,units='W/m2',long_name='long wave radiation')
@@ -1767,7 +1774,9 @@
 !  Write the GOTM core variables to the NetCDF file.
 !
 ! !USES:
-   use airsea,       only: tx,ty,I_0,heat,sst,sss,int_sw,int_hf,int_total,int_cs,qb,qh,qe,skint,cloud,swr_error,wind_error,border
+   use airsea,       only: tx,ty,I_0,albedo,heat,sst,sss, &
+                           int_sw,int_hf,int_total,int_cs, &
+                           qb,qh,qe,skint,cloud,swr_error,wind_error,border
    use meanflow,     only: depth0,u_taub,u_taus,rho_0,gravity
    use meanflow,     only: h,u,v,z,S,T,buoy,SS,NN,P,B
    ! use airsea, only                : seviri_diff,seviri_sq_diff,seviri_obs
@@ -1860,6 +1869,8 @@
    iret = store_data(ncid,x_taus_id,4,1,scalar=tx)
    iret = store_data(ncid,y_taus_id,4,1,scalar=ty)
    iret = store_data(ncid,swr_id,4,1,scalar=I_0)
+   ! WT 20170724
+   iret = store_data(ncid,albedo_id,4,1,scalar=albedo)
    iret = store_data(ncid,heat_id,4,1,scalar=heat)
    iret = store_data(ncid,total_id,4,1,scalar=heat+I_0)
    iret = store_data(ncid,lwr_id,4,1,scalar=-qb)
