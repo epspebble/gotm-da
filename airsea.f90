@@ -201,6 +201,11 @@ module airsea
 
   !WT 2016-09-24 Debug
   character(len=19) :: assim_timestr
+  
+  !WT 20171026
+  integer                           ::iter_max=60 ! was hard-coded to be 30
+  real                              ::err_max=0.0001 ! was hard-coded to be 0.001
+
 
   !-----------------------------------------------------------------------
 
@@ -259,17 +264,25 @@ contains
          sst_method2, sst_file2, &
          sss_method, sss_file, &
          airt_method, airt_file
+    
+    namelist /coolskin/ iter_max,err_max !WT
     !
     !-----------------------------------------------------------------------
     !BOC
     write(0,*) '   ', 'init_air_sea'
+
+!WT 20171026
+    open(namlst,file='coolskin.inp',action='read',status='old',err=901)
+    read(namlst,nml=coolskin,err=902)
+    close(namlst)
+    
+999 write(0,*) 'Finished temporary hack for coolskin control.'
 
     open(namlst,file='airsea.inp',action='read',status='old',err=90)
     read(namlst,nml=airsea,err=91)
     close(namlst)
 
     if (calc_fluxes) then
-
        open(meteo_unit,file=meteo_file,action='read',status='old',err=92)
        write(0,*) '       ', 'Reading meteo data from:'
        write(0,*) '           ', trim(meteo_file)
@@ -374,6 +387,17 @@ contains
 98  write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(airt_file)
     stop 'init_airsea'
 
+!WT 20171026
+901 write(0,*) 'WARNING: ', 'I could not open coolskin.inp.\n Resorting to default values.'
+    iter_max = 30
+    err_max = 0.001
+    goto 999
+902 write(0,*) 'WARNING: ', 'I could not read coolskin namelist.\n Resorting to default values.'
+    iter_max = 30
+    err_max = 0.001
+    goto 999
+
+    
   end subroutine init_air_sea
   !EOC
 
@@ -675,7 +699,7 @@ contains
     double precision                  ::usrold,tsrold,qsrold,conusr,contsr,conqsr
     double precision                  ::hsb,hlb,qout,dels,qcol,alq,xlamx
     integer                           ::iter
-
+    
     integer                           ::i,ios,count=1,count2=1,count3=0
 
     !
@@ -843,7 +867,7 @@ contains
     ! **** Iterate across u*(t*,q*),zo(zot,zoq) and z/L including cool skin ****
 
     !(sxj) original loop to nits commented out and convergence test introduced
-    do 10 iter=1,30
+    do 10 iter=1,iter_max
 
        zo=charn*usr*usr/gravity + 0.11*visa/usr    !after Smith 1988
        rr=zo*usr/visa
@@ -902,10 +926,10 @@ contains
        dqer=wetc*dter
 
        !(sxj) check for convergence and leave loop if met
-       IF((iter==30).AND.(max(abs(conusr),abs(contsr),abs(conqsr)).gt.0.001)) THEN
-          PRINT*,'convergence error'
+       IF((iter==iter_max).AND.(max(abs(conusr),abs(contsr),abs(conqsr)).gt.err_max)) THEN
+          PRINT*,'convergence error: consur, constr, conqsr = ', conusr, contsr, conqsr
        END IF
-       if (max(abs(conusr),abs(contsr),abs(conqsr)).lt.0.001) then
+       if (max(abs(conusr),abs(contsr),abs(conqsr)).lt.err_max) then
           goto 912
        end if
 10     continue                                           ! end iterations
