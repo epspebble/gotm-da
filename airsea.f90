@@ -684,6 +684,9 @@ contains
     !
     !  See log for the airsear module
     !
+    !WT 20171027 The COARE Bulk-Flux Algorithm is now found at
+    !   ftp://ftp.etl.noaa.gov/BLO/Air-Sea/bulkalg/
+    !
     !EOP
     !
     ! !LOCAL VARIABLES:
