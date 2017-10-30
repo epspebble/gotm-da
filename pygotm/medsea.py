@@ -101,6 +101,15 @@ def set_grid(new_grid=grid,
             j = k%4
             subindices = (slice(i,None,4), slice(j,None,4))
 
+    if new_grid == 'aeg_144x':
+        subindices = (slice(77,186,None), slice(456,553,None))
+
+    if new_grid == 'aeg_36x':
+        subindices = (slice(77,186,2), slice(456,553,2))
+        
+    if new_grid == 'aeg_9x':
+        subindices = (slice(77,186,4), slice(456,553,4))
+    
     if new_grid == '144x':
         subindices = (slice(None,None,None),slice(None,None,None))
 
