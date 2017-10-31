@@ -25,7 +25,7 @@ def set_folders():
     scratch_folder = os.path.join(userhome,'scratch')
     # the grid subfolder is now part of the data_folder
 #    data_folder = os.path.join(userhome,'medsea_data', grid)
-    data_folder = os.path.join(scratch_folder,'medsea_data')
+    data_folder = os.path.join(userhome,'medsea_data')
     while not(os.path.isdir(data_folder)):
         print('The data folder ' + data_folder + ' is either not accessible or created.')
         data_folder = input("Enter new data folder location.")
