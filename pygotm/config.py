@@ -69,8 +69,13 @@ run_profiles = {
                      depth = 74.539324233308434, nlev = 122,
                      grid_method = 2, grid_file = 'grid_75m.dat'),
 
-    # 20170727 New test runs
+    # 20171031 New test runs
     'ASM4-75m': dict(assimilation_type=2, assim_window=1,
+                     extinct_method=13, extinct_file='iop.dat', 
+                     depth = 74.539324233308434, nlev = 122,
+                     grid_method = 2, grid_file = 'grid_75m.dat'),
+
+    'ASM5-75m': dict(assimilation_type=2, assim_window=1,
                      extinct_method=13, extinct_file='iop.dat', 
                      depth = 74.539324233308434, nlev = 122,
                      grid_method = 2, grid_file = 'grid_75m.dat'),

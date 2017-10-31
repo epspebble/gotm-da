@@ -490,8 +490,11 @@
    end select
    call get_int_pressure(int_press_method,int_press_unit,julday,secs,nlev,z)
 
-!  The light extinction profiles
+   ! The light extinction profiles
+   ! WT 20171031 TODO: Maybe we can print the extinction method and reference at this point, to remind users
+   ! what is being used.
    select case (extinct_method)
+      ! WT 20171031 2 stream Jerlov [1976] water type 1 solar transmission for case (1) through (7) 
       case (1)
          A=0.58;g1=0.35;g2=23.0
       case (2)
@@ -507,43 +510,21 @@
       case (7)
          A=0.7;g1=0.40;g2=8.0 ! Adolf Stips - Lago Maggiore
 
-!!!!!!WT Case (0), (12), (13), (14) temporarily moved to case default.
-      ! case (12)
-      !    open(extinct_unit,file=extinct_file,status='unknown',err=105)
-      !    write(0,*) '       ', 'Reading chlorophyll-a data from:'
-      !    write(0,*) '           ', trim(extinct_file)
-      !    call read_chlo(extinct_unit,julday,secs)
-      !    !SP 22/02/06  The parameterisation holds for values of chlorophyll between 0.03 and 3.0
-      !    IF(chlo.gt.3.0) THEN
-      !       chlo=3.0
-      !    END IF
-      !    IF (chlo.lt.0.03) THEN
-      !       chlo=0.03
-      !    END IF
-
-      ! case(13)  !HX 12/May/2017
-      !    open(extinct_unit,file=extinct_file,status='unknown',err=105)
-      !    write(1,*) '       ', 'Reading absorption-c data from:'
-      !    write(1,*) '           ', trim(extinct_file)
-      !    call read_IOP(extinct_unit,julday,secs)  
-      !    open(extinct_unit,file=extinct_file,status='unknown',err=105)
-      !    write(2,*) '       ', 'Reading backscattering-c data from:'
-      !    write(2,*) '           ', trim(extinct_file)
-      !    call read_IOP(extinct_unit,julday,secs)  
-        
-      !  case (14) !HX 16/June/2017
-      !    open(extinct_unit,file=extinct_file,status='unknown',err=105)
-      !    write(0,*) '       ', 'Reading chlorophyll-a data from:'
-      !    write(0,*) '           ', trim(extinct_file)
-      !    call read_chlo(extinct_unit,julday,secs)
+      case (8,9,10,11)
+         !WT 20171031 Variants of 9 stream solar transmission, Paulson-Simpson (1931).
+         !The actual computations are done in temperature.f90, in the temperature() subroutine.    
+         write(0,*) 'Using 9-stream solar transmission [Paulson & Simpson, 1981]', &
+                    'External extinction data not required.'
          
-       case default
+      case default
+         !WT 20171031 For case (12) Ohlmann-Siegel (2000), case (13) Lee et al. (2005), case (14) Ohlmann (2013)
+         ! The following should produce an error when either no data for extinction is supplied or an explicit
+         ! 'extinct_method' is not chosen consciously.
          open(extinct_unit,file=extinct_file,status='unknown',err=105)
          write(0,*) '       ', 'Reading extinction data from:'
          write(0,*) '           ', trim(extinct_file)
          call read_extinction(extinct_unit,julday,secs,extinct_method)
-
-         !WT 20170726, postprocessing code (e.g. imposes 0.03 .lt. chlo .lt. 3.0)
+         !WT 20170726, postprocessing code (e.g. imposes 0.03 .lt. chlo .lt. 3.0 for case (12) )
          ! reloacted to read_extinct.f90
          
    end select
