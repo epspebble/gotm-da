@@ -559,7 +559,7 @@ contains
     if(calc_fluxes) then
     else
        !   Calculate cool skin effect (Wick, 96) SP: 13/03/06
-       call skin_temp(sst,skint)
+       call skin_temp(sst,skint) ! WT 2017-10-31 Obsolete parametrization.
     end if
 
     return
