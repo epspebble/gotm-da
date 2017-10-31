@@ -38,6 +38,7 @@ timestep = 30
 #
 
 # List of run_profiles done in the past.
+# TODO: We should specify the corresponding GOTM code version in the profiles as well.
 run_profiles = {
 
     # The V2 runs. They were run at 150m deep with 150 levels.
@@ -68,22 +69,30 @@ run_profiles = {
     'ASM2-75m': dict(assimilation_type=2, assim_window=1, extinct_method=9, 
                      depth = 74.539324233308434, nlev = 122,
                      grid_method = 2, grid_file = 'grid_75m.dat'),
-
-    # 20171031 New test runs
+    # 20171031 Previously ASM4-75m uses extinct_method=13, but the GOTM code
+    # has not incorporated this case and it fell through to the default case
+    # which is extinct_method=1, Jerlev (1976) water type 1.
     'ASM4-75m': dict(assimilation_type=2, assim_window=1,
-                     extinct_method=13, extinct_file='iop.dat', 
+                     extinct_method=1,  
                      depth = 74.539324233308434, nlev = 122,
                      grid_method = 2, grid_file = 'grid_75m.dat'),
-
-    'ASM5-75m': dict(assimilation_type=2, assim_window=1,
-                     extinct_method=13, extinct_file='iop.dat', 
-                     depth = 74.539324233308434, nlev = 122,
-                     grid_method = 2, grid_file = 'grid_75m.dat'),
-
     # 20170912 Hybrid grid
     'ASM3-HYB-75m': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat', 
                          depth = 74.389762997627258, nlev = 41,
                          grid_method = 2, grid_file = 'grid_HYB_75m.dat'),
+    # 20171031 Two levels as per email with Sam Pimentel, 2017-10-27.
+    # This is identical to the previous ASM4-75m, now should properly use iop.dat
+    'ASM5-75m': dict(assimilation_type=2, assim_window=1,
+                     extinct_method=13, extinct_file='iop.dat', 
+                     depth = 74.539324233308434, nlev = 122,
+                     grid_method = 2, grid_file = 'grid_75m.dat'),
+    # This is identical to ASM3-75m, the difference lies in the GOTM code. The fixed GOTM
+    # code has the albedo issue fixed, so that Payne's albedo is not applied to Ohlmann-Siegel (2000)
+    # formulas which implicitly include albedo.
+    'ASM3.1-75m': dict(assimilation_type=2, assim_window=1,
+                       extinct_method=12, extinct_file='chlo.dat', 
+                       depth = 74.539324233308434, nlev = 122,
+                       grid_method = 2, grid_file = 'grid_75m.dat'),
 }
 
 epoch = datetime(1981,1,1)
