@@ -438,11 +438,14 @@ contains
     ! INPUT
     double precision, intent(in) :: lon
 
-    if (lon > 0) then
-       tz = int((lon+7.5)/15)
-    else
-       tz = int((lon-7.5)/15)
-    end if
+    ! WT 20171101 Apparently, there is a stupid mistake here. This formula is wrong.
+    ! This affects all sea locations with lon < 0.
+    ! if (lon > 0) then
+    !    tz = int((lon+7.5)/15)
+    ! else
+    !    tz = int((lon-7.5)/15)
+    ! end if
+    tz = int((lon+7.5)/15)
 
     return
 
