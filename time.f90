@@ -438,14 +438,18 @@ contains
     ! INPUT
     double precision, intent(in) :: lon
 
-    ! WT 20171101 Apparently, there is a stupid mistake here. This formula is wrong.
-    ! This affects all sea locations with lon < 0.
-    ! if (lon > 0) then
-    !    tz = int((lon+7.5)/15)
-    ! else
-    !    tz = int((lon-7.5)/15)
-    ! end if
-    tz = int((lon+7.5)/15)
+
+    ! Behavior of int() according to https://gcc.gnu.org/onlinedocs/gfortran/INT.html:
+    ! If A is of type REAL and |A| < 1, INT(A) equals 0. If |A| \geq 1,
+    ! then INT(A) is the integer whose magnitude is the largest integer that
+    ! does not exceed the magnitude of A and whose sign is the same as the sign of A.
+    if (lon > 0) then
+       tz = int((lon+7.5)/15)
+    else
+       tz = int((lon-7.5)/15)
+    end if
+
+    !tz = int((lon+7.5)/15) ! Actually this works for lon > -7.5 
 
     return
 

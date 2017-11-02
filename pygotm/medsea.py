@@ -41,7 +41,7 @@ def set_folders():
         os.mkdir(run_folder)
 
     # Ocean and Satellite products datasets source folders.
-    p_sossta_folder = os.path.join(scratch_folder,'p_sossta')
+    p_sossta_folder = os.path.join(userhome,'p_sossta')
     ERA_folder = os.path.join(p_sossta_folder,'medsea_ERA-INTERIM','3-hourly')
     rea_folder = os.path.join(p_sossta_folder,'medsea_rea')
     cache_folder = '/dev/shm'
