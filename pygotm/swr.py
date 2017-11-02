@@ -103,20 +103,23 @@ def coszen(ndays,nsecs,lat,lon):
     vfunc = vectorize(coszen_nv)
     return vfunc(ndays,nsecs,lat,lon)
 
-## Requires the solar_utils package from PyPI
-#def sp_coszen(ndays,nsecs,lat,lon):
-#    dt = datetime(year,1,1) + timedelta(days=ndays) + timedelta(seconds=nsecs)
-#    (angles, airmass) = solpos(location=[lat, lon, tz(lon)],
-#                               datetime=[dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second],
-#                               weather=[1015.62055, 40.0]) # Pressure and dry-bulb temp
-#    zenith, azimuth = angles # in degrees
-#    return cos(zenith/180*pi)
-#
-#def coszen_argmax_error_seconds(ndays,lat,lon):
-#    ss = linspace(0,86400)
-#    sp_cc = array([sp_coszen(ndays,s,lat,lon) for s in ss])
-#    cc = coszen(ndays,ss,lat,lon)
-#    return ss[argmax(sp_cc)]-ss[argmax(cc)]
+# Requires the solar_utils package from PyPI
+def sp_coszen(ndays,nsecs,lat,lon):
+    from solar_utils import solposAM as solpos
+    from datetime import datetime, timedelta
+    dt = datetime(year,1,1) + timedelta(days=ndays) + timedelta(seconds=nsecs)
+    (angles, airmass) = solpos(location=[lat, lon, tz(lon)],
+                               datetime=[dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second],
+                               weather=[1015.62055, 40.0]) # Pressure and dry-bulb temp
+    zenith, azimuth = angles # in degrees
+    return cos(zenith/180*pi)
+
+def coszen_argmax_error_seconds(ndays,lat,lon):
+    from numpy import linspace, array, argmax
+    ss = linspace(0,86400)
+    sp_cc = array([sp_coszen(ndays,s,lat,lon) for s in ss])
+    cc = coszen(ndays,ss,lat,lon)
+    return ss[argmax(sp_cc)]-ss[argmax(cc)]
 
 # Compute our swr using Rosati's formulas.
 def swr_nv(ndays,nsecs,lat,lon):
