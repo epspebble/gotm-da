@@ -90,7 +90,6 @@ liboutput.a(output.o)			\
 libturbulence.a(sediment.o)		\
 libturbulence.a(seagrass.o)
 
-
 UTIL	= \
 libutil.a(advection.o)		\
 libutil.a(w_split_it_adv.o)	\
@@ -112,6 +111,10 @@ libmeanflow.a(stratification.o)		\
 libmeanflow.a(buoyancy.o)		\
 libmeanflow.a(convectiveadjustment.o)	\
 libmeanflow.a(production.o)
+
+AIRSEA	= \
+libairsea.a(airsea.o)		 	\
+libairsea.a(solar.o)			\
 
 TURBULENCE   = \
 libturbulence.a(tkeeq.o)		\
