@@ -17,10 +17,10 @@ subroutine short_wave_radiation(jul,secs,alat,alon,swr)
   !
   ! !USES:
   use time, only: calendar_date, julian_day, UTC_to_local, tz
-  use airsea, only: albedo, solar
+  use airsea, only: solar ! Value read from airsea namelist
 
   ! WT 20171102, the following are the intended output variables after calling this subroutine.
-  use airsea, only: qtot, cosr, coszen, sunbet, qdir_frac, qdiff_frac
+  use airsea, only: qtot, cosr, coszen, sunbet, qdir_frac, qdiff_frac, albedo
 
   IMPLICIT NONE
   !
