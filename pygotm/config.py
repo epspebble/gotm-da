@@ -89,10 +89,23 @@ run_profiles = {
     # This is identical to ASM3-75m, the difference lies in the GOTM code. The fixed GOTM
     # code has the albedo issue fixed, so that Payne's albedo is not applied to Ohlmann-Siegel (2000)
     # formulas which implicitly include albedo.
-    'ASM3.1-75m': dict(assimilation_type=2, assim_window=1,
+    'ASM3.1-75m': dict(assimilation_type=2, assim_window=1, 
                        extinct_method=12, extinct_file='chlo.dat', 
                        depth = 74.539324233308434, nlev = 122,
                        grid_method = 2, grid_file = 'grid_75m.dat'),
+
+    # 20171106, same as the previous, except with a higher resolution output.
+    'ASM5-75m_4t': dict(assimilation_type=2, assim_window=1,
+                        extinct_method=13, extinct_file='iop.dat', 
+                        depth = 74.539324233308434, nlev = 122,
+                        grid_method = 2, grid_file = 'grid_75m.dat',
+                        nsave=30),
+    'ASM3.1-75m_4t': dict(assimilation_type=2, assim_window=1,
+                          extinct_method=12, extinct_file='chlo.dat', 
+                          depth = 74.539324233308434, nlev = 122,
+                          grid_method = 2, grid_file = 'grid_75m.dat',
+                          nsave=30),
+    
 }
 
 epoch = datetime(1981,1,1)
