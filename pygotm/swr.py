@@ -1,6 +1,10 @@
 from .config import *
 
+from math import sin, cos, asin, acos, tan, atan
+
 ### For SWRD Calcluations
+
+# Reference: https://www.esrl.noaa.gov/gmd/grad/solcalc/solareqns.PDF
 
 # Temporary global variable
 year = 2014
@@ -102,6 +106,34 @@ def coszen(ndays,nsecs,lat,lon):
     from numpy import vectorize
     vfunc = vectorize(coszen_nv)
     return vfunc(ndays,nsecs,lat,lon)
+
+def solar_times(day,lat,lon,events=['sunrise','snoon','sunset']):
+    """UTC time of sunrise / solar noon / sunset at a given day."""
+    from datetime import date, datetime
+    if isinstance(day,date) or isinstance(day,datetime):
+        year = day.year
+        month = day.month
+        day = day.day
+        ndays= (date(year,month,day)-date(year-1,12,31)).days
+    elif isinstance(day,int): # Assume it is directly ndays, not day_of_year = ndays + 1
+        ndays = day
+    else:
+        raise Exception('Unhandled argument type: {!s}'.format(type(day)))
+            
+    t = gamma(ndays,3600*12) # Use the UTC noon time sun declination, this was not specified in reference.
+    decl = sundec(t)
+    alat = lat/180*pi
+    zen = 90.833/180*pi # The approx correction for atmospheric refraction at sunrise and sunset, and size of solar disk.
+    cos_ha = cos(zen)/cos(alat)/cos(decl) - tan(alat)*tan(decl)
+    ha = abs(acos(cos_ha))/pi*180 # Convert to degrees
+    eqt = eqtime(t)
+
+    UTC_times = dict(
+        sunrise = 720 - 4*(lon+ha) - eqt,
+        snoon = 720 - 4*lon - eqt,
+        sunset = 720 - 4*(lon-ha) - eqt,
+        )
+    return [UTC_times[event] for event in events] 
 
 # Requires the solar_utils package from PyPI
 def sp_coszen(ndays,nsecs,lat,lon):
