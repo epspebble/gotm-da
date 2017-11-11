@@ -133,7 +133,12 @@ def solar_times(day,lat,lon,events=['sunrise','snoon','sunset']):
         snoon = 720 - 4*lon - eqt,
         sunset = 720 - 4*(lon-ha) - eqt,
         )
-    return [UTC_times[event] for event in events] 
+    if isinstance(events,list):
+        return [UTC_times[event] for event in events]
+    else:
+        event = events
+        assert event in UTC_times.keys()
+        return UTC_times[event]
 
 # Requires the solar_utils package from PyPI
 def sp_coszen(ndays,nsecs,lat,lon):
