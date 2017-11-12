@@ -120,7 +120,7 @@ def medsea_ERA_reformat(year, grid='1x',
 
 ### ECMWF
 # This improves current code in pygotm/ncdf_reformat.py, version on 2017-07-13
-def medsea_ECMWF_reformat(year,month,
+def medsea_ECMWF_reformat(year,month,grid='1x',
                           src_folder='p_sossta/medsea_ECMWF/3-HOURLY',
                           dst_folder='medsea_data/medsea_ECMWF'):    
     """ Combine variables from monthly ECMWF data into intermediate netCDF4 files, grouped by 
@@ -242,7 +242,7 @@ def medsea_ECMWF_reformat(year,month,
         print('Total time: {!s}s'.format(elapsed))
 
 ### MFC_midnights
-def medsea_MFC_midnights_reformat(year,month=None,
+def medsea_MFC_midnights_reformat(year,month=None,grid='1x',
                                   src_folder='p_sossta/medsea_rea',
                                   dst_folder='medsea_data/medsea_MFC_midnights'):
     """ Combine daily MFC midnightly mean TEMP / PSAL data into intermediate yearly or monthly netCDF4 files, 
@@ -399,7 +399,7 @@ def medsea_MFC_midnights_reformat(year,month=None,
 
 
 ### MFC_sunrise
-def medsea_MFC_sunrise_reformat(start_day,stop_day,
+def medsea_MFC_sunrise_reformat(start_day,stop_day,grid='1x',
                                 src_folder='p_sossta/medsea_rea/sunrise_nrt',
                                 dst_folder='medsea_data/medsea_MFC_sunrise'):
     """ Combine hourly MFC TEMP / PSAL profile chosen closest to sunrise into intermediate yearly or monthly netCDF4 files, 
