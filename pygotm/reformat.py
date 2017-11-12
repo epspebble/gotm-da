@@ -1,11 +1,6 @@
-from datetime import date, datetime, timedelta
-from pygotm import medsea
-grid = '1x' # Default testing grid.
-medsea.set_grid(grid);
-
 ### ERA-INTERIM
 # This improves current code in pygotm/ncdf_reformat.py, version on 2017-07-13
-def medsea_ERA_reformat(year, 
+def medsea_ERA_reformat(year, grid='1x',
                         src_folder='p_sossta/medsea_ERA-INTERIM/3-hourly',
                         dst_folder='medsea_data/medsea_ERA-INTERIM'):    
     """ Combine variables from yearly ERA data into intermediate netCDF4 files, grouped by 
@@ -21,7 +16,8 @@ def medsea_ERA_reformat(year,
     from time import time
     from datetime import datetime, timedelta
     from netCDF4 import Dataset, date2num
-    from numpy import array_equal    
+    from numpy import array_equal
+    from pygotm import medsea
     from pygotm.gotmks import tic, toc
     from pygotm.config import epoch # Should be datetime(1981,1,1,0,0,0)    
     
@@ -33,10 +29,6 @@ def medsea_ERA_reformat(year,
         if not isdir(dst_folder):
             mkdir(dst_folder)
     
-    # User need to make sure the medsea module is loaded and set up.
-    import sys
-    assert 'medsea' not in sys.modules, "'import pygotm.medsea as medsea' first!'"
-
     ## Hard-coding some information for the subfunction get_ERA_yearly_data()
     
     # Filename keyword 'name' / internal nc variable name 'alias' (when they don't agree)
@@ -45,12 +37,17 @@ def medsea_ERA_reformat(year,
     aliases = dict(precip='var144', snow='var228',
                    lwrd='var175', swrd='var169')
 
-    # Precomputed indices to map ERA-INTERIM to GOTM 1x grid 
-    src_lat_idx = slice(-8,4,-1)
-    src_lon_idx = slice(12,-18,1)
-    dst_lats = medsea.grid_lats
-    dst_lons = medsea.grid_lons
-    
+    if grid == '1x':
+        from pygotm import medsea
+        medsea.set_grid('1x')
+        # Precomputed indices to map ERA-INTERIM to GOTM 1x grid 
+        src_lat_idx = slice(-8,4,-1)
+        src_lon_idx = slice(12,-18,1)
+        dst_lats = medsea.grid_lats
+        dst_lons = medsea.grid_lons
+    else:
+        raise NotImplementedError('Me no do grid = {!s} (yet).'.format(grid))
+        
     # Convenience function to get one variable's yearly data.
     def get_data(name,src_fn):
         with Dataset(join(src_folder,src_fn),'r') as ds:
@@ -151,10 +148,6 @@ def medsea_ECMWF_reformat(year,month,
         if not isdir(dst_folder):
             mkdir(dst_folder)
             
-    # User need to make sure the medsea module is loaded and set up.
-    import sys
-    assert 'medsea' not in sys.modules, "'import pygotm.medsea as medsea' first!'"
-
     ## Hard-coding some information for the subfunction get_ERA_yearly_data()
     
     # Filename keyword 'name' / internal nc variable name 'alias' (when they don't agree)
@@ -162,11 +155,18 @@ def medsea_ECMWF_reformat(year,month,
                  heat = ['lwrd','swrd'])
     aliases = dict() # Checked: they are identical.
 
+    if grid == '1x':
+        from pygotm import medsea
+        medsea.set_grid(grid)
+        # Precomputed indices to map ERA-INTERIM to GOTM 1x grid 
+        src_lat_idx = slice(154,33,-6) 
+        src_lon_idx = slice(72,409,6)
+        dst_lats = medsea.grid_lats
+        dst_lons = medsea.grid_lons
+    else:
+        raise NotImplementedError('Me no do grid = {!s} (yet).'.format(grid))
+    
     # Precomputed indices to map ECMWF data to medsea 1x grid.
-    src_lat_idx = slice(154,33,-6) 
-    src_lon_idx = slice(72,409,6)
-    dst_lats = medsea.grid_lats
-    dst_lons = medsea.grid_lons
     
     # Convenience function to get one variable's yearly data.
     def get_data(name,src_fn):
@@ -273,10 +273,6 @@ def medsea_MFC_midnights_reformat(year,month=None,
         if not isdir(dst_folder):
             mkdir(dst_folder)
             
-    # User need to make sure the medsea module is loaded and set up.
-    import sys
-    assert 'medsea' not in sys.modules, "'import pygotm.medsea as medsea' first!'"
-
     ## Hard-coding some information for the subfunction get_ERA_yearly_data()
 
     # Filename keyword 'name' / internal nc variable 'alias' (when they don't agree)
@@ -287,35 +283,41 @@ def medsea_MFC_midnights_reformat(year,month=None,
     dst_varname = dict(TEMP = 'temp',
                        PSAL = 'salt')
 
-    # Precomputed indices map MFC reanalysis data to medsea 1x grid up to 75m deep.
-    nlev = 16
-    src_lev = \
-    [1.4721018075942993,
-     4.587478160858154,
-     7.944124221801758,
-     11.558627128601074,
-     15.448707580566406,
-     19.633302688598633,
-     24.132646560668945,
-     28.968355178833008,
-     34.16352844238281,
-     39.742835998535156,
-     45.73264694213867,
-     52.1611213684082,
-     59.05834197998047,
-     66.4564437866211,
-     74.38976287841797,
-     82.89495086669922]
+    if grid == '1x':
+        from pygotm import medsea
+        medsea.set_grid(grid)
+        # Precomputed indices map MFC reanalysis data to medsea 1x grid up to 75m deep.
+        nlev = 16
+        src_lev = \
+                  [1.4721018075942993,
+                   4.587478160858154,
+                   7.944124221801758,
+                   11.558627128601074,
+                   15.448707580566406,
+                   19.633302688598633,
+                   24.132646560668945,
+                   28.968355178833008,
+                   34.16352844238281,
+                   39.742835998535156,
+                   45.73264694213867,
+                   52.1611213684082,
+                   59.05834197998047,
+                   66.4564437866211,
+                   74.38976287841797,
+                   82.89495086669922]
+        
+        assert len(src_lev) == nlev
+        src_lat_idx = slice(9,None,12)
+        src_lon_idx = slice(0,None,12)
     
-    assert len(src_lev) == nlev
-    src_lat_idx = slice(9,None,12)
-    src_lon_idx = slice(0,None,12)
-    
-    # Target grid
-    dst_lats = medsea.grid_lats
-    dst_lons = medsea.grid_lons
-    dst_lev = src_lev
-    
+        # Target grid
+        dst_lats = medsea.grid_lats
+        dst_lons = medsea.grid_lons
+        dst_lev = src_lev
+        
+    else:
+        raise NotImplementedError('Me no do grid = {!s} (yet).'.format(grid))
+
     # Convenience function to get one variable's yearly data.
     def get_data(name,src_fn):
         # Use MFDataset instead of Dataset, src_fn is a glob-able pattern instead of a specific filename. 
@@ -449,37 +451,42 @@ def medsea_MFC_sunrise_reformat(start_day,stop_day,
                        PSAL = 'vosaline')
     dst_varname = dict(TEMP = 'temp',
                        PSAL = 'salt')
+    if grid == '1x':
+        from pygotm import medsea
+        medsea.set_grid(grid)
+        # Precomputed indices map MFC reanalysis data to medsea 1x grid up to 75m deep.
+        nlev = 16
+        src_lev = \
+                  [1.4721018075942993,
+                   4.587478160858154,
+                   7.944124221801758,
+                   11.558627128601074,
+                   15.448707580566406,
+                   19.633302688598633,
+                   24.132646560668945,
+                   28.968355178833008,
+                   34.16352844238281,
+                   39.742835998535156,
+                   45.73264694213867,
+                   52.1611213684082,
+                   59.05834197998047,
+                   66.4564437866211,
+                   74.38976287841797,
+                   82.89495086669922]
+        
+        assert len(src_lev) == nlev
+        src_lat_idx = slice(9,None,12)
+        # This is different from MFC_midnights because the lon starts from -15 instead of -6, so there is 9 / 0.0625 = 144 index shift
+        src_lon_idx = slice(144,None,12) 
+        
+        # Target grid
+        dst_lats = medsea.grid_lats
+        dst_lons = medsea.grid_lons
+        dst_lev = src_lev
+       
+    else:
+        raise NotImplementedError('Me no do grid = {!s} (yet).'.format(grid))
 
-    # Precomputed indices map MFC reanalysis data to medsea 1x grid up to 75m deep.
-    nlev = 16
-    src_lev = \
-    [1.4721018075942993,
-     4.587478160858154,
-     7.944124221801758,
-     11.558627128601074,
-     15.448707580566406,
-     19.633302688598633,
-     24.132646560668945,
-     28.968355178833008,
-     34.16352844238281,
-     39.742835998535156,
-     45.73264694213867,
-     52.1611213684082,
-     59.05834197998047,
-     66.4564437866211,
-     74.38976287841797,
-     82.89495086669922]
-    
-    assert len(src_lev) == nlev
-    src_lat_idx = slice(9,None,12)
-    # This is different from MFC_midnights because the lon starts from -15 instead of -6, so there is 9 / 0.0625 = 144 index shift
-    src_lon_idx = slice(144,None,12) 
-    
-    # Target grid
-    dst_lats = medsea.grid_lats
-    dst_lons = medsea.grid_lons
-    dst_lev = src_lev
-    
     # Convenience function to get one variable's data.
     def get_data(name,src_fn):
 #         print('Reading from {!s}...'.format(join(src_folder,src_fn)))
@@ -573,14 +580,32 @@ def medsea_MFC_sunrise_reformat(start_day,stop_day,
 
 if __name__ == '__main__':
     import sys
-    from datetime import date
+    from datetime import date, datetime, timedelta
+    from pygotm import medsea
+    grid = '1x' # Default testing grid.
+    medsea.set_grid(grid);
+
     if len(sys.argv) == 1:
         grid = '1x'
+        datasets = ['ERA','ECMWF','MFC_midnights','MFC_sunrise']
     elif len(sys.argv) == 2:
         grid = sys.argv[1]
+        datasets = ['ERA','ECMWF','MFC_midnights','MFC_sunrise']
+    elif len(sys.argv) == 3:
+        grid = sys.argv[1]
+        datasets = [sys.argv[2]]
+    else:
+        print(
+        """
+        Usage:
+              python reformat.py {grid} {ERA|ECMWF|MFC_midnights|MFC_sunrise}
+        """)
+        raise RuntimeError('Wrong number of arguments.')
 
     print('Attempting to regenerate reformatted date for medsea_{!s}...'.format(grid))
-
+    input('Press any key to continue...')
+    medsea.set_grid('1x')
+            
     ## ERA & MFC midnightly means for years 2013 and 2014
     medsea_ERA_reformat(2013)
     medsea_ERA_reformat(2014)
