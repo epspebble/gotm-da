@@ -26,46 +26,46 @@ def dt2daysecs(dt):
     return ndays, nsecs
 
 def UTC_to_local_nv(ndays,nsecs,lon):
-    local_nsecs = nsecs + tz(lon)*3600
-    local_ndays = ndays
-    if local_nsecs > 86400:
-        local_nsecs -= 86400
-        local_ndays +=1
+    lsecs = nsecs + tz(lon)*3600
+    ldays = ndays
+    if lsecs > 86400:
+        lsecs -= 86400
+        ldays +=1
         
-    elif local_nsecs < 0:
-        local_nsecs += 86400
-        local_ndays -= 1
-    #if local_ndays < 0:
+    elif lsecs < 0:
+        lsecs += 86400
+        ldays -= 1
+    #if ldays < 0:
     #    print("WARNING: local date is in the previous year!")
-    #if local_ndays > yrdays(year):
+    #if ldays > yrdays(year):
     #    print("WANRING: local date is in the next year!")
     
-    return local_ndays, local_nsecs
+    return ldays, lsecs
     
 def UTC_to_local(ndays,nsecs,lon):
     from numpy import vectorize
     vfunc = vectorize(UTC_to_local_nv)
     return vfunc(ndays,nsecs,lon)
 
-def local_to_UTC_nv(ndays,nsecs,lon):
-    UTC_nsecs = nsecs - tz(lon)*3600
-    UTC_ndays = ndays
-    if UTC_nsecs > 86400:
-        UTC_nsecs -= 86400
-        UTC_ndays +=1
-    elif UTC_nsecs < 0:
-        UTC_nsecs += 86400
-        UTC_ndays -= 1
-        #if UTC_ndays < 0:
+def local_to_UTC_nv(ldays,lsecs,lon):
+    nsecs = nsecs - tz(lon)*3600
+    ndays = ndays
+    if nsecs > 86400:
+        nsecs -= 86400
+        ndays +=1
+    elif nsecs < 0:
+        nsecs += 86400
+        ndays -= 1
+        #if ndays < 0:
         #   print("WARNING: UTC date is in the previous year!")
-        #if UTC_ndays > yrdays(year):
+        #if ndays > yrdays(year):
         #   print("WARNING: UTC date is in the next year!")
-    return UTC_ndays, UTC_nsecs 
+    return ndays, nsecs 
         
-def local_to_UTC(ndays,nsecs,lon):
+def local_to_UTC(ldays,lsecs,lon):
     from numpy import vectorize
     vfunc = vectorize(local_to_UTC_nv)
-    return vfunc(ndays,nsecs,lon)
+    return vfunc(ldays,lsecs,lon)
 
 ## Low-accuracy General Solar Position Calculations by NOAA Global Monitoring Division [https://www.esrl.noaa.gov/gmd/grad/solcalc/solareqns.PDF. The value we need is coszen.
 
@@ -74,7 +74,7 @@ def gamma(ndays,nsecs):
     return 2*pi/yrdays(year)*(ndays+(nsecs/3600-12)/24)
 
 def sundec(t):
-    "Sun declination (in radians) as a function of fractional solar year (in radians)"
+    "Sun declination (in radians) as a function of fractional solar year (in radians)."
     return 0.006918 - 0.399912*cos(t) + 0.070257*sin(t) \
                     - 0.006758*cos(2*t) + 0.000907*sin(2*t) \
                     - 0.002697*cos(3*t) + 0.00148*sin(3*t)
@@ -86,82 +86,57 @@ def eqtime(t):
                              - 0.014615*cos(2*t) - 0.040849*sin(2*t))
 
 def coszen_nv(ndays,nsecs,lat,lon):
+    "Cosine of the solar zenith angle. Non-vectorized version. Input date and time should be in UTC."
     from numpy import pi
     alat = lat/180*pi
     alon = lon/180*pi
-    decl = sundec(gamma(*local_to_UTC(ndays,nsecs,lon)))
-    #decl = sundec(gamma(ndays,nsecs))
-    #lndays,lnsecs = UTC_to_local(ndays,nsecs,lon) # Which day it is should not matter.
-    time_offset = eqtime(gamma(*local_to_UTC(ndays,nsecs,lon)))+4*lon-60*tz(lon)
-    #time_offset = eqtime(gamma(ndays,nsecs))+4*lon-60*tz(lon)
+    #decl = sundec(gamma(*local_to_UTC(ndays,nsecs,lon)))
+    decl = sundec(gamma(ndays,nsecs))
+
+    #time_offset = eqtime(gamma(*local_to_UTC(ndays,nsecs,lon)))+4*lon-60*tz(lon)
+    time_offset = eqtime(gamma(ndays,nsecs))+4*lon-60*tz(lon)
     #tst = lnsecs/60.0 + time_offset
     #print(tz(lon),alon,time_offset,eqtime(gamma(*local_to_UTC(ndays,nsecs,lon))),eqtime(gamma(ndays,nsecs)))
-    tst = nsecs/60.0 + time_offset
-    ha = tst/4-180
-    thsun = ha/180*pi
-    return sin(alat)*sin(decl)+cos(alat)*cos(decl)*cos(thsun)        
+    ldays,lsecs = UTC_to_local(ndays,nsecs,lon) # Which day it is should not matter.
+    tst = lsecs/60.0 + time_offset
+    ha = (tst/4-180)/180*pi # convert tst from minutes to degrees, then recenter, then convert to radians.
+    #thsun = ha/180*pi
+    #return sin(alat)*sin(decl)+cos(alat)*cos(decl)*cos(thsun)
+    return sin(alat)*sin(decl)+cos(alat)*cos(decl)*cos(ha)
         
 def coszen(ndays,nsecs,lat,lon):
-    "Cosine of the solar zenith angle. Inputs date and time should be local."
+    "Cosine of the solar zenith angle. Vectorized version. Inputs date and time should be in UTC."
     from numpy import vectorize
     vfunc = vectorize(coszen_nv)
     return vfunc(ndays,nsecs,lat,lon)
 
-def solar_times(day,lat,lon,events=['sunrise','snoon','sunset']):
-    """UTC time of sunrise / solar noon / sunset at a given day."""
-    from datetime import date, datetime
-    if isinstance(day,date) or isinstance(day,datetime):
-        year = day.year
-        month = day.month
-        day = day.day
-        ndays= (date(year,month,day)-date(year-1,12,31)).days
-    elif isinstance(day,int): # Assume it is directly ndays, not day_of_year = ndays + 1
-        ndays = day
-    else:
-        raise Exception('Unhandled argument type: {!s}'.format(type(day)))
-            
-    t = gamma(ndays,3600*12) # Use the UTC noon time sun declination, this was not specified in reference.
-    decl = sundec(t)
-    alat = lat/180*pi
-    zen = 90.833/180*pi # The approx correction for atmospheric refraction at sunrise and sunset, and size of solar disk.
-    cos_ha = cos(zen)/cos(alat)/cos(decl) - tan(alat)*tan(decl)
-    ha = abs(acos(cos_ha))/pi*180 # Convert to degrees
-    eqt = eqtime(t)
-
-    UTC_times = dict(
-        sunrise = 720 - 4*(lon+ha) - eqt,
-        snoon = 720 - 4*lon - eqt,
-        sunset = 720 - 4*(lon-ha) - eqt,
-        )
-    if isinstance(events,list):
-        return [UTC_times[event] for event in events]
-    else:
-        event = events
-        assert event in UTC_times.keys()
-        return UTC_times[event]
-
 # Requires the solar_utils package from PyPI
-def sp_coszen(ndays,nsecs,lat,lon):
+def sp_coszen(ldays,lsecs,lat,lon):
+    """
+    SOLPOS assumes Standard Time input, i.e. local time zone without
+     daylight savings. Our function assumes input is in theoretical local timezone.
+    """
     from solar_utils import solposAM as solpos
     from datetime import datetime, timedelta
-    dt = datetime(year,1,1) + timedelta(days=ndays) + timedelta(seconds=nsecs)
+    dt = datetime(year,1,1) + timedelta(days=ldays) + timedelta(seconds=lsecs)
     (angles, airmass) = solpos(location=[lat, lon, tz(lon)],
                                datetime=[dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second],
-                               weather=[1015.62055, 40.0]) # Pressure and dry-bulb temp
+                               weather=[1013.0, 10.0]) # Standard pressue and temperature, but we could have used 'sp' and 't2m' data.
     zenith, azimuth = angles # in degrees
     return cos(zenith/180*pi)
 
-def coszen_argmax_error_seconds(ndays,lat,lon):
+def coszen_argmax_error_seconds(ldays,lat,lon):
     from numpy import linspace, array, argmax
     ss = linspace(0,86400)
-    sp_cc = array([sp_coszen(ndays,s,lat,lon) for s in ss])
-    cc = coszen(ndays,ss,lat,lon)
+    sp_cc = array([sp_coszen(ldays,s,lat,lon) for s in ss])
+    cc = coszen(*UTC_to_local(ldays,ss,lon),lat,lon) # Need to convert to UTC before calling coszen.
     return ss[argmax(sp_cc)]-ss[argmax(cc)]
 
 # Compute our swr using Rosati's formulas.
 def swr_nv(ndays,nsecs,lat,lon):
-    tau = 0.7  # atmospheric transmission coefficient (0.7 used in Rossatti)
-    aozone = 0.09 # water vapour plus ozone absorption (0.09 used in Rossatti)
+    "Downward solar short wave radiation for the given location and time, which is assumed to be UTC. Non-vectorized version."
+    tau = 0.7  # atmospheric transmission coefficient (0.7 for the latitudes of medsea used in Rosati)
+    aozone = 0.09 # water vapour plus ozone absorption (0.09 used in Rosati)
     solar = 1370  # solar constant
 
     # Beware if called with a nsecs > 86400 or < 0 because of adjusting the timezone.
@@ -185,16 +160,18 @@ def swr_nv(ndays,nsecs,lat,lon):
     return qtot    
 
 def swr(ndays,nsecs,lat,lon):
-    "Calculate short wave radiation for the given moment, time assumed to be local."
+    "Downward solar short wave radiation for the given location and time, which is assumed to be UTC. Vectorized version."
     from numpy import vectorize
 #     assert (min(array(nsecs)) >= 0) and (max(array(nsecs))<=86400)
     vfunc = vectorize(swr_nv)
     return vfunc(ndays,nsecs,lat,lon)
 
-def swr_3hourly_mean(ndays,nsecs,lat,lon,timestep,method='quadrature'):
+def swr_3hourly_mean(ndays,nsecs,lat,lon,timestep=15,method='quadrature'):
     """ Calculate short wave radiation, averaged for the subsequent 3-hourly period.
-    Time period begins at the given moment (ndays, nsecs), assumed to be local.
-    Average taken over equally spaced samples with duration of 'timestep' in seconds. 
+    
+    3-hourly period begins at the given moment (ndays, nsecs), assumed to be given in UTC.
+    
+    Average taken either over equally spaced samples with duration of 'timestep' in seconds, or estimated by a quadrature.
     """
     from scipy.integrate import quadrature
     
@@ -217,6 +194,7 @@ def swr_3hourly_mean(ndays,nsecs,lat,lon,timestep,method='quadrature'):
                              lat,lon)
             swr_mean = cumsum/ns
     elif method == 'quadrature':
+        # CHECK whether swr() assumes LT or UT.
         swr_mean =  quadrature(lambda nsecs: swr(ndays,nsecs,lat,lon),
                                nsecs,nsecs+10800,tol=1e-1,rtol=1e-3)[0]/10800
     else:
@@ -239,7 +217,6 @@ def swr_3hourly_mean_monthly(year,month,lat,lon,method='quadrature'):
     ndays_start = (start-datetime(start.year,1,1)).days
     ndays_stop = (stop-datetime(start.year,1,1)).days
 
-    #tic = time()
     swr_mean = ones((ndays_stop-ndays_start)*8)
     
     for ndays in range(ndays_start,ndays_stop):
@@ -248,20 +225,13 @@ def swr_3hourly_mean_monthly(year,month,lat,lon,method='quadrature'):
             ndays_of_month = ndays-ndays_start            
             j = ndays_of_month*8+i
 
-            # TAKE CARE BELOW.
-            # Local time not necssarily at 0, 3, 6, 9 ... etc hours. 
-            # Also, swr_3hourly_mean gives the mean over the SUBSEQUENT 3 hours. 
-            I_0_calc = swr_3hourly_mean(*UTC_to_local_nv(ndays,nsecs,lon),
-                                        lat,lon,timestep,method=method) 
-            swr_mean[j] = I_0_calc
-    #toc = time()
-    # How long does it take for one grid point and one 3-hourly period?
-    #print('time elapsed for (m,n) = ({},{}):'.format(m,n), toc-tic)
+            # TAKE CARE BELOW. Check the timezone and interval assumptions of swr_3hourly_mean()
+            swr_mean[j] = swr_3hourly_mean(ndays,nsecs,lat,lon,timestep,method=method) 
     return swr_mean
 
 def cloud_factor_local(year,month,lat,lon,swr_obs,method='quadrature'):
 
-    " Compute cloud factor per grid point: lat/lon required and I_0 and I_0_calc expected to be given for the month with same number of records."
+    "Compute cloud factor per grid point: lat/lon required and I_0 and I_0_calc expected to be given for the month with same number of records."
     from datetime import datetime
     from time import time
     from netCDF4 import Dataset
@@ -351,3 +321,37 @@ def cloud_factor_all(year,month,grid='1x',use_ipp=True,append_to_ERA_dataset_now
             n = nn[i]
             cf[:,m,n] = cloud_factor
             swr_cs[:,m,n] = swr_mean
+
+# New stuff on 2017-11-08.
+def solar_times(day,lat,lon,events=['sunrise','snoon','sunset']):
+    """Calculate UTC time of sunrise / solar noon / sunset at a given day."""
+    from datetime import date, datetime
+    if isinstance(day,date) or isinstance(day,datetime):
+        year = day.year
+        month = day.month
+        day = day.day
+        ndays= (date(year,month,day)-date(year-1,12,31)).days
+    elif isinstance(day,int): # Assume it is directly ndays, not day_of_year = ndays + 1
+        ndays = day
+    else:
+        raise Exception('Unhandled argument type: {!s}'.format(type(day)))
+            
+    t = gamma(ndays,3600*12) # Use the UTC noon time sun declination, this was not specified in reference.
+    decl = sundec(t)
+    alat = lat/180*pi
+    zen = 90.833/180*pi # The approx correction for atmospheric refraction at sunrise and sunset, and size of solar disk.
+    cos_ha = cos(zen)/cos(alat)/cos(decl) - tan(alat)*tan(decl)
+    ha = abs(acos(cos_ha))/pi*180 # Convert to degrees
+    eqt = eqtime(t)
+
+    UTC_times = dict(
+        sunrise = 720 - 4*(lon+ha) - eqt,
+        snoon = 720 - 4*lon - eqt,
+        sunset = 720 - 4*(lon-ha) - eqt,
+        )
+    if isinstance(events,list):
+        return [UTC_times[event] for event in events]
+    else:
+        event = events
+        assert event in UTC_times.keys()
+        return UTC_times[event]
