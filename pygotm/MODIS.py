@@ -1,18 +1,24 @@
+
 from pylab import *
 from netCDF4 import Dataset
 from numpy.ma import masked_invalid, masked_outside
 import os, sys
 from scipy.interpolate import *
 from pygotm import medsea
+from importlib import reload
 
-target_grid = '144x'
-medsea.set_grid(target_grid)
-medsea.set_folders()
+target_grid = '1x'
+def set_grid(target_grid):
+    global grid_lats, grid_lons, data_folder, p_sossta_folder
+    reload(medsea)    
+    medsea.set_grid(target_grid)
+    medsea.set_folders()
+    data_folder = medsea.data_folder
+    p_sossta_folder = medsea.p_sossta_folder
+    grid_lats = medsea.grid_lats
+    grid_lons = medsea.grid_lons
 
-data_folder = medsea.data_folder
-p_sossta_folder = medsea.p_sossta_folder
-grid_lats = medsea.grid_lats
-grid_lons = medsea.grid_lons
+set_grid(target_grid)
 
 coverage_length = '8D'
 MODIS_folder = os.path.join(p_sossta_folder,'glo_MODIS',coverage_length)
@@ -87,7 +93,7 @@ def plot(year,num,ax=None):
     fig.tight_layout()
     return im, cbar
 
-def animate(year):
+def animate(year,num=46):
     from matplotlib import animation
     from IPython.display import HTML
 
@@ -107,7 +113,7 @@ def animate(year):
         return im,
 
     anim = animation.FuncAnimation(fig, animate, #init_func=init,
-                                   frames=range(1,47), interval=28, blit=True)
+                                   frames=range(1,num+1), interval=28, blit=True)
     
     gif_fn = '{:d}_medsea_MODIS_{:s}.gif'.format(year,varname)
     anim.save(gif_fn, writer='imagemagick', fps=3)
@@ -221,7 +227,7 @@ def plot_interp(year,num, ax=None):
 
     set_vmin_vmax()
     from netCDF4 import Dataset
-    with Dataset(os.path.join(data_folder,'medsea_MODIS','8days','medsea_MODIS_{:s}_8D_{:d}.nc'.format(obs_type,year))) as nc:
+    with Dataset(os.path.join(data_folder,'medsea_MODIS','medsea_MODIS_{:s}_8D_{:d}.nc'.format(obs_type,year))) as nc:
         modis_data = nc[varname][num,:]
     if ax is None:
         fig, ax = subplots(figsize=(10,3))
@@ -251,7 +257,7 @@ def animate_interp(year,num=46):
         return im,
     def animate(i):
         im.set_alpha(1)
-        with Dataset(os.path.join(data_folder,'medsea_MODIS','8days','medsea_MODIS_{:s}_8D_{}.nc'.format(obs_type,year))) as nc:
+        with Dataset(os.path.join(data_folder,'medsea_MODIS','medsea_MODIS_{:s}_8D_{}.nc'.format(obs_type,year))) as nc:
             modis_data = nc[varname][i,:]
         im.set_array(modis_data)
         ax.set_title('{:d}, 8days mean beginning on day #{:003d}'.format(year,i*8+1))
@@ -260,99 +266,120 @@ def animate_interp(year,num=46):
     anim = animation.FuncAnimation(fig, animate, #init_func=init,
                                    frames=range(num), interval=28, blit=True)
 
-    fn = '{:d}_medsea_MODIS_{:s}.gif'.format(year,varname)
+    fn = os.path.join(data_folder,'medsea_MODIS','{:d}_medsea_MODIS_{:s}.gif'.format(year,varname))
     anim.save(fn, writer='imagemagick', fps=3)
     print('Animation saved to {:s}!'.format(fn))
     return anim
 # HTML(anim.to_html5_video())
 
-# def format_modis_8days(year,outdir=os.path.join(data_folder,'medsea_MODIS','8days'),
+def medsea_MODIS_reformat(year,num=46,
+                          src_folder='p_sossta/glo_MODIS/8D',
+                          dst_folder='medsea_data/medsea_MODIS'):
+    """ Combine 8-day MODIS CHLO / IOP data with interpolation to be 
+    eventually written to chlo.dat / iop .dat.
+    
+    Version date: 2017-11-11.
+    """
+
+    # Need to set global variable as a mechanism to avoid explicit arguments passing to functions.
+    global varname
+
+    from os import getenv, mkdir
+    from os.path import join, isfile, isdir, isabs
+    from netCDF4 import Dataset, date2num
+    from numpy.ma import masked_invalid
+    from numpy import nan
+    from pygotm.config import epoch
+
+    # Find absolute path for the src_folder and dst_folder
+    if not isabs(src_folder):
+        src_folder = join(getenv('HOME'),src_folder)
+    if not isabs(dst_folder):
+        dst_folder = join(getenv('HOME'),dst_folder)
+        if not isdir(dst_folder):
+            mkdir(dst_folder)
+            
+    # User need to make sure the medsea module is loaded and set up.
+    import sys
+    assert 'medsea' not in sys.modules, "'import pygotm.medsea as medsea' first!'"
+            
+    # Writing to an nc file.
+    dst_fn = 'medsea_MODIS_{:s}_8D_{:d}.nc'.format(obs_type,year)
+    print('Writing to {:s}...'.format(join(dst_folder,dst_fn)))
+    with Dataset(join(dst_folder,dst_fn),'w',format='NETCDF3_CLASSIC') as ds: 
+
+        ds.createDimension('time') # unlimited
+        ds.createDimension('lat', size = len(grid_lats)) 
+        ds.createDimension('lon', size = len(grid_lons)) 
+        print('Done creating dimensions.')
+        
+        ds_time = ds.createVariable('time','i4',dimensions=('time',))
+        ds_time.units = 'seconds since {!s}'.format(epoch)
+        ds_lat = ds.createVariable('lat','f4',dimensions=('lat',))
+        ds_lat.units = 'degrees north'
+        ds_lon = ds.createVariable('lon','f4',dimensions=('lon',))
+        ds_lon.units = 'degrees east'
+        ds_lat[:] = grid_lats
+        ds_lon[:] = grid_lons
+        print('Done creating lat/lon grid.')
+
+        for i in range(num):
+            ds_time[i] = date2num(coverage_midpoint(year,i),ds_time.units)
+        print("Done writing 'time' using coverage midpoints of the nc files for {:s}".format(obs_type))
+            
+        if obs_type == 'IOP':
+        # ignore the current global varname, these two are what we want
+            for varname in ['a_488_giop','bb_488_giop']:
+                var = ds.createVariable(varname,'f4',dimensions=('time','lat','lon'),fill_value=nan)
+                for i in range(num):
+                    var[i,:] = masked_invalid(interp(year,i,method='linear'))
+                print("Done writing '{:s}'.".format(varname))
+
+        if obs_type == 'CHL':
+            varname == 'chlor_a' # ignore global varname, only one variable in this obs_type
+            var = ds.createVariable('chlor_a','f4',dimensions=('time','lat','lon'),fill_value=nan)
+            for i in range(num):
+                var[i,:] = masked_invalid(interp(year,i,method='linear'))
+            print("Done writing '{:s}'.".format(varname))
+
+# def format_modis_8days(year,num=46,outdir=os.path.join(data_folder,'medsea_MODIS','8days'),
 #                        lat=medsea.grid_lats,lon=medsea.grid_lons):
 #     from netCDF4 import Dataset, date2num
 #     from numpy.ma import masked_invalid
-#     global varname
-
+    
 #     epoch = 'seconds since 1981-01-01'
-
+    
 #     # Writing to an nc file.
 #     outfn = os.path.join(outdir,'medsea_MODIS_{:s}_8D_{:d}.nc'.format(obs_type,year))
 #     print('Writing to {:s}...'.format(outfn))
-#     with Dataset(outfn, 'w', format='NETCDF3_CLASSIC') as new: 
+#     mode = 'a' if os.path.isfile(outfn) else 'w'
+#     with Dataset(outfn, mode, format='NETCDF3_CLASSIC') as new:
+#         if mode == 'w':
+#             new.createDimension('time') # unlimited
+#             new.createDimension('lat', size = len(lat))
+#             new.createDimension('lon', size = len(lon))
+#             print('Done creating dimensions.')
+            
+#             nctime = new.createVariable('time','f8',dimensions=('time',))
+#             nctime.units = epoch
+#             nclat = new.createVariable('lat','f8',dimensions=('lat',))
+#             nclat.units = 'degrees north'
+#             nclon = new.createVariable('lon','f8',dimensions=('lon',))
+#             nclon.units = 'degrees east'
+            
+#             nclat[:] = lat
+#             nclon[:] = lon
+#             print('Done creating lat/lon grid.')
 
-#         new.createDimension('time') # unlimited
-#         new.createDimension('lat', size = len(lat)) 
-#         new.createDimension('lon', size = len(lon)) 
-#         print('Done creating dimensions.')
+#         # Common to mode == 'w' and mode == 'a'    
+#         ncvar = new.createVariable(varname,'f8',dimensions=('time','lat','lon'),
+#                                    zlib=True, fill_value=nan) # Fill-value the same as in REA dataset.
+#         print('Done creating variables.')
         
-#         nctime = new.createVariable('time','f8',dimensions=('time',))
-#         nctime.units = epoch
-#         nclat = new.createVariable('lat','f8',dimensions=('lat',))
-#         nclat.units = 'degrees north'
-#         nclon = new.createVariable('lon','f8',dimensions=('lon',))
-#         nclon.units = 'degrees east'
-#         nclat[:] = lat
-#         nclon[:] = lon
-#         print('Done creating lat/lon grid.')
-
-#         for i in range(46):
-#             nctime[i] = date2num(coverage_midpoint(year,i),epoch)
-#         print("Done writing 'time' using coverage midpoints of the nc files for {:s}".format(varname))
-            
-#         if obs_type == 'IOP':
-#             # ignore the current global varname, these two are what we want
-#             for varname in ['a_488_giop','bb_488_giop']:
-#                 ncvar = new.createVariable(varname,'f8',dimensions=('time','lat','lon'),
-#                                            zlib=True, fill_value=nan) # Fill-value the same as in REA dataset.       
-#                 for i in range(46):
-#                     ncvar[i,:] = masked_invalid(interp(year,i,method='linear'))
-#                 print("Done writing '{:s}'.".format(varname))
-
-#         if obs_type == 'CHL':
-#             assert varname == 'chlor_a' # only one variable in this obs_type
-#             ncvar = new.createVariable('chlor_a','f8',dimensions=('time','lat','lon'),
-#                                        zlib=True, fill_value=nan) # Fill-value the same as in REA dataset.
-#             for i in range(46):
-#                 ncvar[i,:] = masked_invalid(interp(year,i,method='linear'))
-#             print("Done writing '{:s}'.".format(varname))
-
-def format_modis_8days(year,num=46,outdir=os.path.join(data_folder,'medsea_MODIS','8days'),
-                       lat=MODIS.grid_lats,lon=MODIS.grid_lons):
-    from netCDF4 import Dataset, date2num
-    from numpy.ma import masked_invalid
-    
-    epoch = 'seconds since 1981-01-01'
-    
-    # Writing to an nc file.
-    outfn = os.path.join(outdir,'medsea_MODIS_{:s}_8D_{:d}.nc'.format(MODIS.obs_type,year))
-    print('Writing to {:s}...'.format(outfn))
-    mode = 'a' if os.path.isfile(outfn) else 'w'
-    with Dataset(outfn, mode, format='NETCDF3_CLASSIC') as new:
-        if mode == 'w':
-            new.createDimension('time') # unlimited
-            new.createDimension('lat', size = len(lat))
-            new.createDimension('lon', size = len(lon))
-            print('Done creating dimensions.')
-            
-            nctime = new.createVariable('time','f8',dimensions=('time',))
-            nctime.units = epoch
-            nclat = new.createVariable('lat','f8',dimensions=('lat',))
-            nclat.units = 'degrees north'
-            nclon = new.createVariable('lon','f8',dimensions=('lon',))
-            nclon.units = 'degrees east'
-            
-            nclat[:] = lat
-            nclon[:] = lon
-            print('Done creating lat/lon grid.')
-
-        # Common to mode == 'w' and mode == 'a'    
-        ncvar = new.createVariable(MODIS.varname,'f8',dimensions=('time','lat','lon'),
-                                   zlib=True, fill_value=nan) # Fill-value the same as in REA dataset.
-        print('Done creating variables.')
-        
-        for i in range(num):
-            if mode == 'w':
-                nctime[i] = date2num(MODIS.coverage_midpoint(year,i),epoch)
+#         for i in range(num):
+#             if mode == 'w':
+#                 nctime[i] = date2num(coverage_midpoint(year,i),epoch)
                 
-            ncvar[i,:] = masked_invalid(MODIS.interp(year,i,method='linear'))
+#             ncvar[i,:] = masked_invalid(interp(year,i,method='linear'))
                 
-        print("Done writing 'time' and '{:s}'.".format(MODIS.varname))
+#         print("Done writing 'time' and '{:s}'.".format(varname))
