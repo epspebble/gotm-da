@@ -916,11 +916,11 @@ def prepare_run(start,stop,run_folder,out_dir='.',out_fn='results',m=None,n=None
     dat_list = ['tprof','sprof','heat','met']
     if ('tprof_method' in gotm_user_args):
         tm = gotm_user_args['tprof_method']
-        if tm ~= 2: # 2 indicates read from file.
+        if tm != 2: # 2 indicates read from file.
             dat_list.remove('tprof')
     if ('sprof_method' in gotm_user_args):
         sm = gotm_user_args['sprof_method']
-        if sm ~= 2: # 2 indicates read from file.
+        if sm != 2: # 2 indicates read from file.
             dat_list.remove('sprof')
     if ('extinct_method' in gotm_user_args):
         em = gotm_user_args['extinct_method']
