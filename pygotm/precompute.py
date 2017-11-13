@@ -9,7 +9,7 @@ def date2ndaysnsecs(dt):
     nsecs = int((dt-datetime(dt.year,dt.month,dt.day,0,0,0)).total_seconds())
     return ndays, nsecs
 
-def medsea_ERA_append_cloud_factor(year,,grid='1x', # Grid info used to get sea_mn
+def medsea_ERA_append_cloud_factor(year,grid='1x', # Grid info used to get sea_mn
                                    dst_folder='medsea_data/medsea_ERA-INTERIM'):
     """
     Append downward short wave radiation 3-hourly means to the nc variable 'swrd_cs' in each file.
