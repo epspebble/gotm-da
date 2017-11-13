@@ -1,9 +1,17 @@
+# Local imports.
+from os import getenv, mkdir
+from os.path import isfile, isdir, isabs, join
+from time import time
+from netCDF4 import Dataset, date2num, num2date
+from datetime import datetime, date, timedelta
+from pygotm.swr import swr_3hourly_mean
+from numpy.ma import masked_all
+
 def date2ndaysnsecs(dt):
     """
     Convert a datetime object to (ndays, nsecs), number of days 
     since last new year eve and number of seconds since midnight.
     """
-    from datetime import datetime,date
     
     ndays = (date(dt.year,dt.month,dt.day) - date(dt.year-1,12,31)).days 
     nsecs = int((dt-datetime(dt.year,dt.month,dt.day,0,0,0)).total_seconds())
@@ -17,14 +25,7 @@ def medsea_ERA_append_cloud_factor(year,grid='1x', # Grid info used to get sea_m
     Version date: 2017-11-11
     """
     
-    ## Preparations.
-    
-    # Local imports.
-    from os import getenv, mkdir
-    from os.path import isfile, isdir, isabs, join
-    from time import time
-    from netCDF4 import Dataset, date2num
-    from pygotm.swr import swr_3hourly_mean
+    ## Preparations.    
 
     # Assumed filename pattern.
     dst_fn = 'medsea_ERA_heat_{:d}.nc'.format(year)
@@ -83,13 +84,13 @@ def medsea_ECMWF_append_cloud_factor(year,month,grid='1x', # Grid info used to g
     
     ## Preparations.
     
-    # Local imports.
-    from os import getenv, mkdir
-    from os.path import isfile, isdir, isabs, join
-    from time import time
-    from netCDF4 import Dataset, num2date
-    from pygotm.swr import swr_3hourly_mean
-    from numpy.ma import masked_all
+    # # Local imports.
+    # from os import getenv, mkdir
+    # from os.path import isfile, isdir, isabs, join
+    # from time import time
+    # from netCDF4 import Dataset, num2date
+    # from pygotm.swr import swr_3hourly_mean
+    # from numpy.ma import masked_all
 
     # Assumed filename pattern.
     dst_fn = 'medsea_ECMWF_heat_{:d}{:02d}.nc'.format(year,month)    
