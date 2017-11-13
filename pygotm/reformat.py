@@ -555,7 +555,7 @@ def medsea_MFC_sunrise_reformat(start_day,stop_day,grid='1x',
 
             # Just the days from 0, 1, 2, ...
             ds_day = ds.createVariable('day','i4',dimensions=('day',))
-            ds_day.units = "number of days since {!s}".format(start_day) # So 0 gives the start_day. 
+            ds_day.units = "days since {!s}".format(start_day) # So 0 gives the start_day. 
             ndays = (stop_day-start_day).days
             ds_day[:] = range(0,ndays)
             
@@ -596,7 +596,7 @@ def medsea_MFC_sunrise_reformat(start_day,stop_day,grid='1x',
         tic = time()
         with Dataset(join(dst_folder,dst_fn),'a') as ds:
             ds_sec = ds.createVariable('seconds','i4',dimensions=('day','lat','lon'))
-            ds_sec.units = "number of seconds since UTC midnight of the day"   
+            ds_sec.units = "seconds since UTC midnight of the day"   
             ds_sec[:] = seconds_of_sunrise
             # Filename pattern instead of specific filename
             var = ds.createVariable(dst_varname[name],'f4',dimensions=('day','depth','lat','lon'))
