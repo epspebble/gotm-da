@@ -1,5 +1,35 @@
 ### ERA-INTERIM
 # This improves current code in pygotm/ncdf_reformat.py, version on 2017-07-13
+def make_abs(rel_path, side_effect = 'raise'):
+    """
+    Returns the absolute path by prepending user home folder. 
+    Options:
+    1. side_effect = 'raise' 
+       Raise OSError if the directory does not exist.
+    2. side_effect = 'mkdir'
+       Assumes it is a folder and create it if it does not exist.
+    Always raise an OSError if the path leads to an existing file.
+    """
+    from os import getenv, mkdir
+    from os.path import isfile, isdir, isabs, join
+
+    if isabs(rel_path):
+        abs_path = rel_path
+    else:
+        abs_path = join(getenv('HOME'),rel_path)
+    if isfile(abs_path):
+        raise OSError('The path to a file is given, expecting a directory.')
+    if not isdir(abs_path):
+        # The mkdir() command could itself raise an OSError.
+        if side_effect == 'mkdir':
+            try:
+                mkdir(abs_path)
+            except OSError as oe:
+                raise oe('Creating the directory {!s} failed. '.format(abs_path))
+        elif side_effect == 'raise':
+            raise OSError('The directory {!s} does not exist.'.format(abs_path))
+    return abs_path
+
 def medsea_ERA_reformat(year, grid='1x',
                         src_folder='p_sossta/medsea_ERA-INTERIM/3-hourly',
                         dst_folder='medsea_data/medsea_ERA-INTERIM'):    
