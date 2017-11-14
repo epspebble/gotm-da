@@ -914,12 +914,12 @@ def prepare_run(start,stop,run_folder,out_dir='.',out_fn='results',m=None,n=None
 
     # Create a list of dat files we expect to see.
     dat_list = ['tprof','sprof','heat','met']
-    if ('tprof_method' in gotm_user_args):
-        tm = gotm_user_args['tprof_method']
+    if ('t_prof_method' in gotm_user_args):
+        tm = gotm_user_args['t_prof_method']
         if tm != 2: # 2 indicates read from file.
             dat_list.remove('tprof')
-    if ('sprof_method' in gotm_user_args):
-        sm = gotm_user_args['sprof_method']
+    if ('s_prof_method' in gotm_user_args):
+        sm = gotm_user_args['s_prof_method']
         if sm != 2: # 2 indicates read from file.
             dat_list.remove('sprof')
     if ('extinct_method' in gotm_user_args):
