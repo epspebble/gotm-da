@@ -106,17 +106,17 @@ run_profiles = {
                           grid_method = 2, grid_file = 'grid_75m.dat',
                           nsave=30),
     # 20171113, same as the previous, except with a higher resolution output.
-    'ASM5-75m_salt_calc': dict(assimilation_type=2, assim_window=1,
-                               s_prof_method=1, # Calculate analytic profiles
+    'ASM5-75m_no_salt': dict(assimilation_type=2, assim_window=1,
+                               s_prof_method=0, # skip s_prof 
                                extinct_method=13, extinct_file='iop.dat', 
                                depth = 74.539324233308434, nlev = 122,
                                grid_method = 2, grid_file = 'grid_75m.dat'),
-    'ASM3.1-75m_salt_calc': dict(assimilation_type=2, assim_window=1,
-                                 s_prof_method=1, # Calculate analytic profiles
+    'ASM3.1-75m_no_salt': dict(assimilation_type=2, assim_window=1,
+                                 s_prof_method=0, # skip s_prof 
                                  extinct_method=12, extinct_file='chlo.dat', 
                                  depth = 74.539324233308434, nlev = 122,
                                  grid_method = 2, grid_file = 'grid_75m.dat'),
-    'ASM2-75m_salt_calc': dict(assimilation_type=2, assim_window=1, extinct_method=9, 
+    'ASM2-75m_no_salt': dict(assimilation_type=2, assim_window=1, extinct_method=9, 
                                depth = 74.539324233308434, nlev = 122,
                                grid_method = 2, grid_file = 'grid_75m.dat'),
 
