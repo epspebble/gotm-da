@@ -1504,7 +1504,6 @@ contains
        ! !INPUT PARAMETERS:
        integer, intent(in)                 :: jul,secs
        !
-       !
        ! !REVISION HISTORY:
        !  Original author(s): Karsten Bolding
        !
@@ -1523,9 +1522,7 @@ contains
        double precision, SAVE            :: dt
        integer, save             :: meteo_jul1,meteo_secs1
        integer, save             :: meteo_jul2=0,meteo_secs2=0
-       !double precision, save        :: obs(6)
-       !WT added for SP's new code below:
-       double precision, save            :: obs1(6), obs2(6)
+       double precision, save            :: obs(6)
 
        !HK: changed alpha(4) to alpha(6)
        double precision, save            :: alpha(9)
@@ -1550,44 +1547,127 @@ contains
        !-----------------------------------------------------------------------
        !BOC
 
-       !WT SP's new code as of 20171115, replaces the whole subroutine.
        !  This part initialises and reads in new values if necessary
        if(time_diff(meteo_jul2,meteo_secs2,jul,secs) .lt. 0) then
           do
              meteo_jul1 = meteo_jul2
              meteo_secs1 = meteo_secs2
-             obs1 = obs2
-             call read_obs(meteo_unit,yy,mm,dd,hh,min,ss,6,obs2,rc)
+             call read_obs(meteo_unit,yy,mm,dd,hh,min,ss,6,obs,rc)
              call julian_day(yy,mm,dd,meteo_jul2)
              meteo_secs2 = hh*3600 + min*60 + ss
              if(time_diff(meteo_jul2,meteo_secs2,jul,secs) .gt. 0) EXIT
           end do
-          dt = time_diff(meteo_jul2,meteo_secs2,meteo_jul1,meteo_secs1)
-       end if
-       !  Do the time interpolation
-       t  = time_diff(jul,secs,meteo_jul1,meteo_secs1)
-
-       alpha(1) = (obs2(1)-obs1(1))/dt
-       wx    = obs1(1) + t*alpha(1)
-       wx_obs = obs1(1) + t*alpha(1)
-       alpha(2) = (obs2(2)-obs1(2))/dt
-       wy    = obs1(2) + t*alpha(2)
-       wy_obs = obs1(2) + t*alpha(2)
-       alpha(3) = (obs2(3)-obs1(3))/dt
-       airp  = (obs1(3) + t*alpha(3))*100. !kbk mbar/hPa --> Pa
-       alpha(4) = (obs2(4)-obs1(4))/dt
-       airt  = obs1(4) + t*alpha(4)
-       alpha(5) = (obs2(5)-obs1(5))/dt
-       spec_hum = obs1(5) + t*alpha(5)
-       !      dew_pt = obs1(5) + t*alpha(5)
-       !      rh    = obs1(5) + t*alpha(5)
-       alpha(6) = (obs2(6)-obs1(6))/dt
-       cloud = obs1(6) + t*alpha(6)
+       end if           !SP I added this so that the fluxes are calculated each time step with a new sst, if using must comment out end if below.
+       wx    = obs(1)
+       wy    = obs(2)
+       wx_obs=obs(1)
+       wy_obs=obs(2)
+       airp  = obs(3)*100. !kbk mbar/hPa --> Pa
+       airt  = obs(4)
+       spec_hum = obs(5)
+       !      dew_pt = obs(5)
+       !      rh    = obs(5)
+       cloud = obs(6)
 
        call exchange_coefficients()
+       !SP FEB05: cloud data assimilation scheme using skin sst obs
+       !count=count+1
+       !count2=count2+1 
+       !if(count==96) then
+       !   OPEN(UNIT=9,FILE="OBS/SUB/sst.dat",IOSTAT=ios)
+       !		IF(ios/=0) THEN
+       !			PRINT*,"Error during opening input file, stopping"; STOP
+       !		END IF
+       !	DO count3=1,count2+85               	
+       !		READ (UNIT=9,FMT='(3X,E13.12)')  sst_obs
+       !	END DO
+       !   CLOSE (UNIT=9)
 
-       call do_calc_fluxes(qb,qh,qe,taux=tx,tauy=ty)
+       !   cloud=cloud+(skint-sst_obs)/0.1
+       !   PRINT*,cloud
+       !   count=0
+       !   if (cloud.lt.0.0) then
+       !            cloud=0.0
+       !   else if (cloud.gt.1.0) then
+       !            cloud=1.0
+       !   end if
+       !end if     
 
+       !HK add in code to get time interpolated u10 and v10 out
+       !so they can be used in co2transfer.f90
+
+       if (first) then
+          !         call do_calc_fluxes(heatf=h1,taux=tx1,tauy=ty1)
+          call do_calc_fluxes(qb1,qh1,qe1,taux=tx1,tauy=ty1)
+          !         call short_wave_radiation(jul,secs,alat,alon,swr=I1)
+          !         I2  = I1                
+          !         h2  = h1
+          tx2 = tx1
+          ty2 = ty1
+          qb2 = qb1
+          qh2 = qh1
+          qe2 = qe1
+          !HK added:
+          wx1=wx
+          wy1=wy        
+          wx2 = wx1
+          wy2 = wy1
+          !end of added
+
+          first = .false.
+       else
+          !         I1  = I2               
+          !         h1  = h2
+          tx1 = tx2
+          ty1 = ty2
+          qb1 = qb2
+          qh1 = qh2
+          qe1 = qe2
+          !         call do_calc_fluxes(heatf=h2,taux=tx2,tauy=ty2)
+          call do_calc_fluxes(qb2,qh2,qe2,taux=tx2,tauy=ty2)
+
+          !         call short_wave_radiation(jul,secs,alat,alon,swr=I2) 
+          !HK added:
+          wx1=wx2
+          wy1=wy2
+          wx2=wx
+          wy2=wy
+          !end of added
+
+       end if
+
+       dt = time_diff(meteo_jul2,meteo_secs2,meteo_jul1,meteo_secs1)
+
+       !      alpha(1) = (I2-I1)/dt
+       !      alpha(2) = (h2-h1)/dt
+       alpha(3) = (tx2-tx1)/dt
+       alpha(4) = (ty2-ty1)/dt
+       alpha(7) = (qb2-qb1)/dt
+       alpha(8) = (qh2-qh1)/dt
+       alpha(9) = (qe2-qe1)/dt
+       !HK added:
+       alpha(5) =  (wx2-wx1)/dt
+       alpha(6) =  (wy2-wy1)/dt
+       !end of added
+
+       !      end if           ! SP - commented out as it placed earlier
+
+       !  Do the time interpolation
+       t  = time_diff(jul,secs,meteo_jul1,meteo_secs1)
+       !   I_0  = I1  + t*alpha(1)    
+       !   heat = h1  + t*alpha(2)
+       tx   = tx1 + t*alpha(3)
+       ty   = ty1 + t*alpha(4)
+       qb   = qb1 + t*alpha(7)
+       qh   = qh1 + t*alpha(8)
+       qe   = qe1 + t*alpha(9)
+
+       !HK added:
+       u10   = wx1 + t*alpha(5)
+       v10   = wy1 + t*alpha(6)
+       !end of added
+
+       return
      end subroutine flux_from_meteo
      !EOC
 
