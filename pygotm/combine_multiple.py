@@ -1,5 +1,5 @@
 from pygotm import medsea
-from combine import reload, hour_range, outfn
+from pygotm.combine import reload, hour_range, outfn
 
 def read(varnames,fn=None,hr=None,year=None,month=None,failed_list=None):
     from time import time
