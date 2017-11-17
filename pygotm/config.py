@@ -5,31 +5,115 @@ try:
 except NameError:
     FileNotFoundError = IOError
 
-### Global settings for the p_sossta project medsea runs.
-import os
+# Use tabulate to beatify output if possible
+try:
+    from tabulate import tabulate
+except ImportError:
+    pass # silently ignore if it is not installed.
+    
+# neccesary library
+import os, sys
 from datetime import datetime
 from netCDF4 import Dataset
 from numpy import pi, cos, sin
 
+### Global settings for the p_sossta project medsea runs.
+userhome = os.getenv('HOME')
+
 ## For general GOTM setup
 
-# Set the default GOTM executable and namelist locations.
-userhome = os.getenv('HOME')
-project_folder = os.path.join(userhome,'medsea_GOTM') # notebooks, jobs, scripts, config templates
-GOTM_executable = os.path.join(project_folder,'bin','gotm')
-if not(os.path.isfile(GOTM_executable)):
-    raise FileNotFoundError("The GOTM executable not found at " + GOTM_executable)
-GOTM_nml_path = os.path.join(project_folder,'config')
-GOTM_nml_list = ['gotmrun.inp','gotmmean.inp','gotmturb.inp','airsea.inp','obs.inp']
-for nml in GOTM_nml_list:
-    GOTM_nml_template = os.path.join(GOTM_nml_path,nml)
-    if not(os.path.isfile(GOTM_nml_template)):
-           raise FileNotFoundError("The GOTM config namelist " + GOTM_nml_template + " is invalid.")
-
-# GOTM namelist values, copied here manually as global variables.
-timestep = 30
+# Global "input" variables.
+project_name = 'medsea_GOTM'
+GOTM_version = 'latest'
+# Some essential GOTM settings overrider
+#timestep = 30
 #max_depth = 150
-            
+#nsave = 120
+# For setting unit of combined result files.
+epoch = datetime(1981,1,1)
+
+def setup(**overrides):
+    """
+    Set up other global variables including: 
+
+       project_folder, GOTM_executable, GOTM_nml_path, GOTM_nml_list
+
+    using preset module global variables including:
+
+       project_name, GOTM_version, epoch
+
+    This function is automatically invoked with default values at loading. Pass a dictionary to override any of 
+    the preset global variables and recompute / check the rest.
+
+    Version date: 2017-11-16.
+    """
+    
+    # Global "output" variables computed from the "input" global preset module variables.
+    global project_folder, GOTM_executable, GOTM_nml_path, GOTM_nml_list
+
+    # Hardcoded lists
+    preset = ['project_name', 'GOTM_version', 'epoch']
+    output = ['project_folder', 'GOTM_executable', 'GOTM_nml_path', 'GOTM_nml_list']
+
+    # Split user overrides by name.
+    preset_overrides = {name: overrides[name] for name in preset if name in overrides}
+    output_overrides = {name: overrides[name] for name in output if name in overrides}
+
+    # Update the preset globals.
+    current_settings = globals()
+    current_settings.update(preset_overrides)
+
+    # Now compute the output global variables one by one.
+
+    # 1.
+    if 'project_folder' in output_overrides:
+        project_folder = output_overrides['project_folder']
+    else:
+        project_folder = os.path.join(userhome,project_name) # notebooks, jobs, scripts, config templates
+
+    # 2.
+    if 'GOTM_executable' in output_overrides:
+        GOTM_executable = output_overrides['GOTM_executable']
+    else:
+        GOTM_executable = os.path.join(project_folder,'bin','gotm'+'-'+GOTM_version)
+    # Check. 
+    if not(os.path.isfile(GOTM_executable)):
+        raise FileNotFoundError("The GOTM executable not found at " + GOTM_executable)
+
+    # 3.
+    if 'GOTM_nml_path' in output_overrides:
+        GOTM_nml_path = output_overrides['GOTM_nml_path']
+    else:
+        GOTM_nml_path = os.path.join(project_folder,'config')
+    # Check.
+    if not os.path.isdir(GOTM_nml_path):
+        raise FileNotFoundError('The GOTM namelist path {!s} is invalid.'.format(GOTM_nml_path))
+
+    # 4.
+    if 'GOTM_nml_list' in output_overrides:
+        GOTM_nml_list = output_overrides['GOTM_nml_list']
+    else:
+        GOTM_nml_list = ['gotmrun.inp','gotmmean.inp','gotmturb.inp','airsea.inp','obs.inp']
+    for nml in GOTM_nml_list:
+        GOTM_nml_template = os.path.join(GOTM_nml_path,nml)
+        if not(os.path.isfile(GOTM_nml_template)):
+            raise FileNotFoundError("The GOTM config namelist file: " + GOTM_nml_template + " is invalid.")
+
+    print('Current pyGOTM settings:\n')
+    if 'tabulate' not in sys.modules.keys():
+        for name in preset:
+            print('\t',name,':\t', current_settings[name])
+            for name in output:
+                print('\t',name,':\t', current_settings[name])
+    else:
+        print('Settings:')
+        print(tabulate([[name,current_settings[name]] for name in preset]))
+        print('Paths:')
+        print(tabulate([[name,current_settings[name]] for name in output]))
+        
+# Set default values.
+setup()
+        
 ## Global config for medsea simulations 
 # The following are not meant to be changed interactively, as functions in other modules in thisos.listdir(ms.base_folder)
 # package will not see the changes. 
@@ -38,9 +122,9 @@ timestep = 30
 #
 
 # List of run_profiles done in the past.
+
 # TODO: We should specify the corresponding GOTM code version in the profiles as well.
 run_profiles = {
-
     # The V2 runs. They were run at 150m deep with 150 levels.
     'ASM0': dict(assimilation_type=0, extinct_method=9),
     'ASM1': dict(assimilation_type=0, extinct_method=12),
@@ -121,5 +205,3 @@ run_profiles = {
                                grid_method = 2, grid_file = 'grid_75m.dat'),
 
 }
-
-epoch = datetime(1981,1,1)
