@@ -71,7 +71,7 @@ def gotm(run_folder = '.', verbose = False, logfn = 'gotm.log',
     run_files = dict()
     
     # Transfer GOTM config namelists in the local run_folder.
-    for each in GOTM_nml_list:
+    for each in GOTM_nml:
         dst = os.path.join(run_folder,each)
         if not(os.path.isfile(dst)):
             src = os.path.join(GOTM_nml_path,each)
@@ -113,7 +113,7 @@ def loadcfg(path='.', verbose = True):
     from f90nml import read
     from os.path import join
     config = dict()
-    for eachnml in GOTM_nml_list:
+    for eachnml in GOTM_nml:
         fn = join(path,eachnml)
         if verbose:
             print('Reading {} ...'.format(fn))
@@ -127,7 +127,7 @@ def writecfg(gotm_cfg, path='.', inp_backup = False, verbose = True):
     from os import rename
     from datetime import datetime
     timestr = print_ctime(sep='_')
-    for eachnml in GOTM_nml_list:
+    for eachnml in GOTM_nml:
         fullfile = join(path,eachnml)
         if exists(fullfile) and inp_backup:
             # Append a suffix with the current timestamp, almost ISO8601-like, sans '-', ':' and timezone.
@@ -170,7 +170,7 @@ def updatecfg(path='.', inp_backup = False, verbose = True, **kwargs):
                 nml[k] = kwargs[k]
         return nml
     newcfg = recursively_update(loadcfg(path=path, verbose=False), **kwargs)
-    for eachnml in GOTM_nml_list:
+    for eachnml in GOTM_nml:
         inp = join(path,eachnml)
         timestr = print_ctime(sep='_')
         inpbkp = inp[:-4] + '_' + timestr + '.inp'
