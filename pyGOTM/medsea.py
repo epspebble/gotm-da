@@ -9,8 +9,7 @@ from pyGOTM.config import \
     GOTM_version, epoch
 
 # Necessary library
-import numpy as np
-import os
+import os, sys
 
 ## Global settings and initializations for medsea runs.
 
@@ -273,35 +272,38 @@ def set_grid(new_grid=grid,
     grid_indices = (M, N, sea_mn, sea_m, sea_n)
     return subgrid, rea_indices, grid_indices
 
-def get_grid():
-    """
-    A simple getter for the global variables, returning three tuples.
-
-    subgrid = (grid_lats, grid_lons, medsea_flags, max_depth)
-    rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth)
-    grid_indices = (M, N, sea_mn, sea_m, sea_n)
-    """
-
-    ## Not necessary!
-    # global grid_lats, grid_lons, medsea_flags, max_depth
-    # global medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth
-    # global M, N, sea_mn, sea_m, sea_n
-    
-    return (grid_lats, grid_lons, medsea_flags, max_depth), \
-        (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth), \
-        (M, N, sea_mn, sea_m, sea_n)
-
-# Set default global values at the loading of this module.
-
-# For the grid info. Load from the file if it exists.
+#  Now run set_grid() only if a cache does not exsit.
+import numpy as np
 if not(os.path.isfile(os.path.join(grid_folder,'grid_data.npy'))):
     subgrid_data = set_grid()
+    # Generate the cache
     np.save(os.path.join(grid_folder,'grid_data.npy'),subgrid_data)
-else:
+else: 
     subgrid, rea_indices, grid_indices = np.load(os.path.join(grid_folder,'grid_data.npy'))
     grid_lats, grid_lons, medsea_flags, max_depth = subgrid
     medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth = rea_indices
     M, N, sea_mn, sea_m, sea_n = grid_indices
+
+# def get_grid():
+#     """
+#     A simple getter for the global variables, returning three tuples.
+
+#     subgrid = (grid_lats, grid_lons, medsea_flags, max_depth)
+#     rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth)
+#     grid_indices = (M, N, sea_mn, sea_m, sea_n)
+#     """
+
+#     ## Not necessary!
+#     # global grid_lats, grid_lons, medsea_flags, max_depth
+#     # global medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth
+#     # global M, N, sea_mn, sea_m, sea_n
+    
+#     return (grid_lats, grid_lons, medsea_flags, max_depth), \
+#         (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth), \
+#         (M, N, sea_mn, sea_m, sea_n)
+
+# Set default global values at the loading of this module.
+
 
 
 data_sources = dict(
