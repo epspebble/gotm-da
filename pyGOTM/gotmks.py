@@ -1,5 +1,9 @@
-#from .config import *
-from pyGOTM.config import GOTM_nml_path, GOTM_nml_list, GOTM_executable
+# Explcitly import what we need from pyGOTM.config
+from pyGOTM.config import \
+    project_name, project_folder, \
+    GOTM_executable, GOTM_executable_path, \
+    GOTM_nml, GOTM_nml_path, \
+    GOTM_version, epoch
 from datetime import datetime
 ### General GOTM wrappers
 
