@@ -39,7 +39,7 @@ def setup(**overrides):
     """
     Set up other global variables including: 
 
-       project_folder, GOTM_executable, GOTM_nml_path, GOTM_nml_list
+       project_folder, GOTM_executable, GOTM_executable_path, GOTM_nml, GOTM_nml_path
 
     using preset module global variables including:
 
@@ -51,16 +51,16 @@ def setup(**overrides):
     Version date: 2017-11-16.
     """
     
-    # Global "output" variables computed from the "input" global preset module variables.
-    global project_folder, GOTM_executable, GOTM_nml_path, GOTM_nml_list
+    # Global "paths" variables computed from the "input" global preset module variables.
+    global project_folder, GOTM_executable, GOTM_executable_path, GOTM_nml_path, GOTM_nml
 
-    # Hardcoded lists
+    # Hardcoded defaults
     preset = ['project_name', 'GOTM_version', 'epoch']
-    output = ['project_folder', 'GOTM_executable', 'GOTM_nml_path', 'GOTM_nml_list']
+    paths = ['project_folder', 'GOTM_executable', 'GOTM_executable_path', 'GOTM_nml', 'GOTM_nml_path']
 
     # Split user overrides by name.
     preset_overrides = {name: overrides[name] for name in preset if name in overrides}
-    output_overrides = {name: overrides[name] for name in output if name in overrides}
+    paths_overrides = {name: overrides[name] for name in paths if name in overrides}
 
     # Update the preset globals.
     current_settings = globals()
@@ -68,52 +68,52 @@ def setup(**overrides):
 
     # Now compute the output global variables one by one.
 
-    # 1.
-    if 'project_folder' in output_overrides:
-        project_folder = output_overrides['project_folder']
+    # 1. Project folder
+    if 'project_folder' in paths_overrides:
+        project_folder = paths_overrides['project_folder']
     else:
         project_folder = join(userhome,project_name) # notebooks, jobs, scripts, config templates
 
-    # 2.
-    if 'GOTM_executable' in output_overrides:
-        GOTM_executable = output_overrides['GOTM_executable']
+    # 2. GOTM program
+    if 'GOTM_executable' in paths_overrides:
+        GOTM_executable = paths_overrides['GOTM_executable']
     else:
         GOTM_executable = 'gotm'+'-'+GOTM_version # Just the name.
-    # The actual file is assumed to reside in join(project_folder,'bin'). Check now.
-    gotm_fullfn = join(project_folder,'bin',GOTM_executable)
-    if not(isfile(gotm_fullfn))
-        raise FileNotFoundError("The GOTM executable cannot be found at " + gotm_fullfn)
-
-    # 3.
-    if 'GOTM_nml_path' in output_overrides:
-        GOTM_nml_path = output_overrides['GOTM_nml_path']
+    if 'GOTM_executable_path' in paths_overrides:
+        GOTM_executable_path = paths_overrides['GOTM_executable_path']
     else:
-        GOTM_nml_path = join(project_folder,'config')
-    # Check.
+        # The actual file is assumed to reside in join(project_folder,'bin'). Check now.
+        GOTM_executable_path = join(project_folder,'bin')
+    if not(isfile(join(GOTM_executable_path,GOTM_executable))):
+        raise FileNotFoundError("The GOTM executable {!s} cannot be found at {!s} ".format(GOTM_executable, GOTM_executable_path))
+
+    # 3. GOTM namelists
+    if 'GOTM_nml_path' in paths_overrides:
+        GOTM_nml_path = paths_overrides['GOTM_nml_path']
+    else:
+        GOTM_nml_path = join(project_folder,'nml')
     if not isdir(GOTM_nml_path):
-        raise FileNotFoundError('The GOTM namelist path {!s} is invalid.'.format(GOTM_nml_path))
-
-    # 4.
-    if 'GOTM_nml_list' in output_overrides:
-        GOTM_nml_list = output_overrides['GOTM_nml_list']
+        raise FileNotFoundError('The GOTM namelist templates path {!s} is invalid.'.format(GOTM_nml_path))
+    if 'GOTM_nml' in paths_overrides:
+        GOTM_nml = paths_overrides['GOTM_nml']
     else:
-        GOTM_nml_list = ['gotmrun.inp','gotmmean.inp','gotmturb.inp','airsea.inp','obs.inp']
-    for nml in GOTM_nml_list:
+        GOTM_nml = ['gotmrun.inp','gotmmean.inp','gotmturb.inp','airsea.inp','obs.inp']
+    for nml in GOTM_nml:
         GOTM_nml_template = join(GOTM_nml_path,nml)
         if not(isfile(GOTM_nml_template)):
             raise FileNotFoundError("The GOTM config namelist file: " + GOTM_nml_template + " is invalid.")
 
-    print('Current pyGOTM settings:\n')
+    # Print config.
+    print('Current pyGOTM settings:')
     if 'tabulate' not in sys.modules.keys():
         for name in preset:
             print('\t',name,':\t', current_settings[name])
-            for name in output:
+            for name in paths:
                 print('\t',name,':\t', current_settings[name])
     else:
-        print('Settings:')
         print(tabulate([[name,current_settings[name]] for name in preset]))
-        print('Paths:')
-        print(tabulate([[name,current_settings[name]] for name in output]))
+        print('\nPaths and filenames:')
+        print(tabulate([[name,current_settings[name]] for name in paths]))
         
 # Set default values.
 setup()
