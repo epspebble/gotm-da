@@ -440,17 +440,18 @@ def get_m_n(*args):
     elif len(args) == 2:
         # Check if it is a valid pair of (m,n)
         m, n = args
-        if (isinstance(m,int) and m in sea_m) and (isinstance(n,int) and n in sea_n):
-            return m, n
+        #print(sea_m.size,m in sea_m, isinstance(m,int),sea_n.size,n in sea_n,isinstance(n,int))
+        if (m%1.==0. and int(m) in sea_m) and (n%1.==0. and n in sea_n):
+            return int(m), int(n)
         else:
-            # Maybe they are (lat,lon)?
+            #print('Maybe {!s} are (lat, lon)?'.format(args))
             lat, lon = args
             spacing = grid_lats[1]-grid_lats[0]
             # Calculate m, n
             m = (lat-grid_lats[0])/spacing
             n = (lon-grid_lons[0])/spacing
             if m%1. != 0. or n%1. != 0.:
-                print('Warning: given latlong ({!s},{!s}) does not correspond exactly to a point in the {:s} grid.'.format(lat,lon,grid))
+                print('Warning: given coordinate: ({!s},{!s}) does not correspond exactly to a point in the {:s} grid.'.format(lat,lon,grid))
                 print('Attempting to return the closest grid point if it is on the sea.')
                 m = round(m)
                 n = round(n)
@@ -535,7 +536,7 @@ def prepare_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or 
                 **gotm_user_args): # Extra GOTM arguments, e.g. from run_profiles):
             
     """
-    Prepare the run folder (which itself is generated if not found): 
+    Prepare the run folder (which itself should not be generated if not existent, because the .dat files should be generated before calling this): 
     1. transfer config files, and update them
     2. transfer GOTM executable with the correct version
     3. generate GOTM input data (heat.dat, met.dat, tprof.dat etc.) if not found. 
@@ -567,12 +568,10 @@ def prepare_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or 
     # Now we treat the standard caller with start, stop as the last two arguments.
     if len(args) == 3 or len(args) == 4:
         # Bad arugments will be caught in the next step.
-        print(args)
-        print(*args[:-2])
         lat, lon = get_lat_lon(*args[:-2])
         # Passing except the last two arguments to get_local_folder(), which creates the folder if necessary
         # and do the error check on the locations as well.
-        local_folder = get_local_folder(*args[:-2], create=True) # Calls get_m_n() too
+        local_folder = get_local_folder(*args[:-2], create=False) # This calls get_m_n() too.
         # TODO: Error check for start/stop, which I have a code somewhere in scripts...
         start, stop = args[-2:]
     else:
