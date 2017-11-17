@@ -1,10 +1,9 @@
-
 from pylab import *
 from netCDF4 import Dataset
 from numpy.ma import masked_invalid, masked_outside
 import os, sys
 from scipy.interpolate import *
-from pygotm import medsea
+from pyGOTM import medsea
 from importlib import reload
 
 target_grid = '1x'
@@ -289,7 +288,7 @@ def medsea_MODIS_reformat(year,num=46,
     from netCDF4 import Dataset, date2num
     from numpy.ma import masked_invalid
     from numpy import nan
-    from pygotm.config import epoch
+    from pyGOTM.config import epoch
 
     # Find absolute path for the src_folder and dst_folder
     if not isabs(src_folder):
@@ -301,7 +300,7 @@ def medsea_MODIS_reformat(year,num=46,
             
     # User need to make sure the medsea module is loaded and set up.
     import sys
-    assert 'medsea' not in sys.modules, "'import pygotm.medsea as medsea' first!'"
+    assert 'medsea' not in sys.modules, "'import pyGOTM.medsea as medsea' first!'"
             
     # Writing to an nc file.
     dst_fn = 'medsea_MODIS_{:s}_8D_{:d}.nc'.format(obs_type,year)

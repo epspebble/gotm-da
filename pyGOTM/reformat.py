@@ -1,5 +1,5 @@
 ### ERA-INTERIM
-# This improves current code in pygotm/ncdf_reformat.py, version on 2017-07-13
+# This improves current code in pyGOTM/ncdf_reformat.py, version on 2017-07-13
 def make_abs(rel_path, side_effect = 'raise'):
     """
     Returns the absolute path by prepending user home folder. 
@@ -47,9 +47,9 @@ def medsea_ERA_reformat(year, grid='1x',
     from datetime import datetime, timedelta
     from netCDF4 import Dataset, date2num
     from numpy import array_equal
-    from pygotm import medsea
-    from pygotm.gotmks import tic, toc
-    from pygotm.config import epoch # Should be datetime(1981,1,1,0,0,0)    
+    from pyGOTM import medsea
+    from pyGOTM.gotmks import tic, toc
+    from pyGOTM.config import epoch # Should be datetime(1981,1,1,0,0,0)    
     
     # Find absolute path for the src_folder and dst_folder
     if not isabs(src_folder):
@@ -68,7 +68,7 @@ def medsea_ERA_reformat(year, grid='1x',
                    lwrd='var175', swrd='var169')
 
     if grid == '1x':
-        from pygotm import medsea
+        from pyGOTM import medsea
         medsea.set_grid('1x')
         # Precomputed indices to map ERA-INTERIM to GOTM 1x grid 
         src_lat_idx = slice(-8,4,-1)
@@ -149,7 +149,7 @@ def medsea_ERA_reformat(year, grid='1x',
         print('Total time: {!s}s'.format(elapsed))
 
 ### ECMWF
-# This improves current code in pygotm/ncdf_reformat.py, version on 2017-07-13
+# This improves current code in pyGOTM/ncdf_reformat.py, version on 2017-07-13
 def medsea_ECMWF_reformat(year,month,grid='1x',
                           src_folder='p_sossta/medsea_ECMWF/3-HOURLY',
                           dst_folder='medsea_data/medsea_ECMWF'):    
@@ -167,8 +167,8 @@ def medsea_ECMWF_reformat(year,month,grid='1x',
     from datetime import datetime, timedelta
     from netCDF4 import Dataset, date2num
     from numpy import array_equal    
-    from pygotm.gotmks import tic, toc
-    from pygotm.config import epoch # Should be datetime(1981,1,1,0,0,0)    
+    from pyGOTM.gotmks import tic, toc
+    from pyGOTM.config import epoch # Should be datetime(1981,1,1,0,0,0)    
     
     # Find absolute path for the src_folder and dst_folder
     if not isabs(src_folder):
@@ -186,7 +186,7 @@ def medsea_ECMWF_reformat(year,month,grid='1x',
     aliases = dict() # Checked: they are identical.
 
     if grid == '1x':
-        from pygotm import medsea
+        from pyGOTM import medsea
         medsea.set_grid(grid)
         # Precomputed indices to map ERA-INTERIM to GOTM 1x grid 
         src_lat_idx = slice(154,33,-6) 
@@ -289,8 +289,8 @@ def medsea_MFC_midnights_reformat(year,month=None,grid='1x',
     from datetime import datetime, timedelta
     from netCDF4 import Dataset, date2num, MFDataset
     from numpy import array_equal, array    
-    from pygotm.gotmks import tic, toc
-    from pygotm.config import epoch # Should be datetime(1981,1,1,0,0,0)    
+    from pyGOTM.gotmks import tic, toc
+    from pyGOTM.config import epoch # Should be datetime(1981,1,1,0,0,0)    
     
     # MFC reanalysis data stored in yearly subfolders.
     src_folder = join(src_folder,str(year))
@@ -314,7 +314,7 @@ def medsea_MFC_midnights_reformat(year,month=None,grid='1x',
                        PSAL = 'salt')
 
     if grid == '1x':
-        from pygotm import medsea
+        from pyGOTM import medsea
         medsea.set_grid(grid)
         # Precomputed indices map MFC reanalysis data to medsea 1x grid up to 75m deep.
         nlev = 16
@@ -448,9 +448,9 @@ def medsea_MFC_sunrise_reformat(start_day,stop_day,grid='1x',
     from numpy import array_equal, array
     from numpy.ma import masked_all
     from glob import glob
-    from pygotm.gotmks import tic, toc
-    from pygotm.swr import solar_times
-    from pygotm.config import epoch # Should be datetime(1981,1,1,0,0,0)    
+    from pyGOTM.gotmks import tic, toc
+    from pyGOTM.swr import solar_times
+    from pyGOTM.config import epoch # Should be datetime(1981,1,1,0,0,0)    
     
     # MFC reanalysis data stored in yearly subfolders.
     #     src_folder = join(src_folder,str(year))
@@ -465,7 +465,7 @@ def medsea_MFC_sunrise_reformat(start_day,stop_day,grid='1x',
             
     # User need to make sure the medsea module is loaded and set up.
     import sys
-    assert 'medsea' not in sys.modules, "'import pygotm.medsea as medsea' first!'"
+    assert 'medsea' not in sys.modules, "'import pyGOTM.medsea as medsea' first!'"
     
     # Restrict the date object type for clarity.
     assert isinstance(start_day,date)
@@ -482,7 +482,7 @@ def medsea_MFC_sunrise_reformat(start_day,stop_day,grid='1x',
     dst_varname = dict(TEMP = 'temp',
                        PSAL = 'salt')
     if grid == '1x':
-        from pygotm import medsea
+        from pyGOTM import medsea
         medsea.set_grid(grid)
         # Precomputed indices map MFC reanalysis data to medsea 1x grid up to 75m deep.
         nlev = 16
@@ -611,7 +611,7 @@ def medsea_MFC_sunrise_reformat(start_day,stop_day,grid='1x',
 if __name__ == '__main__':
     import sys
     from datetime import date, datetime, timedelta
-    from pygotm import medsea
+    from pyGOTM import medsea
     grid = '1x' # Default testing grid.
     medsea.set_grid(grid);
 

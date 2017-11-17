@@ -1,4 +1,4 @@
-from pygotm import medsea
+from pyGOTM import medsea
 
 def reload(grid='144x',run='ASM3-75m',nlev=122):
     from importlib import reload
