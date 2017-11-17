@@ -132,7 +132,7 @@ run_profiles = {
 def set_grid(new_grid=grid,
              new_max_depth=max_depth, # These names just need to be different... Because we cannot declare an input name global below...
              subindices=None,
-             plot = True, stat = True,
+             plot = False, stat = True,
              ):
     """ Obtain the 1/16 degree grid used in medsea_rea, and classify each grid points according to 'max_depth'.
         A sub-grid is set to the global variables in the module, and also returned by specifying 'subindices':
