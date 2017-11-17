@@ -1,4 +1,5 @@
-from .config import *
+#from .config import *
+from pyGOTM.config import GOTM_nml_path, GOTM_nml_list, GOTM_executable
 from datetime import datetime
 ### General GOTM wrappers
 
@@ -51,16 +52,10 @@ def run_command(cmd, output='PIPE'):
 # This function should be extended to output a simulation object, encapsulating the run options and the results in 
 # one class. This will in turn allow us to run continuation calls easily.
 def gotm(run_folder = '.', verbose = False, logfn = 'gotm.log',
-         GOTM_executable = GOTM_executable, GOTM_nml_templates_path = None, inp_backup = False,
-         varsout = {}, # Deprecated
-         **gotm_args):
+         inp_backup = False, **gotm_args):
     """ Runs GOTM in with extra functions. """
     import os, shutil, time
-    
-    # Use default templates if not user-specified.
-    if GOTM_nml_templates_path is None:
-        GOTM_nml_templates_path = GOTM_nml_path
-    
+
     # Remember the current working folder then walk into the run folder.
     home = os.getcwd() 
     if os.path.isdir(run_folder):
@@ -75,7 +70,7 @@ def gotm(run_folder = '.', verbose = False, logfn = 'gotm.log',
     for each in GOTM_nml_list:
         dst = os.path.join(run_folder,each)
         if not(os.path.isfile(dst)):
-            src = os.path.join(GOTM_nml_templates_path,each)
+            src = os.path.join(GOTM_nml_path,each)
             shutil.copyfile(src,dst)
         run_files[each] = dst
     
@@ -104,12 +99,12 @@ def gotm(run_folder = '.', verbose = False, logfn = 'gotm.log',
         if nrec == 0:
             raise Exception("Invalid GOTM results! Time dimension is empty. GOTM failed?")
         else:
+            #TODO: Maybe not. Sometimes GOTM terminates midway. Need to catch that exit code.
             print("GOTM run completed successfully at {!s}.".format(datetime.now()))
             run_files['results'] = os.path.join(dr,fn)        
     return run_files
       
 ## Treating f90 namelists used by GOTM 3.0.0
-    
 def loadcfg(path='.', verbose = True):
     from f90nml import read
     from os.path import join
@@ -138,7 +133,6 @@ def writecfg(gotm_cfg, path='.', inp_backup = False, verbose = True):
         if inp_backup:
             print('A backup set of namelists saved at ' + timestr)
         print('GOTM config written.')
-        
         
 def updatecfg(path='.', inp_backup = False, verbose = True, **kwargs):
     # NOTE: Currently, this method can update multiple key/value pairs if the key names repeat among the files, i.e.
@@ -225,9 +219,36 @@ def print_ctime(dt=datetime.now(),sep=' '):
 def print_cdate(dt=datetime.now()):
     return dt.strftime('%Y%m%d')
 
-
 def tz(lon):
     if lon > 0:
         return int((lon+7.5)/15)
     else:
         return int((lon-7.5)/15)
+
+def timestr(nctime,i):
+    " Return a formatted time string from a nc time variable at index i."
+    from netCDF4 import datetime, num2date
+    try:
+        ts = datetime.strftime(num2date(nctime[i],nctime.units),'%Y-%m-%d %H:%M:%S')
+    except:
+        print("Converting datetime to string failed!")
+        print('i,len(nctime),nctime[i],nctime.units')
+        print(i,len(nctime),nctime[i],nctime.units)
+        raise
+    return ts
+
+def print_lat_lon(lat,lon,fmt_str='g'):
+    "Helper function for printing (lat,lon) as 10.5N2.1E etc. "
+
+    # if not(isinstance(lat,float)):
+    #     raise Exception("`lat` is of type " + str(type(lat)))
+    # if not(isinstance(lon,float)):
+    #     raise Exception("`lon` is of type " + str(type(lon)))
+    lat = float(lat)
+    lon = float(lon)
+
+    template = '{:' + fmt_str + '}'
+    lat_str = template.format(lat) + 'N' if lat>=0 else template.format(-lat) + 'S'
+    lon_str = template.format(lon) + 'E' if lon>=0 else template.format(-lon) + 'W'
+    #return lat_str + ' ' + lon_str
+    return lat_str + lon_str
