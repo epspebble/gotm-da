@@ -39,10 +39,6 @@
 !  'observed' temperature profile
    double precision, public, dimension(:), allocatable   :: tprof
 
-   !WT 20171113 Time of the next 'observed' temperature profile, for use in daily data assimilation.
-   integer, public :: next_tprof_secondsofday
-   
-   
 !  'observed' horizontal salinity  gradients
    double precision, public, dimension(:), allocatable   :: dsdx,dsdy
 
