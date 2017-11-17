@@ -590,7 +590,7 @@ def prepare_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or 
 
     ## Step 1.
     import shutil
-    for each in GOTM_nml_list:
+    for each in GOTM_nml:
         # All config files are overwritten every time GOTM is run.
         src = os.path.join(GOTM_nml_path,each)
         dst = os.path.join(local_folder,each)
@@ -608,11 +608,11 @@ def prepare_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or 
         shutil.copyfile(src,dst)
 
     ## Step 2.
-    # GOTM_executable should already been checked to be at [project_folder]/bin/[GOTM_executable]
+    # GOTM_executable, default to be at [project_folder]/bin/[GOTM_executable], should have been checked for existence when pyGOTM.config was loaded
     from os.path import isfile, join
-    dst = join(local_folder,GOTM_executable)
     if not(isfile(dst)):
-        os.symlink(join(project_folder,'bin',GOTM_executable),dst)
+        os.symlink(join(GOTM_executable_path,GOTM_executable),
+                   join(local_folder,GOTM_executable))
 
     ## Step 3.
     # Create a list of dat files we expect to see.
