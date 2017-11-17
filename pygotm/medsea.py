@@ -1,9 +1,14 @@
+## TODO: Make an explicit list
+from pyGOTM.gotmks import *
+
+# Explcitly import what we need from pyGOTM.config
 from .config import project_folder, GOTM_executable, GOTM_nml_path, GOTM_nml_list, project_name, GOTM_version, epoch
-from .gotmks import *
 
+# Necessary library
 import numpy as np
+import os
 
-## Settings and initializations for medsea runs.
+## Global settings and initializations for medsea runs.
 
 # If a change to the following is desired, do so right after loading the module and then call set_grid() and set_folders() in this order.
 ASM = 3 # This selects the GOTM extra parameters profile
@@ -15,14 +20,110 @@ grid = '144x'
 # This will also be in the name (as a suffix before the .nc extension) in the nc file per grid point.
 run = 'ASM3-75m' # Will be reset when set_grid() is called.
 
-## TODO The region and horizontal grid level (1x) and vertical grid level (122) should be includede in the run tag?
+## TODO The region and horizontal grid level (1x) and vertical grid level (122) should be include in the run tag?
 region = 'medsea' # practically just a prefix of filenames for now, the code is strongly tied to this assumption
 
 # A switch.
 overwrite = True # True means running at the same grid point will overwrite files if already present (notably the *.inp etc...)
 
-# Routines to set global values in this module. Can be used in interactive session to change config.
+# This replaces the ambiguous base_folder or run_folder used in the past, each run folder is a
+# print_lat_lon() named subfolder of the following, which should be symlinked to fast filesystem outside of the home folder,
+# e.g. /scratch/[name] on clusters, or /dev/shm/[name] on a system with sufficient RAM.
+grid_folder = os.path.join(project_folder,'grid')
 
+## Global config for medsea simulations 
+# The following are not meant to be changed interactively, as functions in other modules in thisos.listdir(ms.base_folder)
+# package will not see the changes. 
+#
+# Configs that are meant to be changed in runtime should go into medsea.py.
+#
+
+# List of run_profiles done in the past.
+
+# TODO: We should specify the corresponding GOTM code version in the profiles as well.
+run_profiles = {
+    # The V2 runs. They were run at 150m deep with 150 levels.
+    'ASM0': dict(assimilation_type=0, extinct_method=9),
+    'ASM1': dict(assimilation_type=0, extinct_method=12),
+    'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9),
+    'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat',),
+
+    # Alternative vertical grid runs.
+    # Maybe we should dynamically calculate 'nlev' and 'depth' from number of lines in the 'grid.dat' files.
+    'ASM3-100m': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat',
+                      depth = 99.282236525788903, nlev = 132,
+                      grid_method = 2, grid_file = 'grid_100m.dat'), 
+    'ASM3-75m': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat', 
+                     depth = 74.539324233308434, nlev = 122,
+                     grid_method = 2, grid_file = 'grid_75m.dat'),
+    'ASM3-MFC-75m': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat', 
+                         depth = 74.389762997627258, nlev = 15,
+                         grid_method = 2, grid_file = 'grid_MFC_75m.dat'),
+    
+    # Added for completion and comparison to ASM3-75m
+    'ASM0-75m': dict(assimilation_type=0, extinct_method=9, 
+                     depth = 74.539324233308434, nlev = 122,
+                     grid_method = 2, grid_file = 'grid_75m.dat'),
+    'ASM1-75m': dict(assimilation_type=0, extinct_method=12,
+                     depth = 74.539324233308434, nlev = 122,
+                     grid_method = 2, grid_file = 'grid_75m.dat'),
+    'ASM2-75m': dict(assimilation_type=2, assim_window=1, extinct_method=9, 
+                     depth = 74.539324233308434, nlev = 122,
+                     grid_method = 2, grid_file = 'grid_75m.dat'),
+    # 20171031 Previously ASM4-75m uses extinct_method=13, but the GOTM code
+    # has not incorporated this case and it fell through to the default case
+    # which is extinct_method=1, Jerlev (1976) water type 1.
+    'ASM4-75m': dict(assimilation_type=2, assim_window=1,
+                     extinct_method=1,  
+                     depth = 74.539324233308434, nlev = 122,
+                     grid_method = 2, grid_file = 'grid_75m.dat'),
+    # 20170912 Hybrid grid
+    'ASM3-HYB-75m': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat', 
+                         depth = 74.389762997627258, nlev = 41,
+                         grid_method = 2, grid_file = 'grid_HYB_75m.dat'),
+    # 20171031 Two levels as per email with Sam Pimentel, 2017-10-27.
+    # This is identical to the previous ASM4-75m, now should properly use iop.dat
+    'ASM5-75m': dict(assimilation_type=2, assim_window=1,
+                     extinct_method=13, extinct_file='iop.dat', 
+                     depth = 74.539324233308434, nlev = 122,
+                     grid_method = 2, grid_file = 'grid_75m.dat'),
+    # This is identical to ASM3-75m, the difference lies in the GOTM code. The fixed GOTM
+    # code has the albedo issue fixed, so that Payne's albedo is not applied to Ohlmann-Siegel (2000)
+    # formulas which implicitly include albedo.
+    'ASM3.1-75m': dict(assimilation_type=2, assim_window=1, 
+                       extinct_method=12, extinct_file='chlo.dat', 
+                       depth = 74.539324233308434, nlev = 122,
+                       grid_method = 2, grid_file = 'grid_75m.dat'),
+
+    # 20171106, same as the previous, except with a higher resolution output.
+    'ASM5-75m_4t': dict(assimilation_type=2, assim_window=1,
+                        extinct_method=13, extinct_file='iop.dat', 
+                        depth = 74.539324233308434, nlev = 122,
+                        grid_method = 2, grid_file = 'grid_75m.dat',
+                        nsave=30),
+    'ASM3.1-75m_4t': dict(assimilation_type=2, assim_window=1,
+                          extinct_method=12, extinct_file='chlo.dat', 
+                          depth = 74.539324233308434, nlev = 122,
+                          grid_method = 2, grid_file = 'grid_75m.dat',
+                          nsave=30),
+    # 20171113, same as the previous, except with a higher resolution output.
+    'ASM5-75m_no_salt': dict(assimilation_type=2, assim_window=1,
+                               s_prof_method=0, # skip s_prof 
+                               extinct_method=13, extinct_file='iop.dat', 
+                               depth = 74.539324233308434, nlev = 122,
+                               grid_method = 2, grid_file = 'grid_75m.dat'),
+    'ASM3.1-75m_no_salt': dict(assimilation_type=2, assim_window=1,
+                                 s_prof_method=0, # skip s_prof 
+                                 extinct_method=12, extinct_file='chlo.dat', 
+                                 depth = 74.539324233308434, nlev = 122,
+                                 grid_method = 2, grid_file = 'grid_75m.dat'),
+    'ASM2-75m_no_salt': dict(assimilation_type=2, assim_window=1, extinct_method=9, 
+                               depth = 74.539324233308434, nlev = 122,
+                               grid_method = 2, grid_file = 'grid_75m.dat'),
+
+}
+
+# Routines to set global values in this module. Can be used in interactive session to change config.
 def set_grid(new_grid=grid,
              new_max_depth=max_depth, # These names just need to be different... Because we cannot declare an input name global below...
              subindices=None,
@@ -57,7 +158,7 @@ def set_grid(new_grid=grid,
     grid = new_grid
     max_depth = new_max_depth
 
-    # Update the run name
+    # Update the run run
     run = 'ASM{:d}-{:d}m'.format(ASM,max_depth)
 
     # Set up the slices for the subgrid using the name.
@@ -184,11 +285,11 @@ def get_grid():
 # Set default global values at the loading of this module.
 
 # For the grid info. Load from the file if it exists.
-if not(os.path.isfile(os.path.join(project_folder,'medsea_grid_data.npy'))):
+if not(os.path.isfile(os.path.join(grid_folder,'grid_data.npy'))):
     subgrid_data = set_grid()
-    np.save(os.path.join(project_folder,'medsea_grid_data.npy'),subgrid_data)
+    np.save(os.path.join(grid_folder,'grid_data.npy'),subgrid_data)
 else:
-    subgrid, rea_indices, grid_indices = np.load(os.path.join(project_folder,'medsea_grid_data.npy'))
+    subgrid, rea_indices, grid_indices = np.load(os.path.join(grid_folder,'grid_data.npy'))
     grid_lats, grid_lons, medsea_flags, max_depth = subgrid
     medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth = rea_indices
     M, N, sea_mn, sea_m, sea_n = grid_indices
@@ -292,219 +393,190 @@ def data_sources(year=None, month=None, mode='r', region='medsea',
         return ds_dict
 
 ## Helper functions
-def timestr(nctime,i):
-    " Return a formatted time string from a nc time variable at index i."
-    from netCDF4 import datetime, num2date
-    try:
-        ts = datetime.strftime(num2date(nctime[i],nctime.units),'%Y-%m-%d %H:%M:%S')
-    except:
-        print("Converting datetime to string failed!")
-        print('i,len(nctime),nctime[i],nctime.units')
-        print(i,len(nctime),nctime[i],nctime.units)
-        raise
-    return ts
 
-def print_lat_lon(lat,lon,fmt_str='g'):
-    "Helper function for printing (lat,lon) as 10.5N2.1E etc. "
+## TODO.
+# def chunk(c,k,fun,*args,**kwargs):
+#     """
+#     calls fun() for the c-th chunk with k grid points (c-1)*10, (c-1)*10+1, ... (c-1)*10+9.
+#     This partitions the 390 grid points on sea into 30 chunks.
+#     """
 
-    # if not(isinstance(lat,float)):
-    #     raise Exception("`lat` is of type " + str(type(lat)))
-    # if not(isinstance(lon,float)):
-    #     raise Exception("`lon` is of type " + str(type(lon)))
-    lat = float(lat)
-    lon = float(lon)
-
-    template = '{:' + fmt_str + '}'
-    lat_str = template.format(lat) + 'N' if lat>=0 else template.format(-lat) + 'S'
-    lon_str = template.format(lon) + 'E' if lon>=0 else template.format(-lon) + 'W'
-    #return lat_str + ' ' + lon_str
-    return lat_str + lon_str
-
-def chunk(c,k,fun,*args,**kwargs):
+def get_m_n(*args):
     """
-    calls fun() for the c-th chunk with k grid points (c-1)*10, (c-1)*10+1, ... (c-1)*10+9.
-    This partitions the 390 grid points on sea into 30 chunks.
+    get_m_n(lat,lon) returns the closest grid point index (m,n).
+
+    get_m,n(i) returns the i-th precomputed sea location in the grid.
+    
+    We assume a uniform and equal spacing in both directions of the grid.
     """
+    if len(args) == 1:
+        i = args[0]
+        return sea_m[i],sea_n[i]
+    elif len(args) == 2:
+        lat,lon = args
+        spacing = grid_lats[1]-grid_lats[0]
+        m = (lat-grid_lats[0])/spacing
+        n = (lon-grid_lons[0])/spacing
+        if m%1 != 0. or n%1 != 0.:
+            print('Warning: given latlong ({!s},{!s}) does not correspond exactly to a point in the {:s} grid.'.format(lat,lon,grid))
+            m = int(round(m))
+            n = int(round(n))
+            if m in sea_m and n in sea_n:
+                print('Returning the indices to the closest grid point instead: ({!s},{!s}).'.format(grid_lats[m],grid_lons[n]))
+                return int(m), int(n)
+            else:
+                raise RuntimeError('(lat,lon) = {!s,!s} is neither on the grid nor is its closest grid point a sea location.'.format(lat,lon))
+    else:
+        print(args)
+        raise TypeError('Wrong number of positional arguments given.')
+            
+def get_lat_lon(*args):
+    """
+    get_lat_lon(m,n) returns the (lat,lon) of the grid at index (m,n)
+  
+    get_lat_lon(i) returns the (lat,lon) of the i-th precomputed sea location in the grid.
 
-def get_m_n(lat,lon):
-    "Return the grid index (m,n) given latlong. Assume uniformly-spaced grid."
-    spacing = grid_lats[1]-grid_lats[0]
-    m = (lat-grid_lats[0])/spacing
-    n = (lon-grid_lons[0])/spacing
-    if m%1 != 0. or n%1 != 0.:
-        print('Warning: given latlong ({!s},{!s}) does not correspond exactly to a point in the {:s} grid.'.format(lat,lon,grid))
-        m = int(round(m))
-        n = int(round(n))
-        print('Returning the indices to the closest grid point instead: ({!s},{!s}).'.format(grid_lats[m],grid_lons[n]))
-    return int(m), int(n)
-
-def get_lat_lon(m,n):
-    "Return the latlong given the grid index (m,n)."
+    We assume a uniform and equal spacing in both directions of the grid.
+    """
     return grid_lats[m],grid_lons[n]
 
 ## Medsea serial / parallel run toolbox
-def get_local_folder(*args, new_lats=None,new_lons=None,create=False):
+def get_local_folder(*args, create=False):
     """
-    Return the corresponding local folder for given grid point indices (m,n) or linear index i of the
-    index arrays sea_m and sea_n.
+    Returning the path to a run folder.
 
-    Defaults to the run_folder set by the module 'run' global variable, and 'run_folder' generated by
-    set_folders(). If not desired, pass a new_run keyword argument to get a different run's local folder.
+    get_local_folder(m,n) return the run folder given the grid point indices (m,n)
 
-    TODO: It will be convenient that this function be overloaded by argument type and number (single/multiple
-    dispatch). We want get_local_folder(i) and get_local_folder(m,n) or get_local_folder((m,n)) to both work.
-    Oh well, that's an overkill. Just use *args and count the number for now, that single dispatch thing is
-    better if we need to distinguish by the type of argument.
+    get_local_folder(lat,lon) return the specified or the closest grid point's run folder.
+
+    get_local_folder(i) return the run folder cooresponding (i+1)-th precomputed sea location (i.e. m, n = sea_m[i], sea_n[i]).
+
+    get_local_folder() return a random precomputed sea location.
+
+    Specify 'create=True' to create the folder if it is not yet existent.
     """
     ## Setting default argument values.
-
-    # use module defaults if not provided:
-    if new_lats is None:
-        new_lats = grid_lats
-    if new_lons is None:
-        new_lons = grid_lons
-
     if args is None:
-        print('No grid indices given, defaulting to the favourite grid point (lat, lon) = (36.00, 25.50) near buoy 61277...')
-        m, n = get_m_n(36.,25.5)
-        print('m =',m,'n =',n)
+        # print('No grid indices given, defaulting to the favourite grid point (lat, lon) = (36.00, 25.50) near buoy 61277...')
+        # m, n = get_m_n(36.,25.5)
+        from random import randint
+        i = randint(0,sea_m.size-1)
+        m, n = sea_m[i], sea_n[i]
+        print('Randomly picking the grid point with indices: m =',m,'n =',n)
     elif len(args) == 1:
         i = args[0]
         assert isinstance(i,int), str(i)
-        m = sea_m[i]
-        n = sea_n[i]
+        m, n = sea_m[i], sea_n[i]
         print('Using linear index of sea locations, i = {!s}, (m,n) = ({!s},{!s})...'.format(i,m,n))
     elif len(args) == 2:
-        m,n = args
-        if not(int(m) == m and int(n) == n):
-            raise Exception('Given (m, n) = ({!s}, {!s}) do not seem to be grid indices.'.format(m,n))
+        # Check if it is a valid pair of (m,n)
+        try:
+            m, n = args
+            assert isinstance(m,int) and m in sea_m
+            assert isinstance(n,int) and n in sea_n
+        except AssertionError:
+            # Maybe they are (lat,lon)?
+            lat, lon = args
+            try:
+                m, n = get_m_n(lat,lon)
+            except:
+              # Giving up
+              print(args)
+              raise
     else:
-        print('Position arguments given: ', args)
+        print('Positional arguments given: ', args)
         raise Exception('Wrong number of positional arguments given.')
 
     ## Set up local variables
     lat  = new_lats[m]
     lon = new_lons[n]
     latlong = print_lat_lon(lat,lon)
-    local_folder = os.path.join(base_folder,latlong)
+    local_folder = os.path.join(grid_folder,latlong)
 
     if not(os.path.isdir(local_folder)):
         if create:
-            print('The folder {:s} is not found, creating it.'.format(local_folder))
-            os.mkdir(local_folder)
+            try:
+              print('The folder {:s} is not found, creating it.'.format(local_folder))
+              os.mkdir(local_folder)
+            except:
+              raise
         else:
             raise IOError("The local folder {:s} is not found. Have you run local_dat()?".format(local_folder))
     return local_folder
 
-def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
+def prepare_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or (lat,lon); and start/stop,
+                out_dir='.', out_fn='results', # Where to write GOTM ouputs
+                **gotm_user_args): # Extra GOTM arguments, e.g. from run_profiles):
+            
     """
-    Generate *.dat files from all available data. See core_dat() for other explanations.
-    mm, nn can be a sequence of m,n's
+    Prepare the run folder (which itself is generated if not found): 
+    1. transfer config files, and update them
+    2. transfer GOTM executable with the correct version
+    3. generate GOTM input data (heat.dat, met.dat, tprof.dat etc.) if not found. 
+    4. to the folder in which GOTM will be run.
+
+    Positional arguments:
+    "prepare_run(m,n,start,stop) or prepare_run(i,start,stop) or prepare_run(lat,lon,start,stop)"
+    
+    chooses the grid point by (m,n) as specified or as returned by get_m_n(i) / get_m_n(lat,lon), and takes
+    the string representation of the start and stop argument to be passed to GOTM.
+
+    All keyword arguments are passed to update GOTM input namelists. Note that the default values of
+    'out_dir' and 'out_fn' is specified in the call signature.
     """
 
-    from netCDF4 import MFDataset
-    from tempfile import mkdtemp
-    from shutil import copyfile
-    from glob import glob
+    ## Preparations.
+    if len(args) == 3 or len(args) == 4:
+        # Passing except the last two arguments to get_local_folder(), which creates the folder if necessary
+        # and do the error check on the locations as well.
+        m, n = get_m_n(args[:-2])
+        local_folder = get_local_folder(args[:-2])
+        # TODO: Error check for start/stop, which I have a code somewhere in scripts...
+        start, stop = args[-2:]
+    else:
+        print(args)
+        raise TypeError('Invalid GOTM run location or start/stop times.')
 
-    if isinstance(dat,str):
-        dat = [dat]
+    # Same latlong could correspond to different (m,n) indices with different subgrids, not so helpful?
+    #run_name = 'medsea_GOTM, {:s} grid, #(m,n)=({:d},{:d})'.format(grid,m,n) # debug info
 
-# 20170621, we no longer create separate folders for different runs, but share the same set of subfolders named
-# by print_lat_lon(), to avoid creating too many files and draining disk quota too fast.
-#    run_folder = os.path.join(base_folder,run)
-    run_folder = base_folder
-
-#    if not(os.path.isdir(run_folder)):
-#        os.mkdir(run_folder)
-
-    print("Looking for data sources from " + data_folder + "...")
-    nc_dict = data_sources(dat=dat)
-    if not(isinstance(nc_dict, dict)):
-        nc_dict = {dat[0]: nc_dict}
-    print(nc_dict)
-
-    for dat_fn, nc in nc_dict.items():
-        ## Assume m, n are iterable and of the same length:
-        if isinstance(mm,int) and isinstance(nn,int):
-            mm = [mm]
-            nn = [nn]
-        else:
-            assert len(m) == len(n)
-        try:
-            for m, n in zip(mm, nn):
-                lat = grid_lats[m]
-                lon = grid_lons[n]
-
-                # Create the local folder if necessary.
-                local_folder = os.path.join(run_folder,print_lat_lon(lat,lon))
-                if not(os.path.isdir(local_folder)):
-                    os.mkdir(local_folder)
-
-                # Actually write.
-                write_dat(m,n,dat_fn,nc,local_folder)
-        except Exception:
-                print('mm',mm)
-                print('nn',nn)
-
-        ## When m,n are integers, exception occurs at zip() instead, and it not a TypeError.
-        # except TypeError as te:
-        #     if isinstance(mm,int) and isinstance(nn,int):
-        #         m = mm
-        #         n = nn
-        #         # So the provided sequences are just a single pair of indices. Just write.
-        #         write_dat(m,n,dat_fn,nc,local_folder)
-        #    else:
-
-#        write_dat(m,n,dat_fn,nc,local_folder)
-
-    for nc in nc_dict.values():
-        nc.close()
-
-def prepare_run(start,stop,run_folder,out_dir='.',out_fn='results',m=None,n=None,lat=None,lon=None, **gotm_user_args):
-    "Transfer config files and GOTM executable to the folder in which GOTM will be run."
-    import shutil
-    # Determine the grid point location.
-    if (m is None) and (n is None):
-        (m,n) = get_m_n(lat,lon)
-    if (lat is None) and (lon is None):
-        (lat,lon) = get_lat_lon(m,n)
-    assert not(m is None or n is None or lat is None or lon is None), 'Either a (m,n) or (lat,lon) should be specified.'
-
-    run_name = 'medsea_GOTM, {:s} grid, #(m,n)=({:d},{:d})'.format(grid,m,n)
 
     # Set up GOTM arguments.
-    gotm_args = dict(name = run_name,
+    gotm_args = dict(name = run, # Just use the run name / profile instead of run_name
                      start = str(start), stop = str(stop),
                      latitude = float(lat), longitude = float(lon),
                      out_dir = str(out_dir), out_fn = out_fn)
     gotm_args.update(**gotm_user_args)
 
-    # Get the externally specified sea level widths if method is 2.
-    if 'grid_method' in gotm_user_args.keys() and gotm_user_args['grid_method'] == 2:
-        assert 'grid_file' in gotm_user_args.keys()
-        grid_file = gotm_user_args['grid_file']
-
-    # Copy over GOTM executable and config files, the latter to be updated when gotm() is called.
-    if not(os.path.exists(GOTM_executable)):
-        os.symlink(GOTM_executable,os.path.join(folder,'gotm'))
+    ## Step 1.
+    import shutil
     for each in GOTM_nml_list:
         # All config files are overwritten every time GOTM is run.
         src = os.path.join(GOTM_nml_path,each)
-        dst = os.path.join(run_folder,each)
+        dst = os.path.join(local_folder,each)
         # print('Copying {:s} to {:s}'.format(src,dst))
         shutil.copyfile(src,dst)
 
-    # Temporary hack. Also copy the grid data file.
+    # The grid data file too if necessary.
+    if 'grid_method' in gotm_user_args.keys() and gotm_user_args['grid_method'] == 2:
+        assert 'grid_file' in gotm_user_args.keys()
+        # Get the externally specified sea level widths if method is 2.
+        grid_file = gotm_user_args['grid_file']
     src = os.path.join(GOTM_nml_path,grid_file)
-    dst = os.path.join(run_folder,grid_file)
+    dst = os.path.join(local_folder,grid_file)
     # print('Copying {:s} to {:s}'.format(src,dst))
     shutil.copyfile(src,dst)
 
-    # Check that the dat files exists and are of nonzero size.
+    ## Step 2.
+    # GOTM_executable should already been checked to be at [project_folder]/bin/[GOTM_executable]
+    from os.path import isfile, join
+    dst = join(local_folder,GOTM_executable)
+    if not(isfile(dst)):
+        os.symlink(join(project_folder,'bin',GOTM_executable),dst)
 
+    ## Step 3.
     # Create a list of dat files we expect to see.
-    dat_list = ['tprof','sprof','heat','met']
+    dat_list = ['tprof','sprof','heat','met'] # Usual set.
     if ('t_prof_method' in gotm_user_args):
         tm = gotm_user_args['t_prof_method']
         if tm != 2: # 2 indicates read from file.
@@ -515,8 +587,8 @@ def prepare_run(start,stop,run_folder,out_dir='.',out_fn='results',m=None,n=None
             dat_list.remove('sprof')
     if ('extinct_method' in gotm_user_args):
         em = gotm_user_args['extinct_method']
-        if em == 9:
-            pass
+        if em <= 11:
+            pass # Either Jerlov or Paulson. Data file not needed.
         elif em == 12:
             dat_list.append('chlo')
         elif em == 13:
@@ -526,21 +598,30 @@ def prepare_run(start,stop,run_folder,out_dir='.',out_fn='results',m=None,n=None
 
     # Now whether each dat file exists and has nonzero size (not just 'touched' by an erroneous read by GOTM)
     for each in dat_list:
-        datfn = os.path.join(run_folder,each+'.dat')
+        datfn = os.path.join(local_folder,each+'.dat')
         try:
             assert os.path.getsize(datfn) > 0
         except:
-            print('{:s} is not found or of size 0, regenerating...'.format(datfn))
-            local_dat(m,n,dat=each)
-            try:
-                assert os.path.getsize(datfn) > 0
-            except:
-                print('{:s} regeneration failed.'.format(datfn))
-                raise
+            print('Warning: '+each+'.dat not found or has zero length. Check input data integrity. ')
 
-    updatecfg(path=run_folder, **gotm_args)
+            ## The following also don't work that well... need to rethink...
+            # if not(ignore):
+            #       # We are forced to ignore one or two points for some MODIS-based runs.
+            #       raise
+                  
+            ## Don't regenerate just for one location on demand. They could be from different versions!
+            # print('{:s} is not found or of size 0, regenerating...'.format(datfn))
+            # # Need a write_dat or local_dat !!!
+            # local_dat(m,n,dat=each)
+            # try:
+            #     assert os.path.getsize(datfn) > 0
+            # except:
+            #     print('{:s} regeneration failed.'.format(datfn))
+            #     raise
+
+    updatecfg(path=local_folder, **gotm_args)
     return gotm_args
-
+                  
 def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False,plotvars=None,**gotm_user_args):
     """
 
@@ -694,3 +775,69 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
         return stat, var
     else:
         return stat
+
+## Rewrite and put in another file, not here.
+# def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
+#     """
+#     Generate *.dat files from all available data. See core_dat() for other explanations.
+#     mm, nn can be a sequence of m,n's
+#     """
+
+#     from netCDF4 import MFDataset
+#     from tempfile import mkdtemp
+#     from shutil import copyfile
+#     from glob import glob
+
+#     if isinstance(dat,str):
+#         dat = [dat]
+
+# # 20170621, we no longer create separate folders for different runs, but share the same set of subfolders named
+# # by print_lat_lon(), to avoid creating too many files and draining disk quota too fast.
+# #    run_folder = os.path.join(base_folder,run)
+#     run_folder = base_folder
+
+# #    if not(os.path.isdir(run_folder)):
+# #        os.mkdir(run_folder)
+
+#     print("Looking for data sources from " + data_folder + "...")
+#     nc_dict = data_sources(dat=dat)
+#     if not(isinstance(nc_dict, dict)):
+#         nc_dict = {dat[0]: nc_dict}
+#     print(nc_dict)
+
+#     for dat_fn, nc in nc_dict.items():
+#         ## Assume m, n are iterable and of the same length:
+#         if isinstance(mm,int) and isinstance(nn,int):
+#             mm = [mm]
+#             nn = [nn]
+#         else:
+#             assert len(m) == len(n)
+#         try:
+#             for m, n in zip(mm, nn):
+#                 lat = grid_lats[m]
+#                 lon = grid_lons[n]
+
+#                 # Create the local folder if necessary.
+#                 local_folder = os.path.join(run_folder,print_lat_lon(lat,lon))
+#                 if not(os.path.isdir(local_folder)):
+#                     os.mkdir(local_folder)
+
+#                 # Actually write.
+#                 write_dat(m,n,dat_fn,nc,local_folder)
+#         except Exception:
+#                 print('mm',mm)
+#                 print('nn',nn)
+
+#         ## When m,n are integers, exception occurs at zip() instead, and it not a TypeError.
+#         # except TypeError as te:
+#         #     if isinstance(mm,int) and isinstance(nn,int):
+#         #         m = mm
+#         #         n = nn
+#         #         # So the provided sequences are just a single pair of indices. Just write.
+#         #         write_dat(m,n,dat_fn,nc,local_folder)
+#         #    else:
+
+# #        write_dat(m,n,dat_fn,nc,local_folder)
+
+#     for nc in nc_dict.values():
+#         nc.close()
