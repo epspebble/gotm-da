@@ -4,7 +4,7 @@ from os.path import isfile, isdir, isabs, join
 from time import time
 from netCDF4 import Dataset, date2num, num2date
 from datetime import datetime, date, timedelta
-from pygotm.swr import swr_3hourly_mean
+from pyGOTM.swr import swr_3hourly_mean
 from numpy.ma import masked_all
 
 def date2ndaysnsecs(dt):
@@ -48,7 +48,7 @@ def medsea_ERA_append_cloud_factor(year,grid='1x', # Grid info used to get sea_m
 
     # Grab some indices and lat/lon info about the medsea...
     # ... coz they are NOT available from ANY sort atmospheric forecast data.
-    from pygotm import medsea
+    from pyGOTM import medsea
     medsea.set_grid('1x')
     for m,n in medsea.sea_mn:
         tic = time()
@@ -89,7 +89,7 @@ def medsea_ECMWF_append_cloud_factor(year,month,grid='1x', # Grid info used to g
     # from os.path import isfile, isdir, isabs, join
     # from time import time
     # from netCDF4 import Dataset, num2date
-    # from pygotm.swr import swr_3hourly_mean
+    # from pyGOTM.swr import swr_3hourly_mean
     # from numpy.ma import masked_all
 
     # Assumed filename pattern.
@@ -113,7 +113,7 @@ def medsea_ECMWF_append_cloud_factor(year,month,grid='1x', # Grid info used to g
 
     # Grab some indices and lat/lon info about the medsea...
     # ... coz they are NOT available from ANY sort atmospheric forecast data.
-    from pygotm import medsea
+    from pyGOTM import medsea
     medsea.set_grid('1x')
     for m,n in medsea.sea_mn:
         tic = time()
