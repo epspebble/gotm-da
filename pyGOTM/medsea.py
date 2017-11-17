@@ -2,7 +2,11 @@
 from pyGOTM.gotmks import *
 
 # Explcitly import what we need from pyGOTM.config
-from pyGOTM.config import project_folder, GOTM_executable, GOTM_nml_path, GOTM_nml_list, project_name, GOTM_version, epoch
+from pyGOTM.config import \
+    project_name, project_folder, \
+    GOTM_executable, GOTM_executable_path, \
+    GOTM_nml, GOTM_nml_path, \
+    GOTM_version, epoch
 
 # Necessary library
 import numpy as np
