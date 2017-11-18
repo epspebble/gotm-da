@@ -50,17 +50,19 @@ def medsea_ERA_append_cloud_factor(year,grid='1x', # Grid info used to get sea_m
     # ... coz they are NOT available from ANY sort atmospheric forecast data.
     from pyGOTM import medsea
     medsea.set_grid('1x')
+    tic = time()
+    print('Precomputing swr_cs and cloud_factor values.')
     for m,n in medsea.sea_mn:
-        tic = time()
         lat, lon = medsea.grid_lats[m],medsea.grid_lons[n]
-        print('Calculating for lat,lon =',lat,',',lon)
+        #print('Calculating for lat,lon =',lat,',',lon)
         for i,dt in enumerate(full_dates):
             ndays, nsecs = date2ndaysnsecs(dt)
             swrd_cs[i,m,n] = swr_3hourly_mean(ndays,nsecs,lat,lon)
             if swrd_cs[i,m,n] > 0: # This implies fill_value for night time on sea locations. 
                 cloud_factor[i,m,n] = swrd[i,m,n]/swrd_cs[i,m,n] 
         elapsed += time() - tic
-        print('Elapsed {:.2f}s'.format(elapsed))
+        print('\t {:d}/{:d} completed. About {:.2f}s to go.'.format(j+1,medsea.sea_m.size,elapsed/(j+1)*medsea.sea_m.size),end='\r')
+    print('Elapsed {:.2f}s.'.format(elapsed))
     
     # Append the data
     tic = time()
@@ -115,17 +117,20 @@ def medsea_ECMWF_append_cloud_factor(year,month,grid='1x', # Grid info used to g
     # ... coz they are NOT available from ANY sort atmospheric forecast data.
     from pyGOTM import medsea
     medsea.set_grid('1x')
-    for m,n in medsea.sea_mn:
-        tic = time()
+    tic = time()
+    print('Precomputing swr_cs and cloud_factor values.')
+    for j,(m,n) in enumerate(medsea.sea_mn):
         lat, lon = medsea.grid_lats[m],medsea.grid_lons[n]
-        print('Calculating for lat,lon =',lat,',',lon)
+        # print('Calculating for lat,lon =',lat,',',lon)
+
         for i,dt in enumerate(full_dates):
             ndays, nsecs = date2ndaysnsecs(dt)
             swrd_cs[i,m,n] = swr_3hourly_mean(ndays,nsecs,lat,lon)
             if swrd_cs[i,m,n] > 0: # This implies fill_value for night time on sea locations. 
                 cloud_factor[i,m,n] = swrd[i,m,n]/swrd_cs[i,m,n] 
         elapsed += time() - tic
-        print('Elapsed {:.2f}s'.format(elapsed))
+        print('\t {:d}/{:d} completed. About {:.2f}s to go.'.format(j+1,medsea.sea_m.size,elapsed/(j+1)*medsea.sea_m.size),end='\r')
+    print('Elapsed {:.2f}s.'.format(elapsed))
     
     # Append the data
     tic = time()
