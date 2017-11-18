@@ -1,5 +1,7 @@
 ## Medsea results visualization toolbox
 
+## The following were the old plotters since v2 (before 2017-07-13)
+
 # Import matplotlib colormap for assigning default values to functions.
 from matplotlib import cm
 from numpy.ma import mean
