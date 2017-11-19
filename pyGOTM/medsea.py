@@ -131,23 +131,6 @@ run_profiles = {
 
 }
 
-# Taking from scratch notebook. Good to saving buoy information in this module.
-class buoy:
-    def __init__(self,name,lat,lon,grid='1x'):
-        import sys
-        import pyGOTM.medsea as medsea
-        self.name = name
-        self.lat = lat
-        self.lon = lon
-        self.m, self.n = medsea.get_m_n(lat,lon)
-        self.grid_lat, self.grid_lon = medsea.get_lat_lon(self.m,self.n)
-        self.run_GOTM = lambda start, stop: medsea.local_run(self.m,self.n,start,stop,plotvars=['swr','sst'])
-        
-buoy_UTC0 = buoy('61430',39.56,2.1,'1x')
-buoy_UTC1 = buoy('ADN-E2M3A',41.5277,18.0824,'1x')
-buoy_UTC2 = buoy('61277',35.723,25.462,'1x')
-buoys = [buoy_UTC0,buoy_UTC1,buoy_UTC2]
-
 # Routines to set global values in this module. Can be used in interactive session to change config.
 def set_grid(new_grid=grid,
              new_max_depth=max_depth, # These names just need to be different... Because we cannot declare an input name global below...
@@ -826,12 +809,27 @@ def create_dimensions(nc, lat=grid_lats, lon=grid_lons):
     nclon[:] = lon
     #print('Done initializing dimensions.')
     return nctime, nclat, nclon
+
 def create_variable(nc,varname,datatype,dimensions=('time','lat','lon'),zlib=True, fill_value=1e+20):
     " Default settings applied to create a netCDF variable. 'fill_value' of the rea dataset is used here."
     ncvar = nc.createVariable(varname,datatype,dimensions=dimensions,zlib=zlib,fill_value=fill_value)
     #print('Done initializing variables.')
     return ncvar
 
+# Taking from scratch notebook. Good to saving buoy information in this module.
+class buoy:
+    def __init__(self,name,lat,lon,grid='1x'):
+        self.name = name
+        self.lat = lat
+        self.lon = lon
+        self.m, self.n = get_m_n(lat,lon)
+        self.grid_lat, self.grid_lon = get_lat_lon(self.m,self.n)
+        self.run_GOTM = lambda start, stop: local_run(self.m,self.n,start,stop,plotvars=['swr','sst'])
+        
+buoy_UTC0 = buoy('61430',39.56,2.1,'1x')
+buoy_UTC1 = buoy('ADN-E2M3A',41.5277,18.0824,'1x')
+buoy_UTC2 = buoy('61277',35.723,25.462,'1x')
+buoys = [buoy_UTC0,buoy_UTC1,buoy_UTC2]
 
 ## Rewrite and put in another file, not here.
 # def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
