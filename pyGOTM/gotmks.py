@@ -58,12 +58,15 @@ def run_command(cmd, output='PIPE'):
 def gotm(run_folder = '.', verbose = False, logfn = 'gotm.log',
          inp_backup = False, **gotm_args):
     """ Runs GOTM in with extra functions. """
-    import os, shutil, time
+    import time
+    from os.path import isfile,isdir, join
+    from os import chdir, getcwd
+    from shutil import copyfile
 
     # Remember the current working folder then walk into the run folder.
-    home = os.getcwd() 
-    if os.path.isdir(run_folder):
-        os.chdir(run_folder)   
+    home = getcwd() 
+    if isdir(run_folder):
+        chdir(run_folder)   
     else:
         raise IOError("The folder path: " + run_folder + " is invalid.")
 
@@ -72,10 +75,10 @@ def gotm(run_folder = '.', verbose = False, logfn = 'gotm.log',
     
     # Transfer GOTM config namelists in the local run_folder.
     for each in GOTM_nml:
-        dst = os.path.join(run_folder,each)
-        if not(os.path.isfile(dst)):
-            src = os.path.join(GOTM_nml_path,each)
-            shutil.copyfile(src,dst)
+        dst = join(run_folder,each)
+        if not(isfile(dst)):
+            src = join(GOTM_nml_path,each)
+            copyfile(src,dst)
         run_files[each] = dst
     
     # Update the config as well if user specified extra options.
@@ -83,21 +86,22 @@ def gotm(run_folder = '.', verbose = False, logfn = 'gotm.log',
         new_cfg = updatecfg(path = run_folder, inp_backup = inp_backup, verbose = verbose, **gotm_args)
     
     # Now run the GOTM executable in this folder.
+    exe = join(GOTM_executable_path,GOTM_executable)
     if verbose:       
-        run_command(GOTM_executable,output='PIPE')
+        run_command(exe,output='PIPE')
     else:
         with open(logfn,'w') as logfile:
-            run_command(GOTM_executable,output=logfile)
+            run_command(exe,output=logfile)
         run_files['log'] = logfn
         
     # Return to the original working directory.
-    os.chdir(home)
+    chdir(home)
     
     # Check whether a result file is created. Should be replaced by a better exception handling structure.
     from netCDF4 import Dataset
     dr = getval(loadcfg(verbose=False),'out_dir')
     fn = getval(loadcfg(verbose=False),'out_fn') + '.nc'
-    with Dataset(os.path.join(dr,fn),'r') as results:
+    with Dataset(join(dr,fn),'r') as results:
         #print('len of time in results = ',len(results['time'])>0)
         nrec = len(results['time'])
         if nrec == 0:
@@ -105,7 +109,7 @@ def gotm(run_folder = '.', verbose = False, logfn = 'gotm.log',
         else:
             #TODO: Maybe not. Sometimes GOTM terminates midway. Need to catch that exit code.
             print("GOTM run completed successfully at {!s}.".format(datetime.now()))
-            run_files['results'] = os.path.join(dr,fn)        
+            run_files['results'] = join(dr,fn)        
     return run_files
       
 ## Treating f90 namelists used by GOTM 3.0.0
