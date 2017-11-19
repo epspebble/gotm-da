@@ -197,7 +197,7 @@ def write(data,varname,year,month=None,hr=None,fn=None,epoch=None,grid_fn='grid_
     import os
 
     if fn is None:
-        dr = join(medsea.data_folder,'{0.run}_{0.grid}'.format(medsea))
+        dr = join(medsea.project_folder,'results','{0.run}_{0.grid}'.format(medsea))
         if not os.path.isdir(dr):
             os.mkdir(dr)
             
@@ -220,7 +220,7 @@ def write(data,varname,year,month=None,hr=None,fn=None,epoch=None,grid_fn='grid_
             ds.createDimension('depth', size = medsea.nlev)
             depth = ds.createVariable('depth', 'f4', dimensions=('depth',))
             from numpy import loadtxt, cumsum
-            depth[:] = cumsum(loadtxt('/home/simontse/medsea_GOTM/config/{:s}'.format(grid_fn),skiprows=1))
+            depth[:] = cumsum(loadtxt(join(medsea.project_folder,'nml',grid_fn),skiprows=1))
             ncvar = medsea.create_variable(ds,varname,'f4',dimensions=('time','depth','lat','lon'))
         else:
             ncvar = medsea.create_variable(ds,varname,'f4',dimensions=('time','lat','lon'))
@@ -240,7 +240,7 @@ def write(data,varname,year,month=None,hr=None,fn=None,epoch=None,grid_fn='grid_
         assert data.shape[0] == len(hr), "Number of hours specified is NOT equal to the time dimension of {!s}!".format(varname)
 
         # Actual write
-        nctime[:] = hr[:]            
+        nctime[:] = hr[:] + 1 # Python indices begin 0, 1, 2 but actual GOTM hours are 1, 2, 3, ...
         ncvar[:] = data[:]
         
     elapsed = time()-tic
