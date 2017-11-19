@@ -35,6 +35,7 @@ overwrite = True # True means running at the same grid point will overwrite file
 grid_folder = os.path.join(project_folder,'grid',grid)
 p_sossta_folder = os.path.join(project_folder,'p_sossta')
 data_folder = os.path.join(project_folder,'data')
+cache_folder = '/dev/shm'
 
 ## Global config for medsea simulations 
 # The following are not meant to be changed interactively, as functions in other modules in thisos.listdir(ms.base_folder)
@@ -48,10 +49,10 @@ data_folder = os.path.join(project_folder,'data')
 # TODO: We should specify the corresponding GOTM code version in the profiles as well.
 run_profiles = {
     # The V2 runs. They were run at 150m deep with 150 levels.
-    'ASM0': dict(assimilation_type=0, extinct_method=9),
-    'ASM1': dict(assimilation_type=0, extinct_method=12),
-    'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9),
-    'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat',),
+#    'ASM0': dict(assimilation_type=0, extinct_method=9),
+#    'ASM1': dict(assimilation_type=0, extinct_method=12),
+#    'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9),
+#    'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat',),
 
     # Alternative vertical grid runs.
     # Maybe we should dynamically calculate 'nlev' and 'depth' from number of lines in the 'grid.dat' files.
@@ -153,6 +154,7 @@ def set_grid(new_grid=grid,
             grid_indices = (M, N, sea_mn, sea_m, sea_n)
     """
     from netCDF4 import Dataset
+    from matplotlib import cm
     print('Initializing grid...')
     # Declaring global is necessary for modifying them interactively after importing this module.
     global run, grid, max_depth, ASM
@@ -256,13 +258,19 @@ def set_grid(new_grid=grid,
 
     if plot:
         import matplotlib.pyplot as plt
-        fig, axes = plt.subplots(2,1,figsize=(14,14))
-        ax1, ax2 = axes
+        # fig, axes = plt.subplots(1,2,figsize=(14,14))
+        # ax1, ax2 = axes
+        # ax1.imshow(loc_type,origin='lower',extent=[lon_rea.min(),lon_rea.max(),lat_rea.min(),lat_rea.max()],cmap=cm.Blues)
+        # ax1.set_title('full medsea_rea grid')
+        # ax2.imshow(medsea_flags,origin='lower',extent=[grid_lons.min(),grid_lons.max(),grid_lats.min(),grid_lats.max()],cmap=cm.Blues)
+        # ax2.set_title('current subgrid')
+        fig, ax1 = plt.subplots()
         ax1.imshow(loc_type,origin='lower',extent=[lon_rea.min(),lon_rea.max(),lat_rea.min(),lat_rea.max()],cmap=cm.Blues)
         ax1.set_title('full medsea_rea grid')
-        ax2.imshow(medsea_flags,origin='lower',extent=[lon_rea.min(),lon_rea.max(),lat_rea.min(),lat_rea.max()],cmap=cm.Blues)
+        fig, ax2 = plt.subplots()
+        ax2.imshow(medsea_flags,origin='lower',extent=[grid_lons.min(),grid_lons.max(),grid_lats.min(),grid_lats.max()],cmap=cm.Blues)
         ax2.set_title('current subgrid')
-        for ax in axes:
+        for ax in (ax1,ax2):
             ax.set_xlabel('longitude')
             ax.set_ylabel('latitude')
 
@@ -500,7 +508,7 @@ def get_local_folder(*args, create=False):
     Specify 'create=True' to create the folder if it is not yet existent.
     """
     ## Setting default argument values.
-    if args is None:
+    if len(args) == 0:
         # print('No grid indices given, defaulting to the favourite grid point (lat, lon) = (36.00, 25.50) near buoy 61277...')
         # m, n = get_m_n(36.,25.5)
         from random import randint
@@ -532,7 +540,7 @@ def get_local_folder(*args, create=False):
 
 def prepare_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or (lat,lon); and start/stop,
                 year = None, month = None, # Provided to compute start, stop.
-                out_dir='.', out_fn='results', # Where to write GOTM ouputs
+                out_dir = '.', # Specifiy where to write GOTM ouputs if not the current folder... for caching purpose.
                 **gotm_user_args): # Extra GOTM arguments, e.g. from run_profiles):
             
     """
@@ -552,12 +560,15 @@ def prepare_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or 
 
     The 'start' and 'stop' arguments can be omitted if 'year' and 'month' are specified by keyword.
 
-    All remaining keyword arguments are passed to update GOTM input namelists. Note that the default values of
-    'out_dir' and 'out_fn' is specified in the call signature.
+    All remaining keyword arguments are passed to update GOTM input namelists. 
     """
 
     ## Preparations.
 
+    from os import symlink
+    from os.path import join, isfile, getsize
+    from shutil import copyfile
+    
     # If 'year' and / or 'month' is specified, extend the positional arguments to match the standard call signature.
     if year is not None:
         from datetime import datetime
@@ -581,39 +592,43 @@ def prepare_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or 
     # Same latlong could correspond to different (m,n) indices with different subgrids, not so helpful?
     #run_name = 'medsea_GOTM, {:s} grid, #(m,n)=({:d},{:d})'.format(grid,m,n) # debug info
 
-
+    # Put a tag to generated file names.
+    tag = run + '_' + GOTM_version
+    out_fn = 'results_' + tag
+    daily_stat_fn='daily_stat_'+tag+'.txt'
+    
     # Set up GOTM arguments.
-    gotm_args = dict(name = run, # Just use the run name / profile instead of run_name
+    gotm_args = dict(name = tag, # Just use the run name / profile instead of run_name
                      start = str(start), stop = str(stop),
                      latitude = float(lat), longitude = float(lon),
-                     out_dir = str(out_dir), out_fn = out_fn)
+                     out_dir = out_dir, out_fn = out_fn,
+                     daily_stat_fn = daily_stat_fn)
     gotm_args.update(**gotm_user_args)
 
     ## Step 1.
     import shutil
     for each in GOTM_nml:
         # All config files are overwritten every time GOTM is run.
-        src = os.path.join(GOTM_nml_path,each)
-        dst = os.path.join(local_folder,each)
+        src = join(GOTM_nml_path,each)
+        dst = join(local_folder,each)
         # print('Copying {:s} to {:s}'.format(src,dst))
-        shutil.copyfile(src,dst)
+        copyfile(src,dst)
 
     # The grid data file too if necessary.
     if 'grid_method' in gotm_user_args.keys() and gotm_user_args['grid_method'] == 2:
         assert 'grid_file' in gotm_user_args.keys()
         # Get the externally specified sea level widths if method is 2.
         grid_file = gotm_user_args['grid_file']
-        src = os.path.join(GOTM_nml_path,grid_file)
-        dst = os.path.join(local_folder,grid_file)
+        src = join(GOTM_nml_path,grid_file)
+        dst = join(local_folder,grid_file)
         # print('Copying {:s} to {:s}'.format(src,dst))
-        shutil.copyfile(src,dst)
+        copyfile(src,dst)
 
     ## Step 2.
     # GOTM_executable, default to be at [project_folder]/bin/[GOTM_executable], should have been checked for existence when pyGOTM.config was loaded
-    from os.path import isfile, join
     if not(isfile(dst)):
-        os.symlink(join(GOTM_executable_path,GOTM_executable),
-                   join(local_folder,GOTM_executable))
+        symlink(join(GOTM_executable_path,GOTM_executable),
+                join(local_folder,GOTM_executable))
 
     ## Step 3.
     # Create a list of dat files we expect to see.
@@ -639,124 +654,83 @@ def prepare_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or 
 
     # Now whether each dat file exists and has nonzero size (not just 'touched' by an erroneous read by GOTM)
     for each in dat_list:
-        datfn = os.path.join(local_folder,each+'.dat')
+        datfn = join(local_folder,each+'.dat')
         try:
-            assert os.path.getsize(datfn) > 0
+            assert getsize(datfn) > 0
         except:
-            print('Warning: '+each+'.dat not found or has zero length. Check input data integrity. ')
-
-            ## The following also don't work that well... need to rethink...
-            # if not(ignore):
-            #       # We are forced to ignore one or two points for some MODIS-based runs.
-            #       raise
-                  
-            ## Don't regenerate just for one location on demand. They could be from different versions!
-            # print('{:s} is not found or of size 0, regenerating...'.format(datfn))
-            # # Need a write_dat or local_dat !!!
-            # local_dat(m,n,dat=each)
-            # try:
-            #     assert os.path.getsize(datfn) > 0
-            # except:
-            #     print('{:s} regeneration failed.'.format(datfn))
-            #     raise
+            raise OSError(each+'.dat not found or has zero length. Check overall grid data integrity. ')
 
     updatecfg(path=local_folder, **gotm_args)
-    return gotm_args
+    return local_folder, out_fn, gotm_args
                   
-def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False,plotvars=None,**gotm_user_args):
+def local_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or (lat,lon); and start/stop,
+#              run, # A name for this run, if it matches a key in run_profile, the settings will be loaded. Should specify when loading the module.
+              year = None, month = None, # Provided to compute start, stop.
+#              create=False, # Should not run if the folder is not prepared.
+              cached = False,
+              verbose = False, # Print GOTM output to screen?
+              plotvars = None, # Plot results immediately after run? Pass a list of GOTM output variable names.
+              **gotm_user_args): # Extra GOTM arguments, e.g. from run_profiles):
     """
 
     Generate GOTM results for the (m,n)-th grid point at the specified month. Only *.dat files are expected to be
-    in the local folder. The config file, GOTM run time will be generated or copied over.
+    in the local folder. The config file, GOTM run time will be generated or copied over by calling prepare_run().
 
-    Temporary hack: pass None to month to run for the whole year.
+    See prepare_run() for argument options.
 
     """
     from datetime import datetime
     from netCDF4 import Dataset, num2date
-    import shutil
+    from matplotlib.pyplot import subplots
     from os.path import join
+    import shutil
 
-    lat, lon = get_lat_lon(m,n)
-#    local_folder = get_local_folder(lat,lon,run)
-    local_folder = get_local_folder(m,n,create=create)
-
-    # Argument handling, at tht end 'start', 'stop', 'suffix' should all be defined.
-    if year is not None:
-        if month is None: # Run for a year.
-            start = datetime(year,1,1)
-            stop = datetime(year,12,31) # Avoid data boundary for now.
-            #stop = datetime(year+1,1,1)
-            suffix = '_' + run + '_' + '{:04d}'.format(start.year)
-        else: # Run for a month
-            assert start is None
-            assert stop is None
-            start = datetime(year,month,1);
-            stop = datetime(year,month+1,1) if month < 12 else datetime(year,12,31) # Avoid data boundary for now
-            #stop = datetime(year,month+1,1) if month < 12 else datetime(year+1,1,1)
-            suffix = '_' + run + '_' + '{:04d}{:02d}'.format(start.year, start.month)
-    else: # Run for a specific period.
-        assert start is not None
-        assert stop is not None
-
-        def check(string):
-            if isinstance(string,str):
-                assert len(string) == 4+3+3+ 3+3+3 # 2013-01-01 00:00:00
-            else:
-                assert isinstance(string, datetime)
-        check(start)
-        check(stop)
-        startdayofyear = (start-datetime(start.year-1,12,31)).days # E.g. start is 2013-01-07, then it is 7.
-        stopdayofyear = (stop-datetime(stop.year-1,12,31)).days # E.g. stop is 2013-12-31, then it is 365, if stop is 2014-01-01, then it is 1.
-        suffix = '_{:04d}{:03d}{:04d}{:03d}_'.format(start.year,startdayofyear,stop.year,stopdayofyear) + run
-
-    # Now we can set the filename in each grid point subfolder.
-    out_fn = 'results' + suffix
-
-    # Check global name cache_folder is set of not.
-    out_dir = local_folder if cache_folder is None else cache_folder
-
+    if cached:
+        out_dir = cache_folder
+    else:
+        out_dir = '.'
     if run in run_profiles.keys():
         # Should subclass an Exception to tell people what happened.
         if gotm_user_args != {}:
             print(('{:s} = {!s}' * len(gotm_user_args)).format(*(gotm_user_args.items())))
-            raise Exception("A recorded run profile {:s} is specified, rejecting all user arguments for GOTM.\n")
+            raise RuntimeError("A recorded run profile {:s} is specified, rejecting all user arguments for GOTM.\n")
         print('Using pre-defined profile: {:s}...'.format(run))
-        gotm_args = prepare_run(start,stop,local_folder,lat=lat,lon=lon,
-                                out_fn=out_fn,
-                                out_dir=out_dir,
-                                daily_stat_fn='daily_stat'+suffix+'.dat',
-                                **run_profiles[run])
+        local_folder, out_fn, gotm_args = prepare_run(*args,
+                                                      year=year, month=month,
+                                                      out_dir=out_dir,
+                                                      **run_profiles[run])
     else:
-        print('Running without a pre-defined profile and creating new folder structures for {:s}...'.format(run))
-        gotm_args = prepare_run(start,stop,local_folder,lat=lat,lon=lon,
-                                out_dir=out_dir,
-                                out_fn=out_fn,
-                                daily_stat_fn='daily_stat'+suffix+'.dat',
-                                **gotm_user_args)
-
+        print('Running without a pre-defined profile and tagging results with "{:s}"...'.format(run))
+        local_folder, out_fn, gotm_args = prepare_run(*args,
+                                                    year=year, month=month,
+                                                      out_dir=out_dir,
+                                                      **gotm_user_args)
     os.chdir(local_folder)
     stat = dict()
     try:
         tic()
-        logfn = 'GOTM_' + print_ctime(sep='_') + '.log'
+
+        # 1. Run GOTM keeping the output to log.
+        logfn = 'GOTM_' + run + '_' + print_ctime(sep='_') + '.log'
         print('GOTM running... ')
         print('  Working from: {:s}...'.format(local_folder))
         gotm(verbose=verbose,logfn=logfn)
-        print('  Results written to {:s}.nc...'.format(os.path.join(out_dir,out_fn)))
+        print('  Results written to {:s}.nc...'.format(join(out_dir,out_fn)))
 
-        if cache_folder is not None:
-            src = os.path.join(out_dir,out_fn+'.nc')
-            dst = os.path.join(local_folder,out_fn+'.nc')
+        # 2. Transfer the results nc immediately.
+        if cached:
+            src = join(out_dir,out_fn+'.nc')
+            dst = join(local_folder,out_fn+'.nc')
             try:
                 print('Moving {:s} to {:s}...'.format(src,dst))
                 shutil.move(src,dst)
             except:
                 raise
 
+        # 3. Print out GOTM execution statistics.
         stat['elapsed'] = toc()
         # statfn = 'stat_{:d}{:02d}.dat'.format(year,month)
-        statfn = 'run_stat_' + print_ctime(sep='_') + '.log'
+        statfn = 'STAT_' + run + '_' + print_ctime(sep='_') + '.log'
         with open(statfn,'w') as f:
             print('Writing diagnostic statistics to {0}...\n'.format(statfn))
             f.write('--------------------------------------------------------------\n')
@@ -768,7 +742,7 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
             f.write('Elapsed: {:.2f} seconds.\n'.format(stat['elapsed']))
             f.write('--------------------------------------------------------------\n')
             f.write('Data statisitics:\n')
-            with Dataset(os.path.join(local_folder,gotm_args['out_fn']+'.nc'),'r') as ds:
+            with Dataset(join(local_folder,gotm_args['out_fn']+'.nc'),'r') as ds:
                 sst = ds['sst'][:]
                 time = ds['time']
                 stat.update(sst_mean = sst.mean(),
@@ -784,11 +758,7 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
     except:
         raise
 
-    if plotvars:
-        from os.path import join
-        from netCDF4 import num2date
-        from matplotlib.pyplot import subplots
-         
+    if plotvars:       
         assert isinstance(plotvars,list)
         ds = Dataset(out_fn+'.nc','r')
         time = num2date(ds['time'][:],ds['time'].units)
@@ -813,9 +783,36 @@ def local_run(year,month,m,n,run,start=None,stop=None,create=False,verbose=False
             ax.set_title(name)
             ax.grid('on')
         fig.autofmt_xdate()
-        return stat, var
+        return stat, var # Return the plotted data as well.
     else:
         return stat
+
+
+#Still used by combine.py and combine_multiple.py, to be deprecated
+def create_dimensions(nc, lat=grid_lats, lon=grid_lons):
+    " Declaring dimensions and creating the coordinate variables for each dimension."
+    # Dimensions
+    nc.createDimension('time') # unlimited
+    nc.createDimension('lat', size = len(lat))
+    nc.createDimension('lon', size = len(lon))
+
+    # Dimension variables.
+    nctime = nc.createVariable('time','i4',dimensions=('time',))
+    nctime.units = 'hours since ' + str(epoch) # epoch is to be set in global config, and loaded by importing .config
+    nclat = nc.createVariable('lat','f4',dimensions=('lat',))
+    nclat.units = 'degrees north'
+    nclon = nc.createVariable('lon','f4',dimensions=('lon',))
+    nclon.units = 'degrees east'
+    nclat[:] = lat
+    nclon[:] = lon
+    #print('Done initializing dimensions.')
+    return nctime, nclat, nclon
+def create_variable(nc,varname,datatype,dimensions=('time','lat','lon'),zlib=True, fill_value=1e+20):
+    " Default settings applied to create a netCDF variable. 'fill_value' of the rea dataset is used here."
+    ncvar = nc.createVariable(varname,datatype,dimensions=dimensions,zlib=zlib,fill_value=fill_value)
+    #print('Done initializing variables.')
+    return ncvar
+
 
 ## Rewrite and put in another file, not here.
 # def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
