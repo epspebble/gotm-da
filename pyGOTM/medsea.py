@@ -131,6 +131,23 @@ run_profiles = {
 
 }
 
+# Taking from scratch notebook. Good to saving buoy information in this module.
+class buoy:
+    def __init__(self,name,lat,lon,grid='1x'):
+        import sys
+        import pyGOTM.medsea as medsea
+        self.name = name
+        self.lat = lat
+        self.lon = lon
+        self.m, self.n = medsea.get_m_n(lat,lon)
+        self.grid_lat, self.grid_lon = medsea.get_lat_lon(self.m,self.n)
+        self.run_GOTM = lambda start, stop: medsea.local_run(self.m,self.n,start,stop,plotvars=['swr','sst'])
+        
+buoy_UTC0 = buoy('61430',39.56,2.1,'1x')
+buoy_UTC1 = buoy('ADN-E2M3A',41.5277,18.0824,'1x')
+buoy_UTC2 = buoy('61277',35.723,25.462,'1x')
+buoys = [buoy_UTC0,buoy_UTC1,buoy_UTC2]
+
 # Routines to set global values in this module. Can be used in interactive session to change config.
 def set_grid(new_grid=grid,
              new_max_depth=max_depth, # These names just need to be different... Because we cannot declare an input name global below...
