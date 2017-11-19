@@ -142,7 +142,10 @@ def write(data_dict,varnames,year,month=None,fn=None,hr=None,epoch=None,grid_fn=
             assert data_dict[varname].shape[0] == len(hr) # check the data lengths 
             elapsed = write_each(varname,data_dict[varname])
             print('Elapsed {:d} min {:d} sec'.format(int(elapsed/60),int(elapsed%60)))
-        nctime[:] = hr+1 # Python indices are 0,1,2,.. but actualy hours are 1,2,3, ...
+
+        # Python indices begin 0, 1, 2 but actual GOTM hours are 1, 2, 3, ...
+        true_hr = [hr[i]+1 for i in range(len(hr))]
+        nctime[:] = true_hr 
         
     print('Finished writing to {:s}.'.format(fn)) 
     elapsed = time()-tic

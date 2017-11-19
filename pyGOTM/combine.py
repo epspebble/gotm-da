@@ -239,8 +239,10 @@ def write(data,varname,year,month=None,hr=None,fn=None,epoch=None,grid_fn='grid_
 
         assert data.shape[0] == len(hr), "Number of hours specified is NOT equal to the time dimension of {!s}!".format(varname)
 
+        # Python indices begin 0, 1, 2 but actual GOTM hours are 1, 2, 3, ...
+        true_hr = [hr[i]+1 for i in range(len(hr))]
+        nctime[:] = true_hr 
         # Actual write
-        nctime[:] = hr[:] + 1 # Python indices begin 0, 1, 2 but actual GOTM hours are 1, 2, 3, ...
         ncvar[:] = data[:]
         
     elapsed = time()-tic
