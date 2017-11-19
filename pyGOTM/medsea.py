@@ -36,6 +36,8 @@ grid_folder = os.path.join(project_folder,'grid',grid)
 p_sossta_folder = os.path.join(project_folder,'p_sossta')
 data_folder = os.path.join(project_folder,'data')
 cache_folder = '/dev/shm'
+results_folder = os.path.join(project_folder,'results')
+plots_folder = os.path.join(project_folder,'plots')
 
 ## Global config for medsea simulations 
 # The following are not meant to be changed interactively, as functions in other modules in thisos.listdir(ms.base_folder)
