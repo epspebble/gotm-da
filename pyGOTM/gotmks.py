@@ -260,3 +260,52 @@ def print_lat_lon(lat,lon,fmt_str='g'):
     lon_str = template.format(lon) + 'E' if lon>=0 else template.format(-lon) + 'W'
     #return lat_str + ' ' + lon_str
     return lat_str + lon_str
+
+def subindices(src,dst):
+    """
+        If: 
+        
+        1. 'src' (e.g. 1.5, 2., 2.5, ... 10.) is taken from
+        an arithmetic sequence (e.g. 0., 0.5, 1., ...)
+        
+        2. 'dst' (e.g. 2., 4., 6., 8., 10.) is taken from an 
+        arithmetic subsequence of the above (e.g. 0., 1., 2., ...)
+        
+        3. 'src' contains all the values of 'dst'
+        
+        Then, this function computes:
+        
+            start, stop, step = subindices(src, dst)
+        
+        so that 
+        
+            src[start:stop:step] == dst
+
+        holds.
+        
+        It also works if src or dst were reversed in order of elements.
+    """
+    
+    from numpy import where, array_equal, sign, array
+
+    def get_index_of(val):
+        "Check and return the index of a unique element 'val' in 'src'."
+        found = where(array(src) == val)[0]
+        if len(found) == 0:
+            raise ValueError("Cannot find the value {!s} in the vector: \n{!s}.".format(val,src))
+        elif len(found) != 1:
+            raise ValueError("Repeated elements of {!s} found in the vector: \n{!s}".format(val,src))
+        else:
+            return found[0]
+        
+    first = get_index_of(dst[0])
+    last = get_index_of(dst[-1])
+    step_ratio = (dst[1]-dst[0])/(src[1]-src[0])
+    if step_ratio%1. != 0.:
+        raise ValueError("Step size of 'dst': {:g}, is not an integer multiple of that of 'src': {:g}.".format(dst[1]-dst[0],src[1]-src[0]))
+    step = int(step_ratio)
+    start, stop = first, last + sign(step)
+    if not array_equal(src[start:stop:step],dst):
+        raise ValueError("Assumption failed. Are 'dst' and 'src' equally sized and 'src' contains all values of 'dst'?")
+    else:
+        return start, stop, step
