@@ -1,3 +1,43 @@
+# __all__ = ['medsea_ERA_reformat',
+#            'medsea_ECMWF_reformat',
+#            'medsea_MFC_midnights_eformat',
+#            'medsea_MFC_sunrise_reformat']
+
+from pyGOTM.gotmks import subindices # Use this to subgrid a finer datset.
+from pyGOTM import medsea
+from os.path import isfile, isdir, join
+from os import mkdir
+from numpy import array, array_equal
+from datetime import date, datetime, timedelta
+
+p_sossta_folder = medsea.p_sossta_folder
+data_folder = medsea.data_folder
+dst_lats = medsea.grid_lats
+dst_lons = medsea.grid_lons
+
+# Precomputed indices map MFC reanalysis data to medsea 1x grid up to 75m deep.
+nlev = 16
+
+MFC_lev = \
+          [1.4721018075942993,
+           4.587478160858154,
+           7.944124221801758,
+           11.558627128601074,
+           15.448707580566406,
+           19.633302688598633,
+           24.132646560668945,
+           28.968355178833008,
+           34.16352844238281,
+           39.742835998535156,
+           45.73264694213867,
+           52.1611213684082,
+           59.05834197998047,
+           66.4564437866211,
+           74.38976287841797,
+           82.89495086669922]
+dst_lev = MFC_lev
+
+    
 ### ERA-INTERIM
 # This improves current code in pyGOTM/ncdf_reformat.py, version on 2017-07-13
 def make_abs(rel_path, side_effect = 'raise'):
@@ -30,13 +70,96 @@ def make_abs(rel_path, side_effect = 'raise'):
             raise OSError('The directory {!s} does not exist.'.format(abs_path))
     return abs_path
 
-def medsea_ERA_reformat(year, grid='1x',
-                        src_folder='p_sossta/medsea_ERA-INTERIM/3-hourly',
-                        dst_folder='medsea_data/medsea_ERA-INTERIM'):    
+def get_subgrid_data(ds,varname,lat_slice,lon_slice,depth_slice=None):
+    """ 
+    Pass lat_slice=None, lon_slice=None to compute the slices, e.g. for the first time. 
+    depth_slice is to be precomputed for now.
+    """
+    # First, compute the right indices if necessary, or confirm they're identical.
+    if lat_slice is None or lon_slice is None:
+        lat_slice = slice(*subindices(ds['lat'][:],dst_lats))
+        lon_slice = slice(*subindices(ds['lon'][:],dst_lons))
+        
+        
+    # Now read.
+    assert array_equal(ds['lat'][lat_slice], dst_lats)
+    assert array_equal(ds['lon'][lon_slice], dst_lons)
+    if depth_slice is not None:
+        assert array_equal(ds['depth'][depth_slice], dst_lev)
+        data = ds[varname][:,depth_slice,lat_slice,lon_slice]
+    else:
+        # Now, read the data unpacked from the netCDF Dataset object.
+        data = ds[varname][:,lat_slice,lon_slice]
+    
+    return data, lat_slice, lon_slice # Also return the lat_slice, lon_slice for reuse 
+
+def get_interpolated_data(ds,varname):
+    """ 
+    Use ds[varname][i,:,:] to interpolate linearly to obtain data at i-th time record.
+    The destination grid defined by 'dst_lats', 'dst_lons' globally in this module need
+    to be strictly within the target Dataset's lat lon limits.
+    """
+    from scipy.interpolate import RectBivariateSpline
+    from numpy import array
+
+    lon = ds['lon'][:]
+    lat = ds['lat'][:]
+    
+    lon_dir = 1 if (lon[1]-lon[0] > 0) else -1
+    lat_dir = 1 if (lat[1]-lat[0] > 0) else -1
+
+    lon_min, lon_max = (lon[0], lon[-1])[::lon_dir]
+    lat_min, lat_max = (lat[0], lat[-1])[::lat_dir]
+
+    #print(lon_min,lon_max,lat_min,lat_max)
+    
+    if any((lon_min > dst_lons[0],
+           lon_max < dst_lons[-1],
+           lat_min > dst_lats[0],
+           lat_max < dst_lats[-1])):
+        raise ValueError("The grid with 'lat' \in [{:g},{:g}], 'lon' \in [{:g},{:g}] do not cover the destination grid. \n Check metadata: \n{!s}\n{!s}".format(lat_min, lat_max, lon_min, lon_max, ds['lat'], ds['lon'] ))
+    
+    # Reorder in strictly ascending order for RectBivariateSpline to work.
+    lon = ds['lon'][::lon_dir]
+    lat = ds['lat'][::lat_dir]
+    val = ds[varname][:,::lat_dir,::lon_dir]
+    val_intp = list()
+    for i in range(val.shape[0]):
+        interp = RectBivariateSpline(lat,lon,val[i,:])
+        val_intp.append(interp(dst_lats,dst_lons))
+    return array(val_intp)
+
+def get_src_dst_folders(dataset):
+    assert isinstance(dataset,str), 'Check argument'
+    
+    if dataset == 'ERA-INTERIM':
+        src_folder = join(p_sossta_folder,'medsea_ERA-INTERIM','3-hourly')        
+        dst_folder = join(data_folder,'medsea_ERA-INTERIM')
+    elif dataset == 'ECMWF':
+        src_folder = join(p_sossta_folder,'medsea_ECMWF','3-HOURLY')
+        dst_folder = join(data_folder,'medsea_ECMWF')
+    elif dataset == 'MFC_midnights':
+        src_folder = join(p_sossta_folder,'medsea_rea') # but stored in yearly subfolders
+        dst_folder = join(data_folder, 'medsea_MFC_midnights')
+    elif dataset == 'MFC_sunrise':
+        src_folder = join(p_sossta_folder, 'medsea_rea','sunrise_nrt')
+        dst_folder = join(data_folder,'medsea_MFC_sunrise')
+    else:
+        raise NotImplementedError('Unknown dataset: ' + dataset)
+
+    if not isdir(src_folder):
+        raise OSError('Invalid path: {!s}'.format(src_folder))
+    
+    if not isdir(dst_folder):
+        try:
+            mkdir(dst_folder)
+        except:
+            raise
+    return src_folder, dst_folder
+
+def medsea_ERA_reformat(year, grid='1x'):
     """ Combine variables from yearly ERA data into intermediate netCDF4 files, grouped by 
     whether they are to be eventually written to heat.dat or met.dat.
-    
-    Version date: 2017-11-09.
     """
     ## Preparations.
     
@@ -51,15 +174,16 @@ def medsea_ERA_reformat(year, grid='1x',
     from pyGOTM.gotmks import tic, toc
     from pyGOTM.config import epoch # Should be datetime(1981,1,1,0,0,0)    
     
-    # Find absolute path for the src_folder and dst_folder
-    if not isabs(src_folder):
-        src_folder = join(getenv('HOME'),src_folder)
-    if not isabs(dst_folder):
-        dst_folder = join(getenv('HOME'),dst_folder)
-        if not isdir(dst_folder):
-            mkdir(dst_folder)
+    # # Find absolute path for the src_folder and dst_folder
+    # if not isabs(src_folder):
+    #     src_folder = join(getenv('HOME'),src_folder)
+    # if not isabs(dst_folder):
+    #     dst_folder = join(getenv('HOME'),dst_folder)
+    #     if not isdir(dst_folder):
+    #         mkdir(dst_folder)
     
-    ## Hard-coding some information for the subfunction get_ERA_yearly_data()
+    dataset = 'ERA-INTERIM'
+    src_folder, dst_folder = get_src_dst_folders(dataset)
     
     # Filename keyword 'name' / internal nc variable name 'alias' (when they don't agree)
     names = dict(met = ['u10m','v10m','sp','t2m','q2m','precip'],
@@ -67,31 +191,39 @@ def medsea_ERA_reformat(year, grid='1x',
     aliases = dict(precip='var144', snow='var228',
                    lwrd='var175', swrd='var169')
 
-    if grid == '1x':
-        from pyGOTM import medsea
-        medsea.set_grid('1x')
-        # Precomputed indices to map ERA-INTERIM to GOTM 1x grid 
-        src_lat_idx = slice(-8,4,-1)
-        src_lon_idx = slice(12,-18,1)
-        dst_lats = medsea.grid_lats
-        dst_lons = medsea.grid_lons
-    else:
-        raise NotImplementedError('Me no do grid = {!s} (yet).'.format(grid))
-        
     # Convenience function to get one variable's yearly data.
+    lat_slice, lon_slice, do_interp = None, None, False
     def get_data(name,src_fn):
+        nonlocal lat_slice, lon_slice, do_interp
         with Dataset(join(src_folder,src_fn),'r') as ds:
-            # First, confirm every time that the indices for lat and lon are correct.
-            assert array_equal(ds['lat'][src_lat_idx], dst_lats)
-            assert array_equal(ds['lon'][src_lon_idx], dst_lons)
             # Switch to the correct netCDF4 variable name if necessary
             if name in aliases.keys():
-                alias = aliases[name]
+                varname = aliases[name]
             else:
-                alias = name
-            # Then return the data unpacked from the netCDF object.
-            data = ds[alias][:,src_lat_idx,src_lon_idx]
+                varname = name
+            if do_interp:
+                data = get_interpolated_data(ds,varname)
+            else:
+                try: 
+                    data = get_subgrid_data(ds,varname,lat_slice,lon_slice)
+                except ValueError as ve:
+                    print('ValueError occurred using get_subgrid_data():')
+                    print(ve)
+                    print('Attempting to interpolate instead...')
+                    do_interp = True
+                    data = get_interpolated_data(ds,varname)
         return data
+
+    # if grid == '1x':
+    #     from pyGOTM import medsea
+    #     medsea.set_grid('1x')
+    #     # Precomputed indices to map ERA-INTERIM to GOTM 1x grid 
+    #     src_lat_idx = slice(-8,4,-1)
+    #     src_lon_idx = slice(12,-18,1)
+    #     dst_lats = medsea.grid_lats
+    #     dst_lons = medsea.grid_lons
+    # else:
+    #     raise NotImplementedError('Me no do grid = {!s} (yet).'.format(grid))
 
     ## Creating intermediate file on 1x grid for creating heat.dat / met.dat later.
     tic = time()
@@ -136,12 +268,17 @@ def medsea_ERA_reformat(year, grid='1x',
             # Append data for one variable for one year.
             with Dataset(join(dst_folder,dst_fn),'a') as ds:
                 var = ds.createVariable(name,'f8',dimensions=('time','lat','lon'))
+                # The lat_slice and lon_slice is computed in the first run, and shold
+                # stay the same after every function call if assumption that
+                # the lat/lon grid of the source dataset is unique and identical
+                # across nc files.
+                val = get_data(name,src_fn) 
                 if name == 't2m':
-                    var[:] = get_data(name,src_fn) - 273.15 # Convert from degrees K to degrees C
+                    var[:] = val - 273.15 # Convert from degrees K to degrees C
                 elif name == 'sp':
-                    var[:] = get_data(name,src_fn) / 100 # Convert from Pa to hPa
+                    var[:] = val / 100 # Convert from Pa to hPa
                 else:
-                    var[:] = get_data(name,src_fn)
+                    var[:] = val
             toc = time()-tic
             elapsed += toc
             print('Finished appending data for {:s}. Elapsed {!s}s'.format(name,toc))
@@ -150,13 +287,11 @@ def medsea_ERA_reformat(year, grid='1x',
 
 ### ECMWF
 # This improves current code in pyGOTM/ncdf_reformat.py, version on 2017-07-13
-def medsea_ECMWF_reformat(year,month,grid='1x',
-                          src_folder='p_sossta/medsea_ECMWF/3-HOURLY',
-                          dst_folder='medsea_data/medsea_ECMWF'):    
+def medsea_ECMWF_reformat(year,month,grid='1x'):
+#                          src_folder='p_sossta/medsea_ECMWF/3-HOURLY',
+#                          dst_folder='medsea_data/medsea_ECMWF'):    
     """ Combine variables from monthly ECMWF data into intermediate netCDF4 files, grouped by 
     whether they are to be eventually written to heat.dat or met.dat.
-    
-    Version date: 2017-11-09.
     """
     ## Preparations.
     
@@ -170,48 +305,84 @@ def medsea_ECMWF_reformat(year,month,grid='1x',
     from pyGOTM.gotmks import tic, toc
     from pyGOTM.config import epoch # Should be datetime(1981,1,1,0,0,0)    
     
-    # Find absolute path for the src_folder and dst_folder
-    if not isabs(src_folder):
-        src_folder = join(getenv('HOME'),src_folder)
-    if not isabs(dst_folder):
-        dst_folder = join(getenv('HOME'),dst_folder)
-        if not isdir(dst_folder):
-            mkdir(dst_folder)
-            
-    ## Hard-coding some information for the subfunction get_ERA_yearly_data()
+    # # Find absolute path for the src_folder and dst_folder
+    # if not isabs(src_folder):
+    #     src_folder = join(getenv('HOME'),src_folder)
+    # if not isabs(dst_folder):
+    #     dst_folder = join(getenv('HOME'),dst_folder)
+    #     if not isdir(dst_folder):
+    #         mkdir(dst_folder)
+
+    src_folder = join(p_sossta_folder,'medsea_ECMWF','3-HOURLY')
+    dst_folder = join(data_folder,'medsea_ECMWF')
+    if not isdir(dst_folder):
+        mkdir(dst_folder)
+
     
     # Filename keyword 'name' / internal nc variable name 'alias' (when they don't agree)
     names = dict(met = ['u10m','v10m','sp','t2m','q2m','precip'],
                  heat = ['lwrd','swrd'])
     aliases = dict() # Checked: they are identical.
 
-    if grid == '1x':
-        from pyGOTM import medsea
-        medsea.set_grid(grid)
-        # Precomputed indices to map ERA-INTERIM to GOTM 1x grid 
-        src_lat_idx = slice(154,33,-6) 
-        src_lon_idx = slice(72,409,6)
-        dst_lats = medsea.grid_lats
-        dst_lons = medsea.grid_lons
-    else:
-        raise NotImplementedError('Me no do grid = {!s} (yet).'.format(grid))
-    
-    # Precomputed indices to map ECMWF data to medsea 1x grid.
-    
+    ## No longer needed when we can compute on the fly.
+    # if grid == '1x':
+    #     from pyGOTM import medsea
+    #     medsea.set_grid(grid)
+    #     # Precomputed indices to map ECMWF data to medsea 1x grid.
+    #     src_lat_idx = slice(154,33,-6) 
+    #     src_lon_idx = slice(72,409,6)
+    #     dst_lats = medsea.grid_lats
+    #     dst_lons = medsea.grid_lons
+    # else:
+    #     raise NotImplementedError('Me no do grid = {!s} (yet).'.format(grid))
+
     # Convenience function to get one variable's yearly data.
+    lat_slice, lon_slice, do_interp = None, None, False
     def get_data(name,src_fn):
+        nonlocal lat_slice, lon_slice, do_interp
+        # Switch to the correct netCDF4 variable name if necessary
+        if name in aliases.keys():
+            varname = aliases[name]
+        else:
+            varname = name
+        # Now read in the data by appealing to subgridding or interpolation.
         with Dataset(join(src_folder,src_fn),'r') as ds:
-            # First, confirm every time that the indices for lat and lon are correct.
-            assert array_equal(ds['lat'][src_lat_idx], dst_lats)
-            assert array_equal(ds['lon'][src_lon_idx], dst_lons)
-            # Switch to the correct netCDF4 variable name if necessary
-            if name in aliases.keys():
-                alias = aliases[name]
+            if do_interp:
+                data = get_interpolated_data(ds,varname)
             else:
-                alias = name
-            # Then return the data unpacked from the netCDF object.
-            data = ds[alias][:,src_lat_idx,src_lon_idx]
+                try: 
+                    data, lat_slice, lon_slince = get_subgrid_data(ds,varname,lat_slice,lon_slice)
+                except ValueError as ve:
+                    print('ValueError occurred using get_subgrid_data():')
+                    print(ve)
+                    print('Attempting to interpolate instead...')
+                    do_interp = True
+                    data = get_interpolated_data(ds,varname)
         return data
+
+    # # Convenience function to get one variable's yearly data.
+    # lat_slice, lon_slice = None, None
+    # def get_data(name,src_fn):
+    #     nonlocal lat_slice, lon_slice
+    #     with Dataset(join(src_folder,src_fn),'r') as ds:
+            
+    #         # Compute the right indices for the first time, or confirm they're correct.
+    #         if lat_slice is None or lon_slice is None:
+    #             lat_slice = slice(*subindices(ds['lat'][:],dst_lats))
+    #             lon_slice = slice(*subindices(ds['lon'][:],dst_lons))
+    #         assert array_equal(ds['lat'][lat_slice], dst_lats)
+    #         assert array_equal(ds['lon'][lon_slice], dst_lons)
+
+    #         # Switch to the correct netCDF4 variable name if necessary
+    #         if name in aliases.keys():
+    #             alias = aliases[name]
+    #         else:
+    #             alias = name
+
+    #         # Then return the data unpacked from the netCDF object.
+    #         data = ds[alias][:,lat_slice,lon_slice]
+
+    #     return data, lat_slice, lon_slice # Also return the lat_slice, lon_slice for use next time.
     
     ## Creating intermediate file on 1x grid for creating heat.dat / met.dat later.
     tic = time()
@@ -252,19 +423,22 @@ def medsea_ECMWF_reformat(year,month,grid='1x',
         elapsed += toc
         print('Finished writing dimensions. Elapsed {!s}s'.format(toc))
     
+
         # Append the data one variable after another.
+        lat_slice, lon_slice = None, None # To instruct get_data to calculate them.
         for name in names[dat_type]:
             tic = time()
             src_fn = 'ECMWF_{:s}_y{:d}m{:02d}.nc'.format(name,year,month)
             # Append data for one variable for one year.
             with Dataset(join(dst_folder,dst_fn),'a') as ds:
                 var = ds.createVariable(name,'f8',dimensions=('time','lat','lon'))
+                val = get_data(name,src_fn)
                 if name == 't2m':
-                    var[:] = get_data(name,src_fn) - 273.15 # Convert from degrees K to degrees C
+                    var[:] = val - 273.15 # Convert from degrees K to degrees C
                 elif name == 'sp':
-                    var[:] = get_data(name,src_fn) / 100 # Convert from Pa to hPa
+                    var[:] = val / 100 # Convert from Pa to hPa
                 else:
-                    var[:] = get_data(name,src_fn)
+                    var[:] = val
             toc = time()-tic
             elapsed += toc
             print('Finished appending data for {:s}. Elapsed {!s}s'.format(name,toc))
@@ -272,13 +446,9 @@ def medsea_ECMWF_reformat(year,month,grid='1x',
         print('Total time: {!s}s'.format(elapsed))
 
 ### MFC_midnights
-def medsea_MFC_midnights_reformat(year,month=None,grid='1x',
-                                  src_folder='p_sossta/medsea_rea',
-                                  dst_folder='medsea_data/medsea_MFC_midnights'):
+def medsea_MFC_midnights_reformat(year,month=None,grid='1x'):
     """ Combine daily MFC midnightly mean TEMP / PSAL data into intermediate yearly or monthly netCDF4 files, 
     to be eventually written to tprof.dat / sprof.dat.
-    
-    Version date: 2017-11-09.
     """
     ## Preparations.
     
@@ -291,17 +461,19 @@ def medsea_MFC_midnights_reformat(year,month=None,grid='1x',
     from numpy import array_equal, array    
     from pyGOTM.gotmks import tic, toc
     from pyGOTM.config import epoch # Should be datetime(1981,1,1,0,0,0)    
-    
+
+
+    src_folder, dst_folder = get_src_dst_folders('MFC_midnights')
     # MFC reanalysis data stored in yearly subfolders.
     src_folder = join(src_folder,str(year))
     
-    # Find absolute path for the src_folder and dst_folder
-    if not isabs(src_folder):
-        src_folder = join(getenv('HOME'),src_folder)
-    if not isabs(dst_folder):
-        dst_folder = join(getenv('HOME'),dst_folder)
-        if not isdir(dst_folder):
-            mkdir(dst_folder)
+    # # Find absolute path for the src_folder and dst_folder
+    # if not isabs(src_folder):
+    #     src_folder = join(getenv('HOME'),src_folder)
+    # if not isabs(dst_folder):
+    #     dst_folder = join(getenv('HOME'),dst_folder)
+    #     if not isdir(dst_folder):
+    #         mkdir(dst_folder)
             
     ## Hard-coding some information for the subfunction get_ERA_yearly_data()
 
@@ -313,57 +485,21 @@ def medsea_MFC_midnights_reformat(year,month=None,grid='1x',
     dst_varname = dict(TEMP = 'temp',
                        PSAL = 'salt')
 
-    if grid == '1x':
-        from pyGOTM import medsea
-        medsea.set_grid(grid)
-        # Precomputed indices map MFC reanalysis data to medsea 1x grid up to 75m deep.
-        nlev = 16
-        src_lev = \
-                  [1.4721018075942993,
-                   4.587478160858154,
-                   7.944124221801758,
-                   11.558627128601074,
-                   15.448707580566406,
-                   19.633302688598633,
-                   24.132646560668945,
-                   28.968355178833008,
-                   34.16352844238281,
-                   39.742835998535156,
-                   45.73264694213867,
-                   52.1611213684082,
-                   59.05834197998047,
-                   66.4564437866211,
-                   74.38976287841797,
-                   82.89495086669922]
-        
-        assert len(src_lev) == nlev
-        src_lat_idx = slice(9,None,12)
-        src_lon_idx = slice(0,None,12)
-    
-        # Target grid
-        dst_lats = medsea.grid_lats
-        dst_lons = medsea.grid_lons
-        dst_lev = src_lev
-        
-    else:
-        raise NotImplementedError('Me no do grid = {!s} (yet).'.format(grid))
+    depth_slice = slice(None,nlev,None)
+    lat_slice, lon_slice = None, None
 
     # Convenience function to get one variable's yearly data.
     def get_data(name,src_fn):
+        nonlocal lat_slice, lon_slice, depth_slice
         # Use MFDataset instead of Dataset, src_fn is a glob-able pattern instead of a specific filename. 
         print('Reading from {!s}...'.format(join(src_folder,src_fn)))
+        # Switch to the correct netCDF4 variable name if necessary
+        if name in src_varname.keys():
+            varname = src_varname[name]
+        else:
+            varname = name
         with MFDataset(join(src_folder,src_fn),'r') as ds:
-            # First, confirm every time that the indices for lat and lon are correct.
-            assert array_equal(ds['lat'][src_lat_idx], dst_lats)
-            assert array_equal(ds['lon'][src_lon_idx], dst_lons)
-            assert array_equal(ds['depth'][:nlev],src_lev), ds['depth'][:nlev]
-            # Switch to the correct netCDF4 variable name if necessary
-            if name in src_varname.keys():
-                alias = src_varname[name]
-            else:
-                alias = name
-            # Then return the data unpacked from the netCDF object.
-            data = ds[alias][:,:nlev,src_lat_idx,src_lon_idx]
+            data, lat_slice, lon_slice = get_subgrid_data(ds,varname,lat_slice,lon_slice,depth_slice)
         return data
     
     ## Creating intermediate file on 1x grid for creating heat.dat / met.dat later.
@@ -388,7 +524,7 @@ def medsea_MFC_midnights_reformat(year,month=None,grid='1x',
             ds_lon = ds.createVariable('lon','f4',dimensions=('lon',))
 
             # Write the depth values using precomputed values.
-            ds_depth[:] = src_lev
+            ds_depth[:] = dst_lev
 
             # Write the values of the lat/lon dimensions using user-specified grid when loading the medsea module.
             ds_lat[:] = dst_lats
@@ -451,21 +587,23 @@ def medsea_MFC_sunrise_reformat(start_day,stop_day,grid='1x',
     from pyGOTM.gotmks import tic, toc
     from pyGOTM.swr import solar_times
     from pyGOTM.config import epoch # Should be datetime(1981,1,1,0,0,0)    
+
+    src_folder, dst_folder = get_src_dst_folders('MFC_midnights')
     
-    # MFC reanalysis data stored in yearly subfolders.
-    #     src_folder = join(src_folder,str(year))
+    # # MFC reanalysis data stored in yearly subfolders.
+    # #     src_folder = join(src_folder,str(year))
     
-    # Find absolute path for the src_folder and dst_folder
-    if not isabs(src_folder):
-        src_folder = join(getenv('HOME'),src_folder)
-    if not isabs(dst_folder):
-        dst_folder = join(getenv('HOME'),dst_folder)
-        if not isdir(dst_folder):
-            mkdir(dst_folder)
+    # # Find absolute path for the src_folder and dst_folder
+    # if not isabs(src_folder):
+    #     src_folder = join(getenv('HOME'),src_folder)
+    # if not isabs(dst_folder):
+    #     dst_folder = join(getenv('HOME'),dst_folder)
+    #     if not isdir(dst_folder):
+    #         mkdir(dst_folder)
             
-    # User need to make sure the medsea module is loaded and set up.
-    import sys
-    assert 'medsea' not in sys.modules, "'import pyGOTM.medsea as medsea' first!'"
+    # # User need to make sure the medsea module is loaded and set up.
+    # import sys
+    # assert 'medsea' not in sys.modules, "'import pyGOTM.medsea as medsea' first!'"
     
     # Restrict the date object type for clarity.
     assert isinstance(start_day,date)
@@ -613,7 +751,6 @@ if __name__ == '__main__':
     from datetime import date, datetime, timedelta
     from pyGOTM import medsea
     grid = '1x' # Default testing grid.
-    medsea.set_grid(grid);
 
     if len(sys.argv) == 1:
         grid = '1x'
@@ -632,9 +769,9 @@ if __name__ == '__main__':
         """)
         raise RuntimeError('Wrong number of arguments.')
 
-    print('Attempting to regenerate reformatted date for medsea_{!s}...'.format(grid))
+    print('Attempting to regenerate reformatted data for medsea_{!s}...'.format(grid))
     input('Press any key to continue...')
-    medsea.set_grid('1x')
+    medsea.set_grid(grid)
             
     ## ERA & MFC midnightly means for years 2013 and 2014
     medsea_ERA_reformat(2013)
