@@ -38,7 +38,7 @@ def hour_range(year,month=None,start=None,avoid_year_end=True):
     nrec = (t2-t1).days*24
     return range(offset,offset+nrec)
 
-# Checked this to agree with the definition of 'suffix' in medsea.local_run() as of 20170719
+# Checked this to agree with the definition of 'suffix' in medsea.local_run() as of 20171118
 def outfn(year=None, month=None, start=None, stop=None):
     #         if month is None:
     #             tag += '-{:d}'.format(year)
@@ -67,7 +67,8 @@ def read(varnames,fn=None,hr=None,year=None,month=None,use_ipp=False,failed_list
     
     # Handle arguments
     if fn is None:
-        fn = outfn(year,month)
+        #fn = outfn(year,month)
+        fn = 'results_{0.run}_{0.GOTM_version}.nc'.format(medsea)
            
     # If not provided, compute 'hr' from one of the nc files.
     if hr is None:
