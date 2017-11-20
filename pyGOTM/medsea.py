@@ -32,12 +32,14 @@ overwrite = True # True means running at the same grid point will overwrite file
 # This replaces the ambiguous base_folder or run_folder used in the past, each run folder is a
 # print_lat_lon() named subfolder of the following, which should be symlinked to fast filesystem outside of the home folder,
 # e.g. /scratch/[name] on clusters, or /dev/shm/[name] on a system with sufficient RAM.
-grid_folder = os.path.join(project_folder,'grid',grid)
 p_sossta_folder = os.path.join(project_folder,'p_sossta')
-data_folder = os.path.join(project_folder,'data')
-cache_folder = '/dev/shm'
 results_folder = os.path.join(project_folder,'results')
+cache_folder = '/dev/shm'
 plots_folder = os.path.join(project_folder,'plots')
+
+# Folders that depend on the grid hoice. Should be updated when set_grid() is run.
+data_folder = os.path.join(project_folder,'data',grid)
+grid_folder = os.path.join(project_folder,'grid',grid) 
 
 ## Global config for medsea simulations 
 # The following are not meant to be changed interactively, as functions in other modules in thisos.listdir(ms.base_folder)
@@ -163,9 +165,19 @@ def set_grid(new_grid=grid,
     global grid_lats, grid_lons, medsea_flags, max_depth
     global medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth
     global M, N, sea_mn, sea_m, sea_n
+    global grid_folder, data_folder
 
     # Override the global variables using values passed from function call.
     grid = new_grid
+    grid_folder = os.path.join(project_folder,'grid',grid)
+    if not os.path.isdir(grid_folder):
+        print('Creating new grid folder: {!s}'.format(grid_folder))
+        os.mkdir(grid_folder)
+    data_folder = os.path.join(project_folder,'data',grid)
+    if not os.path.isdir(data_folder):
+        print('Creating new data folder: {!s}'.format(data_folder))
+        os.mkdir(data_folder)    
+
     max_depth = new_max_depth
 
     # Update the run run
