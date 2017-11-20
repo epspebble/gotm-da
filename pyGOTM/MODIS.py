@@ -3,18 +3,28 @@ from netCDF4 import Dataset
 from numpy.ma import masked_invalid, masked_outside
 import os, sys
 from scipy.interpolate import *
-from pyGOTM import medsea
 from importlib import reload
 from os.path import join, isfile, isdir
 
+# Import only when needed, let user import medsea to initialize with
+# the right options.
+# if not 'pyGOTM.medsea' in sys.modules:
+#     from pyGOTM import medsea
+# else:
+#     print('pyGOTM.medsea already loaded!')
 
-# Hard-coded options
-target_grid = '1x'
-medsea.set_grid(target_grid)
+from pyGOTM import medsea
+
+# # Hard-coded options
+# target_grid = '1x'
+# medsea.set_grid(target_grid)
 
 coverage_length = '8D'
+# Inherit options from pyGOTM.medsea
 src_folder = join(medsea.p_sossta_folder,'glo_MODIS',coverage_length)
 dst_folder = join(medsea.data_folder,'medsea_MODIS')
+if not os.path.isdir(dst_folder):
+    os.mkdir(dst_folder)
 plots_folder = join(medsea.project_folder,'plots')
 
 # usually treating one variable at a time, declare as module global variable to avoid passing the same arguments
