@@ -424,7 +424,7 @@ contains
        ! This is the final step for something below... 
        if (n .eq. MaxN) then
           ! Print the last set of stat.
-          write_daily_stat(unit_daily_stat,-1)
+          call write_daily_stat(unit_daily_stat,-1)
        endif
        
        call update_time(n)
@@ -544,10 +544,10 @@ contains
 
                    if (first) then
                       ! This result is for the part of the day before the first assimilation event.
-                      write_daily_stat(unit_daily_stat,0)
+                      call write_daily_stat(unit_daily_stat,0)
                    else
                       ! Theses result are for the assim cycle that is just completed, i.e. the previous day.
-                      write_daily_stat(unit_daily_stat)
+                      call write_daily_stat(unit_daily_stat)
                    end if
                    
                    ! Also reset aggregator variables
@@ -565,7 +565,7 @@ contains
 
              case (2) ! assimilate at the tprof timestamp
                 ! Basic logic:
-                !      If the secondsofday great than tprof_seconds_of_day, assimlate.
+                !      If the secondsofday greater than tprof_seconds_of_day, assimlate.
                 
              end select
           endif
