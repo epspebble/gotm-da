@@ -205,7 +205,7 @@ def medsea_ERA_reformat(year, grid='1x'):
                 data = get_interpolated_data(ds,varname)
             else:
                 try: 
-                    data = get_subgrid_data(ds,varname,lat_slice,lon_slice)
+                    data, lat_slice, lon_slice = get_subgrid_data(ds,varname,lat_slice,lon_slice)
                 except ValueError as ve:
                     print('ValueError occurred using get_subgrid_data():')
                     print(ve)
@@ -459,7 +459,6 @@ def medsea_MFC_midnights_reformat(year,month=None,grid='1x'):
     from datetime import datetime, timedelta
     from netCDF4 import Dataset, date2num, MFDataset
     from numpy import array_equal, array    
-    from pyGOTM.gotmks import tic, toc
     from pyGOTM.config import epoch # Should be datetime(1981,1,1,0,0,0)    
 
 
@@ -492,7 +491,6 @@ def medsea_MFC_midnights_reformat(year,month=None,grid='1x'):
     def get_data(name,src_fn):
         nonlocal lat_slice, lon_slice, depth_slice
         # Use MFDataset instead of Dataset, src_fn is a glob-able pattern instead of a specific filename. 
-        print('Reading from {!s}...'.format(join(src_folder,src_fn)))
         # Switch to the correct netCDF4 variable name if necessary
         if name in src_varname.keys():
             varname = src_varname[name]
@@ -503,12 +501,11 @@ def medsea_MFC_midnights_reformat(year,month=None,grid='1x'):
         return data
     
     ## Creating intermediate file on 1x grid for creating heat.dat / met.dat later.
-    tic = time()
-    elapsed = 0
     for dat_type in ['tprof','sprof']:
+        begin = time()
         dst_fn = 'medsea_MFC_midnights_' + dat_type + '_' 
         dst_fn += '{:d}{:02d}.nc'.format(year,month) if month is not None else '{:d}.nc'.format(year)
-        
+        tic = time()
         print('Writing {:s}...'.format(join(dst_folder,dst_fn)))
         # Create the dimensions
         with Dataset(join(dst_folder,dst_fn),'w',format="NETCDF3_CLASSIC") as ds:
@@ -542,26 +539,26 @@ def medsea_MFC_midnights_reformat(year,month=None,grid='1x'):
                 yrdays = 366 if year%4 == 0 else 365
                 ds_time[:] = [hour_offset+24*i for i in range(yrdays)]
             
-        toc = time()-tic
-        elapsed += toc
-        print('Finished writing dimensions. Elapsed {!s}s'.format(toc))
+        print('Finished writing dimensions. Elapsed {!s}s'.format(time()-tic))
     
         # Append the data.
-        tic = time()
         with Dataset(join(dst_folder,dst_fn),'a') as ds:
             name = names[dat_type] # Just TEMP / PSAL
             
             # Filename pattern instead of specific filename
             src_fn = '{:d}{:02d}??'.format(year,month) if month else '{:d}????'.format(year)
             src_fn += '_' + name + '_re-fv6.nc'
-            var = ds.createVariable(dst_varname[name],'f8',dimensions=('time','depth','lat','lon'))
-            var[:] = get_data(name,src_fn)
+            print('Reading from {!s}...'.format(join(src_folder,src_fn)))
+            tic = time()
+            data = get_data(name,src_fn)
+            print('Finished reading. Elapsed {!s}s.'.format(time()-tic))
             
-        toc = time()-tic
-        elapsed += toc
-        print('Finished appending data for {:s}. Elapsed {!s}s'.format(dat_type,toc))
+            tic = time()
+            var = ds.createVariable(dst_varname[name],'f8',dimensions=('time','depth','lat','lon'))            
+            var[:] = data
+        print('Finished appending data for {:s}. Elapsed {!s}s'.format(dat_type,time()-tic))
 
-        print('Total time: {!s}s'.format(elapsed))
+        print('Total time for {!s}: {!s}s'.format(dat_type,time()-begin))
 
 
 ### MFC_sunrise
