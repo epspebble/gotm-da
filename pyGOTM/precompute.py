@@ -7,6 +7,11 @@ from datetime import datetime, date, timedelta
 from pyGOTM.swr import swr_3hourly_mean
 from numpy.ma import masked_all
 
+# Hopefully grid has been set correctly...
+from pyGOTM import medsea
+grid = medsea.grid
+data_folder = medsea.data_folder
+
 def date2ndaysnsecs(dt):
     """
     Convert a datetime object to (ndays, nsecs), number of days 
@@ -17,22 +22,18 @@ def date2ndaysnsecs(dt):
     nsecs = int((dt-datetime(dt.year,dt.month,dt.day,0,0,0)).total_seconds())
     return ndays, nsecs
 
-def medsea_ERA_append_cloud_factor(year,grid='1x', # Grid info used to get sea_mn
-                                   dst_folder='medsea_data/medsea_ERA-INTERIM'):
+def medsea_ERA_append_cloud_factor(year): # Grid info used to get sea_mn
     """
     Append downward short wave radiation 3-hourly means to the nc variable 'swrd_cs' in each file.
     
-    Version date: 2017-11-11
+    Version date: 2017-11-19
     """
     
     ## Preparations.    
 
     # Assumed filename pattern.
     dst_fn = 'medsea_ERA_heat_{:d}.nc'.format(year)
-    
-    # Find absolute path for the src_folder and dst_folder
-    if not isabs(dst_folder):
-        dst_folder = join(getenv('HOME'),dst_folder)
+    dst_folder = join(data_folder,'medsea_ERA-INTERIM')
     if not isdir(dst_folder) or not isfile(join(dst_folder,dst_fn)):
         raise(FileNotFoundError('The target directory must contain reformatted ERA data.'))
     
@@ -48,11 +49,9 @@ def medsea_ERA_append_cloud_factor(year,grid='1x', # Grid info used to get sea_m
 
     # Grab some indices and lat/lon info about the medsea...
     # ... coz they are NOT available from ANY sort atmospheric forecast data.
-    from pyGOTM import medsea
-    medsea.set_grid('1x')
     tic = time()
     print('Precomputing swr_cs and cloud_factor values.')
-    for m,n in medsea.sea_mn:
+    for j,(m,n) in enumerate(medsea.sea_mn):
         lat, lon = medsea.grid_lats[m],medsea.grid_lons[n]
         #print('Calculating for lat,lon =',lat,',',lon)
         for i,dt in enumerate(full_dates):
@@ -62,7 +61,7 @@ def medsea_ERA_append_cloud_factor(year,grid='1x', # Grid info used to get sea_m
                 cloud_factor[i,m,n] = swrd[i,m,n]/swrd_cs[i,m,n] 
         elapsed += time() - tic
         print('\t {:d}/{:d} completed. About {:.2f}s to go.'.format(j+1,medsea.sea_m.size,elapsed/(j+1)*medsea.sea_m.size),end='\r')
-    print('Elapsed {:.2f}s.'.format(elapsed))
+    print('\nElapsed {:.2f}s.'.format(elapsed))
     
     # Append the data
     tic = time()
@@ -76,33 +75,19 @@ def medsea_ERA_append_cloud_factor(year,grid='1x', # Grid info used to get sea_m
     
     print('Total time: {:.2f}s'.format(elapsed))
 
-def medsea_ECMWF_append_cloud_factor(year,month,grid='1x', # Grid info used to get sea_mn
-                                     dst_folder='medsea_data/medsea_ECMWF'):
+def medsea_ECMWF_append_cloud_factor(year,month):
     """
     Append downward short wave radiation 3-hourly means to the nc variable 'swrd_cs' in each file.
     
-    Version date: 2017-11-11
+    Version date: 2017-11-19
     """
     
-    ## Preparations.
-    
-    # # Local imports.
-    # from os import getenv, mkdir
-    # from os.path import isfile, isdir, isabs, join
-    # from time import time
-    # from netCDF4 import Dataset, num2date
-    # from pyGOTM.swr import swr_3hourly_mean
-    # from numpy.ma import masked_all
-
     # Assumed filename pattern.
     dst_fn = 'medsea_ECMWF_heat_{:d}{:02d}.nc'.format(year,month)    
-    
-    # Find absolute path for the src_folder and dst_folder
-    if not isabs(dst_folder):
-        dst_folder = join(getenv('HOME'),dst_folder)
+    dst_folder = join(data_folder,'medsea_ECMWF')
     if not isdir(dst_folder) or not isfile(join(dst_folder,dst_fn)):
-        raise(FileNotFoundError('The target directory must contain reformatted ECMWF data: {!s}'.format(join(dst_folder,dst_fn))))
-    
+        raise(FileNotFoundError('The target directory must contain reformatted ERA data.'))
+   
     print('Appending swrd_cs and cloud_factor to {:s}...'.format(join(dst_folder,dst_fn)))
     with Dataset(join(dst_folder,dst_fn),'r') as ds:
         full_dates = num2date(ds['time'][:],ds['time'].units)
@@ -115,8 +100,6 @@ def medsea_ECMWF_append_cloud_factor(year,month,grid='1x', # Grid info used to g
 
     # Grab some indices and lat/lon info about the medsea...
     # ... coz they are NOT available from ANY sort atmospheric forecast data.
-    from pyGOTM import medsea
-    medsea.set_grid('1x')
     tic = time()
     print('Precomputing swr_cs and cloud_factor values.')
     for j,(m,n) in enumerate(medsea.sea_mn):
@@ -130,7 +113,7 @@ def medsea_ECMWF_append_cloud_factor(year,month,grid='1x', # Grid info used to g
                 cloud_factor[i,m,n] = swrd[i,m,n]/swrd_cs[i,m,n] 
         elapsed += time() - tic
         print('\t {:d}/{:d} completed. About {:.2f}s to go.'.format(j+1,medsea.sea_m.size,elapsed/(j+1)*medsea.sea_m.size),end='\r')
-    print('Elapsed {:.2f}s.'.format(elapsed))
+    print('\nElapsed {:.2f}s.'.format(elapsed))
     
     # Append the data
     tic = time()
