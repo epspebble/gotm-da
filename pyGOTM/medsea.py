@@ -208,8 +208,11 @@ def set_grid(new_grid=grid,
 
     # 2017-10-24
     if new_grid == '36x':
-        subindices = (slice(None,None,2), slice(None,None,2))
+        subindices = (slice(1,None,2), slice(None,None,2))
 
+    if new_grid == '9x':
+        subindices = (slice(1,None,4), slice(None,None,4))
+        
     if new_grid == '1x':
         subindices = (slice(9,None,12), slice(None,None,12))
 
