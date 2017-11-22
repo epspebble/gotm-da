@@ -23,8 +23,10 @@
 !  Free format is used for reading-in the actual data.
 !
 ! !USES:
+
    IMPLICIT NONE
 
+   
 !  default: all is private.
    private
 !
@@ -68,6 +70,7 @@
    double precision, public          :: chlo      !SP 20/02/06
    double precision, public          :: abp_coe,bb      !HX 11/05/2017 
    double precision, public          :: Trans_1
+
 !HK/SH
 !  Parameters for absorption of solar energy - Paulson and Simpson 1981
 !  Clear water - Defant,A. 1961. - SH 07/11/02!
@@ -78,6 +81,10 @@
      zdeta = (/3.4849e1,2.2661,3.1486e-2,5.4831e-3,8.317e-4 &
               ,1.2612e-4,3.1326e-4,7.8186e-5,1.4427e-5/)
 
+   !WT 20171113 Time of the next 'observed' temperature profile, for use in daily data assimilation.
+   ! Responsibility of get_t_profile() to set it...
+   integer, public :: next_tprof_julianday, next_tprof_secondsofday
+   
 !------------------------------------------------------------------------------
 !
 ! the following data are not all public,

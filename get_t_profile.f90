@@ -16,14 +16,24 @@
 !
 ! !USES:
    use time
-   use observations, only: read_profiles,tprof
+   use observations, only: read_profiles, tprof, next_tprof_julianday, next_tprof_secondsofday
+
+   ! WT 20171112 Temporary. Make it work first. Should update this after assimilation related code moved to new module.
+   ! Probably not a good idea to ask get_t_profile to be 'aware' of assimilation events. Maybe just pass an extra flag
+   ! about interpolation preferences somewhere.
+   use gotm, only: assim_window ! WT 
+
    IMPLICIT NONE
 !
 ! !INPUT PARAMETERS:
    integer, intent(in)                 :: unit
    integer, intent(in)                 :: jul,secs
    integer, intent(in)                 :: nlev
+
    double precision, intent(in)                :: z(0:nlev)
+
+   ! !OUTPUT PARAMETERS:
+   
 !
 ! !REVISION HISTORY:
 !  Original author(s): Karsten Bolding
@@ -51,6 +61,16 @@
    integer, save             :: nprofiles=0
    logical, save             :: one_profile=.false.
    double precision, save, dimension(:,:), allocatable :: prof1,prof2,alpha
+
+   ! WT 20171112 For instructing the subroutine NOT to interpolate in time.
+   ! This is used in the case when daily assimilation occurs with assim_window .eq. 2,
+   ! where the timestamps are the intended time for assimilation, and so the profile
+   ! should be read in exactly without interpolation.
+   logical                   :: interpolate=.true.
+   if (assim_window .eq. 2) then
+      interpolate = .false.
+   end if
+
 !
 !-----------------------------------------------------------------------
 !BOC
@@ -87,23 +107,36 @@
             end if    
             EXIT
          else
+            !WT When reading multiple records from file, obtain next record time and find time difference.
             nprofiles = nprofiles + 1  
             call julian_day(yy,mm,dd,jul2)
             secs2 = hh*3600 + min*60 + ss
-            if(time_diff(jul2,secs2,jul,secs) .gt. 0) EXIT
+
+            !WT 20171112 Communicate the time of the next record for the assimilation routines to be aware of.
+            !print *, 'get_t_profile() called'
+            !print *, 'prev:',jul1,secs1,'next:',jul2,secs2
+            next_tprof_julianday = jul2
+            next_tprof_secondsofday = secs2
+     
+            !WT If now (jul,secs) is later than the next record time, no more new information, exit DO.
+            if(time_diff(jul2,secs2,jul,secs) .gt. 0) EXIT            
          end if
       end do
       if( .not. one_profile) then
-         dt = time_diff(jul2,secs2,jul1,secs1)
-         alpha = (prof2-prof1)/dt
+         if (interpolate) then
+            dt = time_diff(jul2,secs2,jul1,secs1)
+            alpha = (prof2-prof1)/dt
+         else
+            !WT 20171112 When assim_window .eq. 2, this is when the tprof is updated and ready for assimilation.
+            tprof = prof2(:,1)
+         end if
       end if
    end if
 
 !  Do the time interpolation
-   if( .not. one_profile) then
+   if (( .not. one_profile) .and. interpolate) then
       t  = time_diff(jul,secs,jul1,secs1)
-      tprof = prof1(:,1) + t*alpha(:,1)
-     
+      tprof = prof1(:,1) + t*alpha(:,1)     
    end if
 
    return

@@ -46,7 +46,7 @@ module gotm
 
   use meanflow
   use turbulence
-  use observations
+  use observations !WT 20171121 v3c, This now includes next_tprof_secondsofday
   use output
   use time
   use mtridiagonal
@@ -108,8 +108,12 @@ module gotm
   character(len=80)         :: name
   double precision                  :: latitude,longitude
   double precision            :: cloud_gradient
-  integer                     :: sst_obs,profile_obs,obs_level,assimilation_type,assim_window
+  integer                     :: sst_obs,profile_obs,obs_level
   double precision, public    :: advect(1:150)
+
+  !WT 20171112 Stuff related to assimilation should be moved to a new module. Now for expediency.
+  integer, public :: assimilation_type, assim_window
+
   !SP 19/09/05 test   
   double precision            :: j_one,j_one_b,j_two,j_three,j_four,j_five
 
@@ -209,6 +213,7 @@ contains
     call init_observations(namlst,'obs.inp',julianday,secondsofday, &
          depth,nlev,z,h,latitude,longitude)
 
+    ! Copy the first profiles to be the values of s, t, u, v before time loop begins.
     s = sprof
     t = tprof
     u = uprof
@@ -216,6 +221,9 @@ contains
     call init_output(title,nlev,latitude,longitude)
     call init_air_sea(namlst,latitude,longitude,julianday,secondsofday)
 
+    ! WT 20171112 Place holder for moving stuff into a new assimilation module. 
+    call init_assimilation() 
+    
     !  Initialise each of the extra features/modules
 
     call init_sediment(namlst,'sediment.inp',unit_sediment,nlev, &
@@ -246,6 +254,13 @@ contains
   end subroutine init_gotm
   !EOC
 
+  subroutine init_assimilation()
+    !WT Place holder.
+    ! Uses:
+    IMPLICIT None
+    print *, 'init_assimilation() called. Doing nothing as of now.'
+  end subroutine init_assimilation
+  
   !-----------------------------------------------------------------------
   !BOP
   !
@@ -420,8 +435,7 @@ contains
        ! This is the final step for something below... 
        if (n .eq. MaxN) then
           ! Print the last set of stat.
-          write(unit_daily_stat,714) dayofyear, lsecs_assim_time, & !This result is for the current incomplete assim cycle
-               lsecs_SST_min_day, daily_SST_min_day, lsecs_SST_max, daily_SST_max, lsecs_SST_min_night, daily_SST_min_night
+          call write_daily_stats(unit_daily_stat,-1)
        endif
        
        call update_time(n)
@@ -482,9 +496,10 @@ contains
 
           ! search SST min in local time 1:00 - 11:00, same as HCMR criterion when checking SEVIRI data
           if ((day_cycle .ge. 1*3600/timestep) .and. (day_cycle .le. 11*3600/timestep)) then
-             ! Will only be run if assimilation does not occur at midnight, (assim_window .ne. 1), 
-             ! because mark is reset to 0 after briefly setting to 1. Note the order of statements below.
-             if (mark .eq. 1) then ! After sunrise if assimilating at sunrise
+             ! Will only be run if assimilation does not occur at midnight, (assim_window .gt. 0), 
+             ! because mark is reset to 0 after momentarily after being setting to 1.
+             ! Also note the order of statements below.
+             if (mark .eq. 1) then ! After assimilation event (i.e. sunrise if assimilating at sunrise)
                 if (T(nlev) < daily_SST_min_day) then
                    daily_SST_min_day = T(nlev)
                    lsecs_SST_min_day = secondsofday + tz(longitude)*3600
@@ -522,10 +537,11 @@ contains
              select case (assim_window)
 
              case (0) ! assimilate at "midnight"
-                !WT 2016/09/13 "midnight" means 00:00:00 in tprof.dat,
-                ! which could be in GMT or local time.
+                !WT "midnight" means day_cycle = 0, i.e. local, not UTC, but it may not
+                ! correspond to 00:00:00 in tprof.dat, which more likely in UTC than in local time.
+                ! Check needed.
                 if (day_cycle .eq. 86400/timestep) then
-                   !!! The daily stats is not outputted for this assim_window. Not implemented.
+                   !!! The daily_stats is not outputted for this assim_window. Not implemented.
                    call assimilation(T(1:nlev),S(1:nlev),tprof(1:nlev),sprof(1:nlev),cloud,advect,int_cs)
                    lsecs_assim_time = secondsofday + tz(longitude)*3600
                    mark = 1 
@@ -537,29 +553,14 @@ contains
                 if (I_0.gt.1) then
                    ! The previous assimilation cycle has just completed. Write down the daily stats now.
 
-                   !! Something wrong with doing a daily SST mean over an assimilation cycle, giving up for now
-                   ! print *, 'count = ', count
-                   ! daily_SST_mean = daily_SST_mean / count
-
-                   !! Something wrong with the mean temperature over 
-                   ! write(unit_daily_stat,713) dayofyear, lsecs_assim_time, daily_SST_mean, &
-                   !      lsecs_SST_min_day, daily_SST_min_day, lsecs_SST_max, daily_SST_max, lsecs_SST_min_night, daily_SST_min_night
-
                    if (first) then
                       ! This result is for the part of the day before the first assimilation event.
-                      write(unit_daily_stat,714) dayofyear, lsecs_assim_time, & 
-                           lsecs_SST_min_day, daily_SST_min_day, lsecs_SST_max, daily_SST_max, &
-                           lsecs_SST_min_night, daily_SST_min_night
-                   else ! Expects daily_SST_min_day and daily_SST_max to be unset, i.e. 99 and -99 repectively.
-                      ! These result is for the assim cycle that is just completed, i.e. the previous day.
-                      write(unit_daily_stat,714) dayofyear-1, lsecs_assim_time, & 
-                           lsecs_SST_min_day, daily_SST_min_day, lsecs_SST_max, daily_SST_max, &
-                           lsecs_SST_min_night, daily_SST_min_night
-                      ! The last partial assim cycle will not be treated here, but put at the begining of loop when n reaches MaxN.
+                      call write_daily_stats(unit_daily_stat,0)
+                   else
+                      ! Theses result are for the assim cycle that is just completed, i.e. the previous day.
+                      call write_daily_stats(unit_daily_stat)
                    end if
-713                format(I3,4(1x,I5,1x,F10.6))
-714                format(I3,1x,I5,3(1x,I5,1x,F10.6))
-
+                   
                    ! Also reset aggregator variables
                    count = 0
                    daily_SST_mean = 0 
@@ -572,7 +573,16 @@ contains
                    lsecs_assim_time = secondsofday + tz(longitude)*3600
                    mark = 1
                 endif
-                
+
+             case (2) ! assimilate at the tprof timestamp
+                ! Basic logic:
+                !      If the secondsofday greater than tprof_secondsofday, assimlate.
+                if (time_diff(julianday,secondsofday,next_tprof_julianday,next_tprof_secondsofday) .ge. 0) then
+                   !   print *, julianday, next_tprof_secondsofday
+                   !   print *, secondsofday, next_tprof_secondsofday
+                   call assimilation(T(1:nlev),S(1:nlev),tprof(1:nlev),sprof(1:nlev),cloud,advect,int_cs)
+                   mark = 1
+                endif
              end select
           endif
 
@@ -595,8 +605,9 @@ contains
                 first = .false.
                 day_cycle = 0
              else
-                ! Check whether the assimilation was done or not every day.
-                if (mark.ne.1) then
+                ! Check whether the assimilation was done or not every day for
+                ! assim_window that depend on local day cycle, currently 0 (local midnight) and 1 (local sunrise).
+                if ((mark.ne.1) .and. (assim_window.lt.2))then
                    stop "Assimilation not performed in one full cycle. STOP"
                 endif
 
@@ -991,7 +1002,37 @@ contains
 
   end function mld
 ! END Prospective assimilation module portion.
+  subroutine write_daily_stats(unit, special)
+    integer :: unit
+    integer, optional :: special
 
+    if (present(special)) then
+       select case (special)
+       case (0) ! First record
+          ! This line of stat is for the current incomplete assimilation cycle.
+          ! Should also expect daily_SST_min_day and daily_SST_max to still be the fill in values of 99 and -99 repectively.
+          write(unit_daily_stat,714) dayofyear, lsecs_assim_time, & 
+               lsecs_SST_min_day, daily_SST_min_day, lsecs_SST_max, daily_SST_max, &
+               lsecs_SST_min_night, daily_SST_min_night
+       case (-1) ! Last record
+          !This line of stats is for the current incomplete assim cycle
+          write(unit_daily_stat,714) dayofyear, lsecs_assim_time, & 
+               lsecs_SST_min_day, daily_SST_min_day, lsecs_SST_max, daily_SST_max, lsecs_SST_min_night, daily_SST_min_night
+       case default
+          stop 'You should not see this. Something is wrong.'
+       end select
+    else
+       ! This give the main lines of stats, which are for the assimilation cycle that is just completed, so dayofyear-1
+       write(unit_daily_stat,714) dayofyear-1, lsecs_assim_time, & 
+            lsecs_SST_min_day, daily_SST_min_day, lsecs_SST_max, daily_SST_max, &
+            lsecs_SST_min_night, daily_SST_min_night
+    endif
+    
+!713 format(I3,4(1x,I5,1x,F10.6))
+714 format(I3,1x,I5,3(1x,I5,1x,F10.6))
+    
+  end subroutine write_daily_stats
+  
   ! BEGIN Prospective event handling module.
   subroutine sst_event(sst)
     ! !DESCRIPTION:
@@ -1009,6 +1050,7 @@ contains
   end subroutine sst_event
     
   ! END Prospective event handling module.
+
   !-----------------------------------------------------------------------
   !BOP
   !

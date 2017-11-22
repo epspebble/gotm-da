@@ -23,8 +23,10 @@
 !  Free format is used for reading-in the actual data.
 !
 ! !USES:
+
    IMPLICIT NONE
 
+   
 !  default: all is private.
    private
 !
@@ -79,9 +81,9 @@
      zdeta = (/3.4849e1,2.2661,3.1486e-2,5.4831e-3,8.317e-4 &
               ,1.2612e-4,3.1326e-4,7.8186e-5,1.4427e-5/)
 
-!WT 20171113 Time of the next 'observed' temperature profile, for use in daily data assimilation.
-   integer, public :: next_tprof_secondsofday
-
+   !WT 20171113 Time of the next 'observed' temperature profile, for use in daily data assimilation.
+   ! Responsibility of get_t_profile() to set it...
+   integer, public :: next_tprof_julianday, next_tprof_secondsofday
    
 !------------------------------------------------------------------------------
 !
