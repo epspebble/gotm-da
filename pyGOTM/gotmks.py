@@ -261,9 +261,11 @@ def print_lat_lon(lat,lon,fmt_str='g'):
     #return lat_str + ' ' + lon_str
     return lat_str + lon_str
 
-def subindices(src,dst):
+def subgrid_slice(src,dst):
     """
-        If: 
+    Return a slice object 'sl' so that src[sl] == dst.
+
+        For e.g.
         
         1. 'src' (e.g. 1.5, 2., 2.5, ... 10.) is taken from
         an arithmetic sequence (e.g. 0., 0.5, 1., ...)
@@ -272,16 +274,6 @@ def subindices(src,dst):
         arithmetic subsequence of the above (e.g. 0., 1., 2., ...)
         
         3. 'src' contains all the values of 'dst'
-        
-        Then, this function computes:
-        
-            start, stop, step = subindices(src, dst)
-        
-        so that 
-        
-            src[start:stop:step] == dst
-
-        holds.
         
         It also works if src or dst were reversed in order of elements.
     """
@@ -308,4 +300,4 @@ def subindices(src,dst):
     if not array_equal(src[start:stop:step],dst):
         raise ValueError("Assumption failed. Are 'dst' and 'src' equally sized and 'src' contains all values of 'dst'?")
     else:
-        return start, stop, step
+        return slice(start, stop, step)
