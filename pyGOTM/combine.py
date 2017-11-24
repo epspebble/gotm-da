@@ -1,95 +1,98 @@
 from pyGOTM import medsea
-
-def reload(grid='144x',run='ASM3-75m',nlev=122):
-    from importlib import reload
-    reload(medsea)
+from time import time
+from os.path import join
+from netCDF4 import Dataset
+from numpy.ma import masked_all, masked_invalid
     
-    medsea.set_grid(grid)
-    medsea.run = run
-    medsea.nlev = nlev
+# def reload(grid='144x',run='ASM3-75m',nlev=122):
+#     from importlib import reload
+#     reload(medsea)
     
-def hour_range(year,month=None,start=None,avoid_year_end=True):
-    """
-    Returns the GOTM time index range for the given month of year, 
-    i.e. the number of hours since the beginning to the simulation to the beginning of the month / beginning of the next month.
-    """ 
-    from datetime import date, datetime
-
-    # Assume the epoch is the beginning of year.
-    if start is None:
-        t0 = date(year,1,1)
-    else:
-        start_date = date(start.year,start.month,start.day) # should work for both date, datetime instances 
-        if isinstance(start,datetime):
-            assert start.hour + start.minute + start.second == 0, "We always assume GOTM begins at UTC midnight"
-        t0 = start_date
-        
-    if month is None: # A year-long record.
-        t1 = date(year,1,1)
-        t2 = date(year,12,31) if avoid_year_end else date(year+1,1,1)
-    else: # A monthly record
-        t1 = date(year,month,1)
-        if month == 12:
-            t2 = date(year,12,31) if avoid_year_end else date(year+1,1,1)
-        else:
-            t2 = date(year,month+1,1)
-        
-    offset = (t1-t0).days*24
-    nrec = (t2-t1).days*24
-    return range(offset,offset+nrec)
-
-# Checked this to agree with the definition of 'suffix' in medsea.local_run() as of 20171118
-def outfn(year=None, month=None, start=None, stop=None):
-    #         if month is None:
-    #             tag += '-{:d}'.format(year)
-    #         else:
-    #             tag += '-{:d}{:02d}'.format(year,month)
-    from datetime import date
-    if year is not None:
-        if month is None:
-            return 'results_{0.run}_{1:d}.nc'.format(medsea,year)
-        else:
-            return 'results_{0.run}_{1:d}{2:02d}.nc'.format(medsea,year,month)
-    else:
-        assert month is None
-        assert start is not None
-        assert stop is not None
-        
-        ndays1 = (start - date(start.year,1,1)).days+1
-        ndays2 = (stop - date(stop.year,1,1)).days+1
-        return 'results_{:d}{:03d}{:d}{:03d}_{.run}.nc'.format(start.year,ndays1,stop.year,ndays2,medsea)    
-
-def read(varnames,fn=None,hr=None,year=None,month=None,use_ipp=False,failed_list=None):
-    from time import time
-    from os.path import join
-    from netCDF4 import Dataset
-    from numpy.ma import masked_all, masked_invalid
+#     medsea.set_grid(grid)
+#     medsea.run = run
+#     medsea.nlev = nlev
     
+# def hour_range(year,month=None,start=None,avoid_year_end=True):
+#     """
+#     Returns the GOTM time index range for the given month of year, 
+#     i.e. the number of hours since the beginning to the simulation to the beginning of the month / beginning of the next month.
+#     """ 
+#     from datetime import date, datetime
+
+#     # Assume the epoch is the beginning of year.
+#     if start is None:
+#         t0 = date(year,1,1)
+#     else:
+#         start_date = date(start.year,start.month,start.day) # should work for both date, datetime instances 
+#         if isinstance(start,datetime):
+#             assert start.hour + start.minute + start.second == 0, "We always assume GOTM begins at UTC midnight"
+#         t0 = start_date
+        
+#     if month is None: # A year-long record.
+#         t1 = date(year,1,1)
+#         t2 = date(year,12,31) if avoid_year_end else date(year+1,1,1)
+#     else: # A monthly record
+#         t1 = date(year,month,1)
+#         if month == 12:
+#             t2 = date(year,12,31) if avoid_year_end else date(year+1,1,1)
+#         else:
+#             t2 = date(year,month+1,1)
+        
+#     offset = (t1-t0).days*24
+#     nrec = (t2-t1).days*24
+#     return range(offset,offset+nrec)
+
+# # Checked this to agree with the definition of 'suffix' in medsea.local_run() as of 20171118
+# def outfn(year=None, month=None, start=None, stop=None):
+#     #         if month is None:
+#     #             tag += '-{:d}'.format(year)
+#     #         else:
+#     #             tag += '-{:d}{:02d}'.format(year,month)
+#     from datetime import date
+#     if year is not None:
+#         if month is None:
+#             return 'results_{0.run}_{1:d}.nc'.format(medsea,year)
+#         else:
+#             return 'results_{0.run}_{1:d}{2:02d}.nc'.format(medsea,year,month)
+#     else:
+#         assert month is None
+#         assert start is not None
+#         assert stop is not None
+        
+#         ndays1 = (start - date(start.year,1,1)).days+1
+#         ndays2 = (stop - date(stop.year,1,1)).days+1
+#         return 'results_{:d}{:03d}{:d}{:03d}_{.run}.nc'.format(start.year,ndays1,stop.year,ndays2,medsea)    
+
+def read(varnames,fn=None,year=None,month=None,use_ipp=False,failed_list=None):
+   
     # Handle arguments
     if fn is None:
         #fn = outfn(year,month)
         fn = 'results_{0.run}_{0.GOTM_version}.nc'.format(medsea)
            
-    # If not provided, compute 'hr' from one of the nc files.
-    if hr is None:
-        # Use the first readable file's metadata to determine start time, assuming GOTM's unit for 'time' in the ncdf file is the start time.        
-        i=0
-        start = None
-        from datetime import date
-        from netCDF4 import num2date
-        while start is None:
-            m,n = medsea.sea_m[i], medsea.sea_n[i]
-            try:
-                with Dataset(join(medsea.get_local_folder(m,n),fn),'r') as ds:
-                    start = num2date(0,ds['time'].units).date()
-            except:
-                if i == medsea.sea_m.size-1:
-                    raise OSError('Result file {!s} not found in all grid point folders for {:s}.'.format(fn,medsea.grid))
-                else:
-                    i += 1
-                    pass
-        hr = hour_range(year,month,start=start) 
+    # # If not provided, compute 'hr' from one of the nc files.
+    # if hr is None:
+    #     # Use the first readable file's metadata to determine start time, assuming GOTM's unit for 'time' in the ncdf file is the start time.        
+    #     i=0
+    #     start = None
+    #     from datetime import date
+    #     from netCDF4 import num2date
+    #     while start is None:
+    #         m,n = medsea.sea_m[i], medsea.sea_n[i]
+    #         try:
+    #             with Dataset(join(medsea.get_local_folder(m,n),fn),'r') as ds:
+    #                 start = num2date(0,ds['time'].units).date()
+    #         except:
+    #             if i == medsea.sea_m.size-1:
+    #                 raise OSError('Result file {!s} not found in all grid point folders for {:s}.'.format(fn,medsea.grid))
+    #             else:
+    #                 i += 1
+    #                 pass
+    #     hr = hour_range(year,month,start=start) 
 
+
+    
+    
     # Use medsea global settings and 'hr' to determine array dimensions.
     if isinstance(varnames,str):
         varname = varnames
