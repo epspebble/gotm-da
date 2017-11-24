@@ -552,7 +552,6 @@ contains
                 ! 00:00:00 in tprof.dat that I_0 is found to be nonzero.
                 if (I_0.gt.1) then
                    ! The previous assimilation cycle has just completed. Write down the daily stats now.
-
                    if (first) then
                       ! This result is for the part of the day before the first assimilation event.
                       call write_daily_stats(unit_daily_stat,0)
