@@ -1,9 +1,9 @@
-# __all__ = ['medsea_ERA_reformat',
-#            'medsea_ECMWF_reformat',
-#            'medsea_MFC_midnights_eformat',
-#            'medsea_MFC_sunrise_reformat']
+__all__ = ['medsea_ERA_reformat',
+           'medsea_ECMWF_reformat',
+           'medsea_MFC_midnight_reformat',
+           'medsea_MFC_sunrise_reformat']
 
-from pyGOTM.gotmks import subindices # Use this to subgrid a finer datset.
+from pyGOTM.gotmks import subgrid_slice # Use this to subgrid a finer datset.
 from pyGOTM import medsea
 from os.path import isfile, isdir, join
 from os import mkdir
@@ -70,22 +70,23 @@ def make_abs(rel_path, side_effect = 'raise'):
             raise OSError('The directory {!s} does not exist.'.format(abs_path))
     return abs_path
 
-def get_subgrid_data(ds,varname,lat_slice,lon_slice,depth_slice=None):
+def get_subgrid_data(ds,varname,lat_slice,lon_slice,depth_slice=None,check=True):
     """ 
     Pass lat_slice=None, lon_slice=None to compute the slices, e.g. for the first time. 
     depth_slice is to be precomputed for now.
     """
     # First, compute the right indices if necessary, or confirm they're identical.
     if lat_slice is None or lon_slice is None:
-        lat_slice = slice(*subindices(ds['lat'][:],dst_lats))
-        lon_slice = slice(*subindices(ds['lon'][:],dst_lons))
-        
+        lat_slice = subgrid_slice(ds['lat'][:],dst_lats)
+        lon_slice = subgrid_slice(ds['lon'][:],dst_lons)
         
     # Now read.
-    assert array_equal(ds['lat'][lat_slice], dst_lats)
-    assert array_equal(ds['lon'][lon_slice], dst_lons)
+    if check:
+        assert array_equal(ds['lat'][lat_slice], dst_lats)
+        assert array_equal(ds['lon'][lon_slice], dst_lons)
     if depth_slice is not None:
-        assert array_equal(ds['depth'][depth_slice], dst_lev)
+        if check:
+            assert array_equal(ds['depth'][depth_slice], dst_lev)
         data = ds[varname][:,depth_slice,lat_slice,lon_slice]
     else:
         # Now, read the data unpacked from the netCDF Dataset object.
@@ -138,9 +139,9 @@ def get_src_dst_folders(dataset):
     elif dataset == 'ECMWF':
         src_folder = join(p_sossta_folder,'medsea_ECMWF','3-HOURLY')
         dst_folder = join(data_folder,'medsea_ECMWF')
-    elif dataset == 'MFC_midnights':
+    elif dataset == 'MFC_midnight':
         src_folder = join(p_sossta_folder,'medsea_rea') # but stored in yearly subfolders
-        dst_folder = join(data_folder, 'medsea_MFC_midnights')
+        dst_folder = join(data_folder, 'medsea_MFC_midnight')
     elif dataset == 'MFC_sunrise':
         src_folder = join(p_sossta_folder, 'medsea_rea','sunrise_nrt')
         dst_folder = join(data_folder,'medsea_MFC_sunrise')
@@ -259,7 +260,7 @@ def medsea_ERA_reformat(year, grid='1x'):
             ds_time[:] = [hour_offset+3*i for i in range(yrdays*8)] # 8 records per day.
         toc = time()-tic
         elapsed += toc
-        print('Finished writing dimensions. Elapsed {!s}s'.format(toc))
+        print('Finished writing dimensions. Elapsed {:.2f}s'.format(toc))
     
         # Append the data one variable after another.
         for name in names[dat_type]:
@@ -281,9 +282,9 @@ def medsea_ERA_reformat(year, grid='1x'):
                     var[:] = val
             toc = time()-tic
             elapsed += toc
-            print('Finished appending data for {:s}. Elapsed {!s}s'.format(name,toc))
+            print('Finished appending data for {:s}.'.format(name))
 
-        print('Total time: {!s}s'.format(elapsed))
+        print('Total time: {:.2f}s'.format(elapsed))
 
 ### ECMWF
 # This improves current code in pyGOTM/ncdf_reformat.py, version on 2017-07-13
@@ -421,7 +422,7 @@ def medsea_ECMWF_reformat(year,month,grid='1x'):
             
         toc = time()-tic
         elapsed += toc
-        print('Finished writing dimensions. Elapsed {!s}s'.format(toc))
+        print('Finished writing dimensions. Elapsed {:.2f}s'.format(toc))
     
 
         # Append the data one variable after another.
@@ -441,12 +442,12 @@ def medsea_ECMWF_reformat(year,month,grid='1x'):
                     var[:] = val
             toc = time()-tic
             elapsed += toc
-            print('Finished appending data for {:s}. Elapsed {!s}s'.format(name,toc))
+            print('Finished appending data for {:s}. Took {:.2f}s'.format(name,toc))
 
-        print('Total time: {!s}s'.format(elapsed))
+        print('Total time: {:.2f}s'.format(elapsed))
 
-### MFC_midnights
-def medsea_MFC_midnights_reformat(year,month=None,grid='1x'):
+### MFC_midnight
+def medsea_MFC_midnight_reformat(year,month=None,grid='1x'):
     """ Combine daily MFC midnightly mean TEMP / PSAL data into intermediate yearly or monthly netCDF4 files, 
     to be eventually written to tprof.dat / sprof.dat.
     """
@@ -462,7 +463,7 @@ def medsea_MFC_midnights_reformat(year,month=None,grid='1x'):
     from pyGOTM.config import epoch # Should be datetime(1981,1,1,0,0,0)    
 
 
-    src_folder, dst_folder = get_src_dst_folders('MFC_midnights')
+    src_folder, dst_folder = get_src_dst_folders('MFC_midnight')
     # MFC reanalysis data stored in yearly subfolders.
     src_folder = join(src_folder,str(year))
     
@@ -503,7 +504,7 @@ def medsea_MFC_midnights_reformat(year,month=None,grid='1x'):
     ## Creating intermediate file on 1x grid for creating heat.dat / met.dat later.
     for dat_type in ['tprof','sprof']:
         begin = time()
-        dst_fn = 'medsea_MFC_midnights_' + dat_type + '_' 
+        dst_fn = 'medsea_MFC_midnight_' + dat_type + '_' 
         dst_fn += '{:d}{:02d}.nc'.format(year,month) if month is not None else '{:d}.nc'.format(year)
         tic = time()
         print('Writing {:s}...'.format(join(dst_folder,dst_fn)))
@@ -539,7 +540,7 @@ def medsea_MFC_midnights_reformat(year,month=None,grid='1x'):
                 yrdays = 366 if year%4 == 0 else 365
                 ds_time[:] = [hour_offset+24*i for i in range(yrdays)]
             
-        print('Finished writing dimensions. Elapsed {!s}s'.format(time()-tic))
+        print('Finished writing dimensions. Elapsed {:.2f}s'.format(time()-tic))
     
         # Append the data.
         with Dataset(join(dst_folder,dst_fn),'a') as ds:
@@ -551,133 +552,28 @@ def medsea_MFC_midnights_reformat(year,month=None,grid='1x'):
             print('Reading from {!s}...'.format(join(src_folder,src_fn)))
             tic = time()
             data = get_data(name,src_fn)
-            print('Finished reading. Elapsed {!s}s.'.format(time()-tic))
+            print('Finished reading. Elapsed {:.2f}s.'.format(time()-tic))
             
             tic = time()
             var = ds.createVariable(dst_varname[name],'f8',dimensions=('time','depth','lat','lon'))            
             var[:] = data
-        print('Finished appending data for {:s}. Elapsed {!s}s'.format(dat_type,time()-tic))
+        print('Finished appending data for {:s}. Elapsed {:.2f}s'.format(dat_type,time()-tic))
 
-        print('Total time for {!s}: {!s}s'.format(dat_type,time()-begin))
-
-def medsea_MFC_sunrise_reformat(year,month,grid='1x'):
-    """ Combine daily MFC mean TEMP / PSAL data into intermediate yearly or monthly netCDF4 files, 
-    to be eventually written to tprof.dat / sprof.dat.
-    """
-    ## Preparations.
-    
-    # Local imports.
-    from os import getenv, mkdir
-    from os.path import isfile, isdir, isabs, join
-    from time import time
-    from datetime import datetime, timedelta
-    from netCDF4 import Dataset, date2num, MFDataset
-    from numpy import array_equal, array    
-    from pyGOTM.config import epoch # Should be datetime(1981,1,1,0,0,0)    
-
-
-    src_folder, dst_folder = get_src_dst_folders('MFC_sunrise')
-    # MFC reanalysis data stored in yearly subfolders.
-    #src_folder = join(src_folder,str(year))
-    
-            
-    ## Hard-coding some information for the subfunction get_ERA_yearly_data()
-
-    # Filename keyword 'name' / internal nc variable 'alias' (when they don't agree)
-    names = dict(tprof = 'TEMP',
-                 sprof = 'PSAL')
-    src_varname = dict(TEMP = 'votemper',
-                       PSAL = 'vosaline')
-    dst_varname = dict(TEMP = 'temp',
-                       PSAL = 'salt')
-
-    depth_slice = slice(None,nlev,None)
-    lat_slice, lon_slice = None, None
-
-    # Convenience function to get one variable's yearly data.
-    def get_data(name,src_fn):
-        nonlocal lat_slice, lon_slice, depth_slice
-        # Use MFDataset instead of Dataset, src_fn is a glob-able pattern instead of a specific filename. 
-        # Switch to the correct netCDF4 variable name if necessary
-        if name in src_varname.keys():
-            varname = src_varname[name]
-        else:
-            varname = name
-        with MFDataset(join(src_folder,src_fn),'r') as ds:
-            data, lat_slice, lon_slice = get_subgrid_data(ds,varname,lat_slice,lon_slice,depth_slice)
-        return data
-    
-    ## Creating intermediate file on 1x grid for creating heat.dat / met.dat later.
-    for dat_type in ['tprof','sprof']:
-        begin = time()
-        dst_fn = 'medsea_MFC_sunrise_' + dat_type + '_' 
-        dst_fn += '{:d}{:02d}.nc'.format(year,month) if month is not None else '{:d}.nc'.format(year)
-        tic = time()
-        print('Writing {:s}...'.format(join(dst_folder,dst_fn)))
-        # Create the dimensions
-        with Dataset(join(dst_folder,dst_fn),'w',format="NETCDF3_CLASSIC") as ds:
-            ds.createDimension('time') # unlimited
-            ds.createDimension('depth', size=nlev)             
-            ds.createDimension('lat', size=len(dst_lats))
-            ds.createDimension('lon', size=len(dst_lons))
-
-            ds_time = ds.createVariable('time','i4',dimensions=('time',))
-            ds_time.units = 'hours since {!s}'.format(epoch) # Data given in 3-hourly periods since UTC midnight.
-            ds_depth = ds.createVariable('depth','f4',dimensions=('depth',))
-            ds_lat = ds.createVariable('lat','f4',dimensions=('lat',))
-            ds_lon = ds.createVariable('lon','f4',dimensions=('lon',))
-
-            # Write the depth values using precomputed values.
-            ds_depth[:] = dst_lev
-
-            # Write the values of the lat/lon dimensions using user-specified grid when loading the medsea module.
-            ds_lat[:] = dst_lats
-            ds_lon[:] = dst_lons
-
-            # Write the values of the record times BY MAKING ASSUMPTIONS.
-            # CHECK: The first MFC record is at new year day, 00:00:00, last record at new year eve midnight.
-            first_record = datetime(year,1,1,0,0,0)
-            hour_offset = (first_record - epoch).total_seconds() // 3600
-            if month is not None:
-                next_month = date(year,month+1,1) if month < 12 else date(year+1,month,1)
-                mthdays = (next_month - date(year,month,1)).days
-                ds_time[:] = [hour_offset+24*i for i in range(mthdays)]
-            else:
-                yrdays = 366 if year%4 == 0 else 365
-                ds_time[:] = [hour_offset+24*i for i in range(yrdays)]
-            
-        print('Finished writing dimensions. Elapsed {!s}s'.format(time()-tic))
-    
-        # Append the data.
-        with Dataset(join(dst_folder,dst_fn),'a') as ds:
-            name = names[dat_type] # Just TEMP / PSAL
-            
-            # Filename pattern instead of specific filename
-            src_fn = '{:d}{:02d}??'.format(year,month) if month else '{:d}????'.format(year)
-            src_fn += '_' + name + '_re-fv6.nc'
-            print('Reading from {!s}...'.format(join(src_folder,src_fn)))
-            tic = time()
-            data = get_data(name,src_fn)
-            print('Finished reading. Elapsed {!s}s.'.format(time()-tic))
-            
-            tic = time()
-            var = ds.createVariable(dst_varname[name],'f8',dimensions=('time','depth','lat','lon'))            
-            var[:] = data
-        print('Finished appending data for {:s}. Elapsed {!s}s'.format(dat_type,time()-tic))
-
-        print('Total time for {!s}: {!s}s'.format(dat_type,time()-begin))
-
-
+        print('Total time for {:s}: {:.2f}s'.format(dat_type,time()-begin))
 
         
 ### MFC_sunrise
-def medsea_MFC_sunrise_reformat_by_start_stop(start_day,stop_day,grid='1x'):
-#                                              src_folder='p_sossta/medsea_rea/sunrise_nrt',
-#                                              dst_folder='1x/medsea_data/medsea_MFC_sunrise'):
+def medsea_MFC_sunrise_reformat(*args):
     """ Combine hourly MFC TEMP / PSAL profile chosen closest to sunrise into intermediate yearly or monthly netCDF4 files, 
     to be eventually written to tprof.dat / sprof.dat.
     
-    Version date: 2017-11-09.
+    medsea_MFC_sunrise_reformat(year,month) or
+
+    medsea_MFC_sunrise_reformat(start,stop)
+
+    start, stop must be datetime.date objects; year, month must be integers.
+    
+    Version date: 2017-11-23.
     """
     ## Preparations.
     
@@ -690,32 +586,21 @@ def medsea_MFC_sunrise_reformat_by_start_stop(start_day,stop_day,grid='1x'):
     from numpy import array_equal, array
     from numpy.ma import masked_all
     from glob import glob
-    from pyGOTM.gotmks import tic, toc
+    from pyGOTM.gotmks import tic, toc, subgrid_slice
     from pyGOTM.swr import solar_times
     from pyGOTM.config import epoch # Should be datetime(1981,1,1,0,0,0)    
 
     src_folder, dst_folder = get_src_dst_folders('MFC_sunrise')
-    
-    # # MFC reanalysis data stored in yearly subfolders.
-    # #     src_folder = join(src_folder,str(year))
-    
-    # # Find absolute path for the src_folder and dst_folder
-    # if not isabs(src_folder):
-    #     src_folder = join(getenv('HOME'),src_folder)
-    # if not isabs(dst_folder):
-    #     dst_folder = join(getenv('HOME'),dst_folder)
-    #     if not isdir(dst_folder):
-    #         mkdir(dst_folder)
-            
-    # # User need to make sure the medsea module is loaded and set up.
-    # import sys
-    # assert 'medsea' not in sys.modules, "'import pyGOTM.medsea as medsea' first!'"
-    
-    # Restrict the date object type for clarity.
-    assert isinstance(start_day,date)
-    assert isinstance(stop_day,date)
 
-
+    start_day, stop_day = args
+    if not isinstance(start_day,date):
+        year, month = args
+        assert year in [2016,2017]
+        assert month in range(1,13)
+        by_month = True
+        start_day = date(year,month,1)
+        stop_day = date(year+1,1,1) if month == 12 else date(year,month+1,1)
+        
     ## Hard-coding some information for the subfunction get_ERA_yearly_data()
 
     # Filename keyword 'name' / internal nc variable 'alias' (when they don't agree)
@@ -725,58 +610,36 @@ def medsea_MFC_sunrise_reformat_by_start_stop(start_day,stop_day,grid='1x'):
                        PSAL = 'vosaline')
     dst_varname = dict(TEMP = 'temp',
                        PSAL = 'salt')
-    if grid == '1x':
-        from pyGOTM import medsea
-        medsea.set_grid(grid)
-        # Precomputed indices map MFC reanalysis data to medsea 1x grid up to 75m deep.
-        nlev = 16
-        src_lev = \
-                  [1.4721018075942993,
-                   4.587478160858154,
-                   7.944124221801758,
-                   11.558627128601074,
-                   15.448707580566406,
-                   19.633302688598633,
-                   24.132646560668945,
-                   28.968355178833008,
-                   34.16352844238281,
-                   39.742835998535156,
-                   45.73264694213867,
-                   52.1611213684082,
-                   59.05834197998047,
-                   66.4564437866211,
-                   74.38976287841797,
-                   82.89495086669922]
-        
-        assert len(src_lev) == nlev
-        src_lat_idx = slice(9,None,12)
-        # This is different from MFC_midnights because the lon starts from -15 instead of -6, so there is 9 / 0.0625 = 144 index shift
-        src_lon_idx = slice(144,None,12) 
-        
-        # Target grid
-        dst_lats = medsea.grid_lats
-        dst_lons = medsea.grid_lons
-        dst_lev = src_lev
-       
-    else:
-        raise NotImplementedError('Me no do grid = {!s} (yet).'.format(grid))
 
+    from numpy import linspace 
+    src_lat = linspace(30.1875,45.9375,253)
+    src_lon = linspace(-15.,36.25,821)
+    src_lat_idx = subgrid_slice(src_lat,dst_lats)
+    src_lon_idx = subgrid_slice(src_lon,dst_lons)
+
+#    print(dst_lats,dst_lons)
+#    print(src_lat_idx)
+#    print(src_lon_idx)
+#    print(medsea.grid)
     # Convenience function to get one variable's data.
     def get_data(name,src_fn):
 #         print('Reading from {!s}...'.format(join(src_folder,src_fn)))
         with Dataset(join(src_folder,src_fn),'r') as ds:
             # Unfortunately, all the dimensional data were missing, and the dimensions
-            # for lon is different!
-            #assert array_equal(ds['lat'][src_lat_idx], dst_lats)
-            #assert array_equal(ds['lon'][src_lon_idx], dst_lons)
-            #assert array_equal(ds['depth'][:nlev],src_lev), ds['depth'][:nlev]
+            # for lon is different! Let's check the metadata instead.
+            assert all([
+                ds['lat'].valid_min == src_lat.min(),
+                ds['lat'].valid_max == src_lat.max(),
+                ds['lon'].valid_min == src_lon.min(),
+                ds['lon'].valid_max == src_lon.max(),
+                ds['lat'][:].size == src_lat.size,
+                ds['lon'][:].size == src_lon.size]), 'Typo in hard-coded the grid?'
             # Switch to the correct netCDF4 variable name if necessary
             if name in src_varname.keys():
                 alias = src_varname[name]
             else:
                 alias = name
             # The data lacks the time dimension.
-            # Then return the data unpacked from the netCDF object.
             data = ds[alias][:nlev,src_lat_idx,src_lon_idx]
         return data
     
@@ -784,10 +647,14 @@ def medsea_MFC_sunrise_reformat_by_start_stop(start_day,stop_day,grid='1x'):
     tic = time()
     elapsed = 0
     for dat_type in ['tprof','sprof']:
-        dst_fn = 'medsea_MFC_sunrise_' + dat_type + '_' 
-        dst_fn += '{0.year:02d}{0.month:02d}{0.day:02d}'.format(start_day)
-        dst_fn += '{0.year:02d}{0.month:02d}{0.day:02d}'.format(stop_day)
-        dst_fn += '.nc'
+
+        if by_month:
+            dst_fn = 'medsea_MFC_sunrise_' + dat_type + '_{:d}{:02d}.nc'.format(year,month)
+        else:
+            dst_fn = 'medsea_MFC_sunrise_' + dat_type + '_' 
+            dst_fn += '{0.year:02d}{0.month:02d}{0.day:02d}'.format(start_day)
+            dst_fn += '{0.year:02d}{0.month:02d}{0.day:02d}'.format(stop_day)
+            dst_fn += '.nc'
         
         print('Writing {:s}...'.format(join(dst_folder,dst_fn)))
         # Create the dimensions
@@ -806,7 +673,7 @@ def medsea_MFC_sunrise_reformat_by_start_stop(start_day,stop_day,grid='1x'):
             
             # Write the depth values using precomputed values.
             ds_depth = ds.createVariable('depth','f4',dimensions=('depth',))
-            ds_depth[:] = src_lev
+            ds_depth[:] = dst_lev
 
             # Write the values of the lat/lon dimensions using user-specified grid when loading the medsea module.
             ds_lat = ds.createVariable('lat','f4',dimensions=('lat',))
@@ -816,7 +683,7 @@ def medsea_MFC_sunrise_reformat_by_start_stop(start_day,stop_day,grid='1x'):
             
         toc = time()-tic
         elapsed += toc
-        print('Finished writing dimensions. Elapsed {!s}s'.format(toc))
+        print('Finished writing dimensions. Elapsed {:.2f}s'.format(toc))
 
         # Read the data and build up the tprof data array and sunrise times to be written.
         tic = time()
@@ -835,7 +702,7 @@ def medsea_MFC_sunrise_reformat_by_start_stop(start_day,stop_day,grid='1x'):
                 seconds_of_sunrise[i,m,n] = solar_times(current_day,lat,lon,events='sunrise')*60
         toc = time()-tic
         elapsed += toc
-        print('Finished reading data and calculating sunrise times. Elapsed {!s}s'.format(toc))
+        print('Finished reading data and calculating sunrise times. Elapsed {:.2f}s'.format(toc))
 
         # Append the data.
         tic = time()
@@ -849,9 +716,9 @@ def medsea_MFC_sunrise_reformat_by_start_stop(start_day,stop_day,grid='1x'):
             
         toc = time()-tic
         elapsed += toc
-        print('Finished appending data for {:s}. Elapsed {!s}s'.format(dat_type,toc))
+        print('Finished appending data for {:s}. Elapsed {:.2f}s'.format(dat_type,toc))
 
-        print('Total time: {!s}s'.format(elapsed))
+        print('Total time: {:.2f}s'.format(elapsed))
 
 if __name__ == '__main__':
     import sys
@@ -861,10 +728,10 @@ if __name__ == '__main__':
 
     if len(sys.argv) == 1:
         grid = '1x'
-        datasets = ['ERA','ECMWF','MFC_midnights','MFC_sunrise']
+        datasets = ['ERA','ECMWF','MFC_midnight','MFC_sunrise']
     elif len(sys.argv) == 2:
         grid = sys.argv[1]
-        datasets = ['ERA','ECMWF','MFC_midnights','MFC_sunrise']
+        datasets = ['ERA','ECMWF','MFC_midnight','MFC_sunrise']
     elif len(sys.argv) == 3:
         grid = sys.argv[1]
         datasets = [sys.argv[2]]
@@ -872,7 +739,7 @@ if __name__ == '__main__':
         print(
         """
         Usage:
-              python reformat.py {grid} {ERA|ECMWF|MFC_midnights|MFC_sunrise}
+              python reformat.py {grid} {ERA|ECMWF|MFC_midnight|MFC_sunrise}
         """)
         raise RuntimeError('Wrong number of arguments.')
 
@@ -883,8 +750,8 @@ if __name__ == '__main__':
     ## ERA & MFC midnightly means for years 2013 and 2014
     medsea_ERA_reformat(2013)
     medsea_ERA_reformat(2014)
-    medsea_MFC_midnights_reformat(2013)
-    medsea_MFC_midnights_reformat(2014)
+    medsea_MFC_midnight_reformat(2013)
+    medsea_MFC_midnight_reformat(2014)
 
     ## ECMWF and MFC sunrise profiles for 2016-04 to 2017-07
     for i in range(4,13):
