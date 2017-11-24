@@ -59,8 +59,10 @@ def medsea_ERA_append_cloud_factor(year): # Grid info used to get sea_mn
             swrd_cs[i,m,n] = swr_3hourly_mean(ndays,nsecs,lat,lon)
             if swrd_cs[i,m,n] > 0: # This implies fill_value for night time on sea locations. 
                 cloud_factor[i,m,n] = swrd[i,m,n]/swrd_cs[i,m,n] 
-        elapsed += time() - tic
-        print('\t {:d}/{:d} completed. About {:.2f}s to go.'.format(j+1,medsea.sea_m.size,elapsed/(j+1)*medsea.sea_m.size),end='\r')
+        elapsed = time() - tic
+        avg_time = elapsed/(j+1)
+        J = medsea.sea_m.size
+        print('\t {:d}/{:d} completed. About {:.2f}s to go.'.format(j+1,medsea.sea_m.size,avg_time*(J-j-1)),end='\r')
     print('\nElapsed {:.2f}s.'.format(elapsed))
     
     # Append the data
@@ -111,8 +113,10 @@ def medsea_ECMWF_append_cloud_factor(year,month):
             swrd_cs[i,m,n] = swr_3hourly_mean(ndays,nsecs,lat,lon)
             if swrd_cs[i,m,n] > 0: # This implies fill_value for night time on sea locations. 
                 cloud_factor[i,m,n] = swrd[i,m,n]/swrd_cs[i,m,n] 
-        elapsed += time() - tic
-        print('\t {:d}/{:d} completed. About {:.2f}s to go.'.format(j+1,medsea.sea_m.size,elapsed/(j+1)*medsea.sea_m.size),end='\r')
+        elapsed = time() - tic
+        avg_time = elapsed/(j+1)
+        J = medsea.sea_m.size
+        print('\t {:d}/{:d} completed. About {:.2f}s to go.'.format(j+1,medsea.sea_m.size,avg_time*(J-j-1)),end='\r')
     print('\nElapsed {:.2f}s.'.format(elapsed))
     
     # Append the data
