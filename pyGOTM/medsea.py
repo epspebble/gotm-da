@@ -116,20 +116,22 @@ run_profiles = {
                           depth = 74.539324233308434, nlev = 122,
                           grid_method = 2, grid_file = 'grid_75m.dat',
                           nsave=30),
-    # 20171113, same as the previous, except with a higher resolution output.
-    'ASM5-75m_no_salt': dict(assimilation_type=2, assim_window=1,
+    
+    # assim_window=2 means use the tprof profile time as assimilation time.
+    'ASM5-75m_no_salt': dict(assimilation_type=2, assim_window=2,
                                s_prof_method=0, # skip s_prof 
                                extinct_method=13, extinct_file='iop.dat', 
                                depth = 74.539324233308434, nlev = 122,
                                grid_method = 2, grid_file = 'grid_75m.dat'),
-    'ASM3.1-75m_no_salt': dict(assimilation_type=2, assim_window=1,
+    'ASM3.1-75m_no_salt': dict(assimilation_type=2, assim_window=2,
                                  s_prof_method=0, # skip s_prof 
                                  extinct_method=12, extinct_file='chlo.dat', 
                                  depth = 74.539324233308434, nlev = 122,
                                  grid_method = 2, grid_file = 'grid_75m.dat'),
-    'ASM2-75m_no_salt': dict(assimilation_type=2, assim_window=1, extinct_method=9, 
-                               depth = 74.539324233308434, nlev = 122,
-                               grid_method = 2, grid_file = 'grid_75m.dat'),
+    'ASM2-75m_no_salt': dict(assimilation_type=2, assim_window=2, extinct_method=9, 
+                             s_prof_method=0, # skip s_prof
+                             depth = 74.539324233308434, nlev = 122,
+                             grid_method = 2, grid_file = 'grid_75m.dat'),
 
 }
 
@@ -166,6 +168,9 @@ def set_grid(new_grid=grid,
     global medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth
     global M, N, sea_mn, sea_m, sea_n
     global grid_folder, data_folder
+
+    # For plotting heatmaps more conveniently
+    global extent
 
     # Override the global variables using values passed from function call.
     grid = new_grid
@@ -254,8 +259,9 @@ def set_grid(new_grid=grid,
     assert len(sea_mn) == sea_m.size
 
     #print(grid_lats.size,grid_lons.size,grid_lats.min(),grid_lats.max(),grid_lons.min(),grid_lons.max())
+    extent = (grid_lats.min(),grid_lats.max(),grid_lons.min(),grid_lons.max())
     print('Finished setting up a subgrid of shape {!s} x {!s} with {!s} <= latitude <= {!s}, {!s} <= longitude <= {!s}.'.format(\
-            grid_lats.size,grid_lons.size,grid_lats.min(),grid_lats.max(),grid_lons.min(),grid_lons.max()))
+                                                                                                                                M,N,*extent))
     if stat:
         # The following are for the current subgrid.
         def print_stat(bl_array):
@@ -291,7 +297,7 @@ def set_grid(new_grid=grid,
             ax.set_xlabel('longitude')
             ax.set_ylabel('latitude')
 
-    # These values have been written directly to global variables as well.
+    # These values have been written directly to global variables as well:
     subgrid = (grid_lats, grid_lons, medsea_flags, max_depth)
     rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth)
     grid_indices = (M, N, sea_mn, sea_m, sea_n)
