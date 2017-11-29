@@ -1,11 +1,23 @@
 #!/home/simontse/miniconda3/bin/python
+#SBATCH --requeue
+#SBATCH --time=0-00:05
+#SBATCH --mem=8G
+#SBATCH --mail-user=simon.tse@twu.ca
+#SBATCH --mail-type=END
+#SBATCH --profile=all
+##SBATCH --mail-type=BEGIN,END
+##SBATCH -e %x.e%A-%a
+##SBATCH -o %x.o%A-%a
+
 from time import time
 import os,sys
 from os.path import join
 from netCDF4 import Dataset, MFDataset, num2date, date2num
-from numpy.ma import masked_all, masked_invalid
+from numpy import loadtxt
+from numpy.ma import masked_all, masked_invalid, masked_equal
 from datetime import date, datetime, timedelta
-
+from pyGOTM import medsea
+    
 def hour_range(year,month=None,skip_year_end=False):
     if month is None:
         first = datetime(year,1,1,1,0,0)
@@ -174,7 +186,7 @@ def write_results(data,year,month=None,varname=None,fn=None):
     
     for varname in varnames:
         tic = time()
-        print('Writng data for {:s}...'.format(varname))
+        print('Writing data for {:s}...'.format(varname))
         if data[varname].shape[0] != len(hours):
             raise ValueError("Number of hours specified is NOT equal to the time dimension of {!s}!".format(varname))
 
@@ -190,13 +202,179 @@ def write_results(data,year,month=None,varname=None,fn=None):
         
     total_elapsed = time()-begin
     print('\n Total time: {:d} min {:d} sec'.format(int(total_elapsed/60),int(total_elapsed%60)))
+
+def combine_stat(*args,biannual=False):
+    """
+    combine_stat(year) or
+    combine_stat(year,month) or
+    combine_stat(start,stop) where start, stop are datetime.date objects
+
+    Version as of 2017-11-28.
+    """
+    # Checking arguments.
+    if len(args) == 2:
+        if isinstance(args[0],date) and isinstance(args[1],date):
+            start = args[0]
+            stop = args[1]
+            assert stop > start
+            year = None
+            month = None
+        else:
+            year, month = args
+            assert isinstance(year,int) and isinstance(month,int)
+            start = date(year,month,1)
+            stop = date(year+1,1,1) if month == 12 else date(year,month+1,1)
+    elif len(args) == 1:
+        year = args[0]
+        month = None
+        assert isinstance(year,int) and year > 2010
+        start = date(year,1,1)
+        stop = date(year+1,1,1)
+        
+    dat_fn = 'daily_stat_{0.run}_{0.GOTM_version}.txt'.format(medsea)
+               
+    # Done defining start, stop.
+    print('Working on {!s} to {!s}...\n\n'.format(start, stop))  
+    print('Daily statistics file: ' + dat_fn)
     
+    outdir = os.path.join(medsea.results_folder,medsea.run+'_'+medsea.grid)
+    if not(os.path.isdir(outdir)):
+          os.mkdir(outdir)
+
+    basename = 'daily_stat_{0.run}_{0.grid}_'.format(medsea)
+    if year is None: # A start-stop based time range:
+        basename += '{0.year:d}{0.month:02d}{0.day:02d}'.format(start) + '_' + \
+                    '{0.year:d}{0.month:02d}{0.day:02d}'.format(stop) + '.nc'
+    else:
+        if month is None:
+            basename += '{:d}.nc'.format(year)
+        else:
+            basename += '{:d}{:02d}.nc'.format(year,month)
+            
+    outfn = os.path.join(outdir,basename)
+
+    print('Writing dimensions and metadata...')
+    elapsed = 0
+    medsea.tic()
+
+    with Dataset(outfn,'w',format='NETCDF3_CLASSIC') as ds:
+
+        # Dimensions
+        ds.createDimension('day')
+        ds.createDimension('lat', size = len(medsea.grid_lats))
+        ds.createDimension('lon', size = len(medsea.grid_lons))
+        
+        # Dimension variables.
+        if year is None: 
+            day_var = ds.createVariable('day','i4',dimensions=('day',))
+            day_var.units = "days since " + str(start-timedelta(days=1))
+        else:
+            day_var = ds.createVariable('day','i4',dimensions=('day',))
+            day_var.units = "days since " + str(date(year-1,12,31))
+            
+        lat_var = ds.createVariable('lat','f4',dimensions=('lat',))
+        lat_var.units = 'degrees north'
+        lon_var = ds.createVariable('lon','f4',dimensions=('lon',))
+        lon_var.units = 'degrees east'
+        lat_var[:] = medsea.grid_lats
+        lon_var[:] = medsea.grid_lons
+        print('Done initializing dimensions.')
+        
+        data = [None for i in range(7)]
+        data[0]=ds.createVariable('assim_time','i4',dimensions=('day','lat','lon'))
+        data[0].units = 'seconds since midnight in local time'
+        data[4]=ds.createVariable('SST_max','f4',dimensions=('day','lat','lon'))
+        data[4].units = 'degree Celsius'
+        data[2]=ds.createVariable('SST_min_day','f4',dimensions=('day','lat','lon'))
+        data[2].units = 'degree Celsius'
+        data[6]=ds.createVariable('SST_min_night','f4',dimensions=('day','lat','lon'))
+        data[6].units = 'degree Celsius'
+        data[3]=ds.createVariable('SST_max_time','i4',dimensions=('day','lat','lon'))
+        data[3].units = 'seconds since midnight in local time'
+        data[1]=ds.createVariable('SST_min_day_time','i4',dimensions=('day','lat','lon'))
+        data[1].units = 'seconds since midnight in local time'
+        data[5]=ds.createVariable('SST_min_night_time','i4',dimensions=('day','lat','lon'))
+        data[5].units = 'seconds since midnight in local time'
+        print('Done creating variables.')
+
+        ndays = (stop-start).days
+        start_daynum = (start - date(start.year-1,12,31)).days
+        stop_daynum = (stop - date(stop.year-1,12,31)).days
+        assert ndays == stop_daynum - start_daynum, "Might have crossed year boundary, don't know what to do..."
+        date_range = num2date(range(ndays), 'days since ' + str(start))
+            
+        for i, each in enumerate(date_range):
+            day_var[i] = date2num(each,day_var.units)
+        
+        ndfv = [0,0,99.,0,-99.,0,99.]
+        temp = [masked_all((ndays,medsea.M,medsea.N)) for i in range(7)]
+        
+        medsea.tic()
+        err_count = 0
+        for i in range(medsea.sea_m.size):
+            m = medsea.sea_m[i]
+            n = medsea.sea_n[i]
+            latlong = medsea.print_lat_lon(*medsea.get_lat_lon(m,n))
+                
+            infn = os.path.join(medsea.get_local_folder(m,n),dat_fn)
+            if not(os.path.isfile(infn)):
+                err_count += 1
+                print('\nFile not found: ' + infn)
+                continue
+            try:
+                tmp = loadtxt(infn)
+            except ValueError as ve :
+                print('\n Error reading {:s}: ValueError: {!s}'.format(infn,ve))
+                err_count += 1
+                continue
+                
+            if tmp.size == 0: # empty file
+                print('\nEmpty file: ' + infn)
+                err_count +=1
+                continue
+
+            day_of_year = tmp[:,0]                
+            ind = (day_of_year >= start_daynum) & (day_of_year < stop_daynum)
+            for k in range(7):
+                #if dat_fn[:25] == 'daily_stat_20130012014365':
+                
+                ## Special code to combine a biannual run for 2013-2013.
+                if biannual:
+                    if tmp.shape[0] != 729:
+                        err_count += 1
+                        print('\nUnexpected line count: {:d} for the location {!s}'.format(tmp.shape[0],latlong))
+                        break
+                    if year == 2013:
+                        temp[k][:364,m,n] = tmp[:364,k+1]
+                    elif year == 2014:
+                        temp[k][:364,m,n] = tmp[365:,k+1]
+                else:
+                    try:
+                        temp[k][:,m,n] = tmp[ind,k+1]
+                    except Exception as e:
+                        err_count +=1
+                        print(e)
+                        #raise
+            # Beware, since the progress message overwrites itself, error messages need to do a newline first.
+            print('Reading {0:d}/{1:d} grid points, {2:d}/{1:d} bypassed.'.format(i+1,medsea.sea_m.size,err_count),end='\r')
+        print('\nDone reading in all data.')
+        elapsed += medsea.toc()
+        #save('daily_stats',temp)
+
+        for i in range(7):
+            medsea.tic()
+            data[i][:] = masked_equal(temp[i],ndfv[i])
+            #print("Done writing a variable.")
+            #elapsed += medsea.toc()
+            
+        print('Done writing out data to {:s}.'.format(outfn))
+        elapsed += medsea.toc()
+
 if __name__=='__main__':
     
     grid,run,ver,year,month = sys.argv[1:]
     year = int(year)
     month = int(month)
-    from pyGOTM import medsea
     medsea.set_grid(grid)
     medsea.run = run
     medsea.ver = ver
@@ -212,4 +390,6 @@ if __name__=='__main__':
     salt = read_results('salt',year,month=month)
     write_results(salt,year,month=month,varname='salt')
     del salt
+
+    combine_stat(year,month)
     
