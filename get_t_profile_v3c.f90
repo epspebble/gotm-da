@@ -16,8 +16,13 @@
 !
 ! !USES:
    use time
-   use observations, only: read_profiles,tprof
-   use gotm, only: assim_window ! WT Should update this after assimilation related code moved to new module.
+   use observations, only: read_profiles, tprof, next_tprof_julianday, next_tprof_secondsofday
+
+   ! WT 20171112 Temporary. Make it work first. Should update this after assimilation related code moved to new module.
+   ! Probably not a good idea to ask get_t_profile to be 'aware' of assimilation events. Maybe just pass an extra flag
+   ! about interpolation preferences somewhere.
+   use gotm, only: assim_window ! WT 
+
    IMPLICIT NONE
 !
 ! !INPUT PARAMETERS:
@@ -26,6 +31,9 @@
    integer, intent(in)                 :: nlev
 
    double precision, intent(in)                :: z(0:nlev)
+
+   ! !OUTPUT PARAMETERS:
+   
 !
 ! !REVISION HISTORY:
 !  Original author(s): Karsten Bolding
@@ -99,10 +107,19 @@
             end if    
             EXIT
          else
+            !WT When reading multiple records from file, obtain next record time and find time difference.
             nprofiles = nprofiles + 1  
             call julian_day(yy,mm,dd,jul2)
             secs2 = hh*3600 + min*60 + ss
-            if(time_diff(jul2,secs2,jul,secs) .gt. 0) EXIT
+
+            !WT 20171112 Communicate the time of the next record for the assimilation routines to be aware of.
+            !print *, 'get_t_profile() called'
+            !print *, 'prev:',jul1,secs1,'next:',jul2,secs2
+            next_tprof_julianday = jul2
+            next_tprof_secondsofday = secs2
+     
+            !WT If now (jul,secs) is later than the next record time, no more new information, exit DO.
+            if(time_diff(jul2,secs2,jul,secs) .gt. 0) EXIT            
          end if
       end do
       if( .not. one_profile) then
