@@ -67,14 +67,11 @@ def read_results(varnames,year,month=None,skip_year_end=False):
                 first_i = int((date2num(first,ds['time'].units) - ds['time'][0])/3600)
                 last_i = int((date2num(last,ds['time'].units) - ds['time'][0])/3600)+1
                 if first_i < 0:
-#                     print(first,first_i,ds['time'][0],ds['time'].units)
                     raise ValueError("Time out of range. First record found is at {!s}".format(num2date(ds['time'][0],ds['time'].units)))
-                if last_i >= ds['time'].size:
-#                     print(last,last_i,ds['time'][-1],ds['time'].units)
+                if last_i > ds['time'].size:
                     raise ValueError("Time out of range. Last record found is at {!s}".format(num2date(ds['time'][-1],ds['time'].units)))
                 if len(dims) == 3:
                     data = ds[varname][first_i:last_i,0,0]
-#                     print(first_i,last_i,data.shape)
                     return masked_invalid(data)
                 elif len(dims) == 4:
                     # Reversing the z dimension to agree with "depth"
