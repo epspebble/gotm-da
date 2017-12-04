@@ -297,9 +297,12 @@ def combine_stat(*args,biannual=False):
         data[5].units = 'seconds since midnight in local time'
         print('Done creating variables.')
 
+        yrdays = 366 if year%4==0 else 365
         ndays = (stop-start).days
         start_daynum = (start - date(start.year-1,12,31)).days
-        stop_daynum = (stop - date(stop.year-1,12,31)).days
+        # The 12-th month stops at the start of next year
+        stop_daynum = yrdays+1 if month == 12 else (stop - date(stop.year-1,12,31)).days
+        # print(start_daynum,stop_daynum,ndays)
         assert ndays == stop_daynum - start_daynum, "Might have crossed year boundary, don't know what to do..."
         date_range = num2date(range(ndays), 'days since ' + str(start))
             
