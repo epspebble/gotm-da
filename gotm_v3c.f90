@@ -1000,9 +1000,10 @@ contains
     !end find the grid level of the mixed layer depth
 
   end function mld
-! END Prospective assimilation module portion.
+  ! END Prospective assimilation module portion.
+  
   subroutine write_daily_stats(unit, special)
-    integer :: unit
+    integer :: unit, yrdays
     integer, optional :: special
 
     if (present(special)) then
@@ -1020,6 +1021,17 @@ contains
        case default
           stop 'You should not see this. Something is wrong.'
        end select
+    else if (dayofyear .eq. 1) then
+       ! Would have written dayofyear-1 (which is 0) by next block. Instead, use the number of days of of last year.
+       call calendar_date(julianday,yyyy,mm,dd)
+       if (mod(yyyy-1,4) .eq. 0) then
+          yrdays = 366
+       else
+          yrdays = 365
+       end if
+       write(unit_daily_stat,714) yrdays, lsecs_assim_time, & 
+            lsecs_SST_min_day, daily_SST_min_day, lsecs_SST_max, daily_SST_max, &
+            lsecs_SST_min_night, daily_SST_min_night
     else
        ! This give the main lines of stats, which are for the assimilation cycle that is just completed, so dayofyear-1
        write(unit_daily_stat,714) dayofyear-1, lsecs_assim_time, & 
