@@ -181,6 +181,7 @@ def set_grid(new_grid=grid, new_ASM=ASM,
 
     # Override the global variables using values passed from function call.
     grid = new_grid
+    ASM = new_ASM
     grid_folder = os.path.join(project_folder,'grid',grid)
     if not os.path.isdir(grid_folder):
         print('Creating new grid folder: {!s}'.format(grid_folder))

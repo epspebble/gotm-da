@@ -18,8 +18,7 @@ def is_interactive():
     return not hasattr(main,'__file__')
 
 # Set some default flags for interactive use of the module.
-if is_interactive():
-    verbose = True
+verbose = True if is_interactive() else False
     
 # neccesary library
 import os, sys
