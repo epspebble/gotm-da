@@ -329,7 +329,7 @@ def set_grid(new_grid=grid, new_ASM=ASM,
 #  Now run set_grid() only if a cache does not exsit.
 import numpy as np
 if not(os.path.isfile(os.path.join(grid_folder,'grid_data.npy'))):
-    subgrid_data = set_grid()
+    subgrid_data = set_grid(return_grid_data=True)
     # Generate the cache
     np.save(os.path.join(grid_folder,'grid_data.npy'),subgrid_data)
 else: 
@@ -707,7 +707,6 @@ def local_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or (l
     """
     from datetime import datetime
     from netCDF4 import Dataset, num2date
-    from matplotlib.pyplot import subplots
     from os.path import join
     import shutil
 
@@ -784,7 +783,8 @@ def local_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or (l
     except:
         raise
 
-    if plotvars:       
+    if plotvars:
+        from matplotlib.pyplot import subplots
         assert isinstance(plotvars,list)
         ds = Dataset(out_fn+'.nc','r')
         time = num2date(ds['time'][:],ds['time'].units)
