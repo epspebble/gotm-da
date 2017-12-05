@@ -10,6 +10,16 @@ try:
     from tabulate import tabulate
 except ImportError:
     pass # silently ignore if it is not installed.
+
+# check whether are in interactive shell like ipython or jupyter notebook, which
+# does not have the '__file__' attribute. Maybe all main() based runs has '__file__'?
+def is_interactive():
+    import __main__ as main
+    return not hasattr(main,'__file__')
+
+# Set some default flags for interactive use of the module.
+if is_interactive():
+    verbose = True
     
 # neccesary library
 import os, sys
@@ -105,16 +115,17 @@ def setup(**overrides):
             raise FileNotFoundError("The GOTM config namelist file: " + GOTM_nml_template + " is invalid.")
 
     # Print config.
-    print('Current pyGOTM settings:')
-    if 'tabulate' not in sys.modules.keys():
-        for name in preset:
-            print('\t',name,':\t', current_settings[name])
-            for name in paths:
+    if verbose:
+        print('Current pyGOTM settings:')
+        if 'tabulate' not in sys.modules.keys():
+            for name in preset:
                 print('\t',name,':\t', current_settings[name])
-    else:
-        print(tabulate([[name,current_settings[name]] for name in preset]))
-        print('\nPaths and filenames:')
-        print(tabulate([[name,current_settings[name]] for name in paths]))
+                for name in paths:
+                    print('\t',name,':\t', current_settings[name])
+        else:
+            print(tabulate([[name,current_settings[name]] for name in preset]))
+            print('\nPaths and filenames:')
+            print(tabulate([[name,current_settings[name]] for name in paths]))
         
 # Set default values.
 setup()

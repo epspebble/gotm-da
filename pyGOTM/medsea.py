@@ -6,7 +6,7 @@ from pyGOTM.config import \
     project_name, project_folder, \
     GOTM_executable, GOTM_executable_path, \
     GOTM_nml, GOTM_nml_path, \
-    GOTM_version, epoch
+    GOTM_version, epoch, verbose
 
 # Necessary library
 import os, sys
@@ -691,7 +691,7 @@ def local_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or (l
               year = None, month = None, # Provided to compute start, stop.
 #              create=False, # Should not run if the folder is not prepared.
               cached = False,
-              verbose = False, # Print GOTM output to screen?
+              verbose = verbose, # Print GOTM output to screen? 
               plotvars = None, # Plot results immediately after run? Pass a list of GOTM output variable names.
               **gotm_user_args): # Extra GOTM arguments, e.g. from run_profiles):
     """
