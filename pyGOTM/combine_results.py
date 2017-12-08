@@ -10,7 +10,7 @@
 ##SBATCH -o %x.o%A-%a
 
 from time import time
-import os,sys
+import os, sys
 from os.path import join
 from netCDF4 import Dataset, MFDataset, num2date, date2num
 from numpy import loadtxt
@@ -130,7 +130,7 @@ def read_results(varnames,year,month=None,skip_year_end=False):
     else:
         return data_dict
 
-def write_results(data,year,month=None,varname=None,fn=None):
+def write_results(data,year,month=None,varname=None,fn=None,skip_year_end=False):
     from numpy import loadtxt, cumsum
     epoch = medsea.epoch
     grid_fn = 'grid_75m.dat' # Temporary solution.
@@ -180,7 +180,7 @@ def write_results(data,year,month=None,varname=None,fn=None):
         else:
             nctime.units = 'hours since {!s}'.format(epoch)
             #nctime[:] = hour_range(year,month=month,start=num2date(0,'hours since {:s}'.format(epoch)))
-        hours = hour_range(year,month=month)
+        hours = hour_range(year,month=month,skip_year_end=skip_year_end)
         nctime[:] = date2num(hours,nctime.units)
     print('Elapsed {!s}s.'.format(time()-tic))
     
@@ -298,21 +298,24 @@ def combine_stat(*args,biannual=False):
         print('Done creating variables.')
 
         yrdays = 366 if year%4==0 else 365
+
+        # temporary fix for binannual 2013-2014 run.
         ndays = (stop-start).days
+        
         start_daynum = (start - date(start.year-1,12,31)).days
         # The 12-th month stops at the start of next year
         stop_daynum = yrdays+1 if month == 12 else (stop - date(stop.year-1,12,31)).days
         # print(start_daynum,stop_daynum,ndays)
-        assert ndays == stop_daynum - start_daynum, "Might have crossed year boundary, don't know what to do..."
-        date_range = num2date(range(ndays), 'days since ' + str(start))
-            
+        #assert ndays == stop_daynum - start_daynum, "Might have crossed year boundary, don't know what to do..."
+        date_range = num2date(range(ndays), 'days since ' + str(start))            
         for i, each in enumerate(date_range):
             day_var[i] = date2num(each,day_var.units)
         
-        ndfv = [0,0,99.,0,-99.,0,99.]
+        # redefine ndays and day_var
         temp = [masked_all((ndays,medsea.M,medsea.N)) for i in range(7)]
         
         medsea.tic()
+        ndfv = [0,0,99.,0,-99.,0,99.] # fill values
         err_count = 0
         for i in range(medsea.sea_m.size):
             m = medsea.sea_m[i]
@@ -341,7 +344,7 @@ def combine_stat(*args,biannual=False):
             for k in range(7):
                 #if dat_fn[:25] == 'daily_stat_20130012014365':
                 
-                ## Special code to combine a biannual run for 2013-2013.
+                ## Special code to combine a biannual run for 2013-2014.
                 if biannual:
                     if tmp.shape[0] != 729:
                         err_count += 1
@@ -357,7 +360,7 @@ def combine_stat(*args,biannual=False):
                     except Exception as e:
                         err_count +=1
                         print(e)
-                        #raise
+                        raise
             # Beware, since the progress message overwrites itself, error messages need to do a newline first.
             print('Reading {0:d}/{1:d} grid points, {2:d}/{1:d} bypassed.'.format(i+1,medsea.sea_m.size,err_count),end='\r')
         print('\nDone reading in all data.')
@@ -373,26 +376,74 @@ def combine_stat(*args,biannual=False):
         print('Done writing out data to {:s}.'.format(outfn))
         elapsed += medsea.toc()
 
-if __name__=='__main__':
+def print_usage():
+    print('Usage: ' + sys.argv[0] + ' <grid> <run> <GOTM_version> <year> [month] [--biannual={True|False}]')
+    sys.exit(0)
+
+def get_args():
+    if len(sys.argv) < 5:
+        print_usage()
+    else:
+        grid,run,ver,year = sys.argv[1:5]
+        year = int(year)
+        
+    if len(sys.argv) >= 6:
+        month = int(sys.argv[5])
+        unparsed_kwargs = sys.argv[6:]
+    else:
+        month = None
+        kwargs = None
+
+    # Maybe don't reinvent the wheel... see: https://docs.python.org/3/library/argparse.html
+    if kwargs is not None:
+        kwargs_syntax = dict(biannual=bool)
+        kwargs= dict()
+        for each in unparsed_kwargs:
+            sep = each.find('=') # returns -1 if not found
+            if each[:2] != '--' or sep == -1: 
+                print('Invalid argument: ' + each)
+                print_usage()
+            else:
+                key = each[:sep]
+                val = each[sep+1:]
+                try:
+                    val_type = kwargs_syntax(key)
+                    kwargs[key] = val_type(val)
+                except Exception as e:
+                    print(e)
+                    print_usage()
+    return grid, run, ver, year, month, kwargs
     
-    grid,run,ver,year,month = sys.argv[1:]
-    year = int(year)
-    month = int(month)
+if __name__=='__main__':
+
+    grid, run, ver, year, month, kwargs = get_args()
+    
     medsea.set_grid(grid)
     medsea.run = run
     medsea.ver = ver
+
+    # Temporary code.
+    if year == 2013:
+        skip_year_end = False
+    if year == 2014:
+        skip_year_end = True
+    if year in [2013, 2014]:
+        biannual = True
+    else:
+        biannual = False
+    
     varnames = ['sst','skint','x-taus','y-taus','swr','heat','total','lwr','sens','latent','albedo']
-    data = read_results(varnames,year,month=month)
-    write_results(data,year,month=month)
+    data = read_results(varnames,year,month=month,skip_year_end=skip_year_end)
+    write_results(data,year,month=month,skip_year_end=skip_year_end)
     del data
     
-    temp = read_results('temp',year,month=month)
-    write_results(temp,year,month=month,varname='temp')
+    temp = read_results('temp',year,month=month,skip_year_end=skip_year_end)
+    write_results(temp,year,month=month,varname='temp',skip_year_end=skip_year_end)
     del temp
     
-    salt = read_results('salt',year,month=month)
-    write_results(salt,year,month=month,varname='salt')
+    salt = read_results('salt',year,month=month,skip_year_end=skip_year_end)
+    write_results(salt,year,month=month,varname='salt',skip_year_end=skip_year_end)
     del salt
 
-    combine_stat(year,month)
+    combine_stat(year,month,biannual=biannual)
     
