@@ -16,7 +16,6 @@ from netCDF4 import Dataset, MFDataset, num2date, date2num
 from numpy import loadtxt
 from numpy.ma import masked_all, masked_invalid, masked_equal
 from datetime import date, datetime, timedelta
-from pyGOTM import medsea
     
 def hour_range(year,month=None,skip_year_end=False):
     if month is None:
@@ -40,7 +39,7 @@ def hour_range(year,month=None,skip_year_end=False):
 def read_results(varnames,year,month=None,skip_year_end=False):
     fn = 'results_{0.run}_{0.GOTM_version}.nc'.format(medsea)
     
-    hours = hour_range(year,month=month,skip_year_end=False)
+    hours = hour_range(year,month=month,skip_year_end=skip_year_end)
     first, last = hours[0], hours[-1]
     nrec = len(hours)
     
@@ -221,9 +220,15 @@ def combine_stat(*args,biannual=False):
             month = None
         else:
             year, month = args
-            assert isinstance(year,int) and isinstance(month,int)
-            start = date(year,month,1)
-            stop = date(year+1,1,1) if month == 12 else date(year,month+1,1)
+            assert isinstance(year,int) and year > 2010
+            if month is None:
+                # Same as with len(args) == 1, i.e. only year is supplied.
+                start = date(year,1,1)
+                stop = date(year+1,1,1)
+            else:
+                assert isinstance(month,int)
+                start = date(year,month,1)
+                stop = date(year+1,1,1) if month == 12 else date(year,month+1,1)
     elif len(args) == 1:
         year = args[0]
         month = None
@@ -392,12 +397,12 @@ def get_args():
         unparsed_kwargs = sys.argv[6:]
     else:
         month = None
-        kwargs = None
+        unparsed_kwargs = None
 
     # Maybe don't reinvent the wheel... see: https://docs.python.org/3/library/argparse.html
-    if kwargs is not None:
-        kwargs_syntax = dict(biannual=bool)
-        kwargs= dict()
+    kwargs_syntax = dict(biannual=bool)
+    kwargs = dict()
+    if unparsed_kwargs:
         for each in unparsed_kwargs:
             sep = each.find('=') # returns -1 if not found
             if each[:2] != '--' or sep == -1: 
@@ -417,20 +422,19 @@ def get_args():
 if __name__=='__main__':
 
     grid, run, ver, year, month, kwargs = get_args()
-    
+
+    from pyGOTM import medsea
     medsea.set_grid(grid)
     medsea.run = run
     medsea.ver = ver
 
     # Temporary code.
-    if year == 2013:
-        skip_year_end = False
-    if year == 2014:
-        skip_year_end = True
     if year in [2013, 2014]:
         biannual = True
+        skip_year_end = False if year == 2013 else True
     else:
         biannual = False
+        skip_year_end = False
     
     varnames = ['sst','skint','x-taus','y-taus','swr','heat','total','lwr','sens','latent','albedo']
     data = read_results(varnames,year,month=month,skip_year_end=skip_year_end)
