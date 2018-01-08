@@ -1421,6 +1421,23 @@ double precision              :: K_ir,K_vis,K1,K2
             88.,90./)
        !
        !
+!-----------------Albedo Options-------------------------HX
+        double precision             ::fmiusigma,alphasdif,alphasdir,coszent,rpara,rperp,Rtotal,sigma,n_a,n_o,f_dir,f_dif
+        double precision         ::sigmasquare,wind,fwc,albedoe,para_A,Trans_1
+        integer                   ::j
+        double precision                  :: C1(16) = &
+            (/.026,-.009,-.015,-.003,.063,.278,3.91,16.64, &
+            .033,-.01,-.019,-.006,.066,.396,7.68,51.27/)
+        double precision                  :: C2(16) = &
+            (/.112,.034,-.006,-.131,-.015,-.562,-12.91,-478.28, &
+            .0,.0,.0,.0,.0,.0,.0,.0/)
+        double precision                  :: C3(16) = &
+            (/.0,.0,.0,.0,.0,.0,.0,.0, &
+            -.025,-.007,-.003,-.004,.006,-.027,-2.49,13.14/)
+        double precision                  :: C4(16) = &
+            (/.366,.207,.188,.169,.082,1.02,16.62,736.56, &
+            .419,.231,.195,.154,.066,.886,17.81,665.19/)
+!-------------------------------------------HX
        !-----------------------------------------------------------------------
        !BOC
 
@@ -1598,6 +1615,9 @@ double precision              :: K_ir,K_vis,K1,K2
        !  solar noon altitude in degrees :
        sunbet = asin(sunbet)*rad2deg
 
+! Albedo calculation
+
+!------------------------------------- Payne (1972)
        !  calculates the albedo as a function of sun altitude :
        !  (after Payne jas 1972)
        !  solar zenith angle in degrees :
@@ -1609,8 +1629,78 @@ double precision              :: K_ir,K_vis,K1,K2
 
        !linear interpolation
        albedo=alb1(jab)+.5*(alb1(jab+1)-alb1(jab))*(altitude-alt(jab))      
+!-------------------------------------- end Payne (1972)
 
-       !SH  calculate cosine of angle of direct refracted entrant radiation 
+!---------------------------------------- Ohlmann & Siegel (2000)
+! code by HX
+!        if(cloud.gt.0.1) then
+!            do j=1,4
+!                para_A=C1(j)*chlo+C2(j)*cloud+C4(j)
+!                Trans_1 = Trans_1 + para_A
+!            end do
+!        else
+!            do j=9,12
+!                if(coszen.lt. 0.2588) then
+!                    coszen=0.2588
+!                end if
+!                para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
+!                Trans_1 = Trans_1+para_A
+!            end do
+!        end if
+!        albedo = 1 - Trans_1
+!---------------------------------------- end Ohlmann & Siegel (2000)
+
+!---------------------------------------- Jin et al. (2011)
+! new albedo calculation for broadband from Jin(2011) (HX 30/05/2017)
+!        n_a = 1.               !refractive index of air
+!        n_o = 1.34             !refractive index of seawater
+!        f_dir = 0.7            !coefficient for direct radiance
+!        f_dif = 0.3            !coefficient for diffuse radiance
+!        if (qtot.gt.0) then
+!            if (coszen==0.0) then
+!                coszent=0.0
+!                albedo=0.0
+!            else
+!                coszent = abs(cos(abs(asin(abs(sin(abs(acos(coszen))))*n_a/n_o))))
+!                rpara = (n_a*coszen-n_o*coszent)/(n_a*coszen+n_o*coszent)     !Fresnel's equations for reflection
+!                rperp = (n_o*coszen-n_a*coszent)/(n_o*coszen+n_a*coszent)
+!
+!                Rtotal = 0.5*(rpara**2. + rperp**2.)    !Unpolarised light
+!                wind = sqrt(wx_obs**2.+wy_obs**2.)
+!                if (wind.eq.0) then
+!                    sigmasquare = 0
+!                    sigma = 0
+!                else
+!                    sigmasquare = 0.003+0.00512*wind                  !equ.2
+!                    sigma = sqrt(sigmasquare)
+!                end if
+!
+!                fmiusigma = (0.0152-1.7873*coszen+6.8972*coszen**2.0  &
+!                    - 8.5778*coszen**3.0+4.071*sigma-7.6446*coszen*sigma) &
+!                    *exp(0.1643-7.8409*coszen-3.5639*coszen**2.0-2.3588*sigma  &
+!                    +10.0538*coszen*sigma)                                         !equ.4
+!
+!                alphasdir = Rtotal-fmiusigma
+!                if (cloud.eq.0) then
+!                    alphasdif = -0.1482-0.012*sigma+0.1608*n_o-0.0193*n_o*sigma    !equ.5a
+!                else
+!                    alphasdif = -0.1479+0.1502*n_o-0.0176*n_o*sigma                !equ.5b
+!                end if
+!
+!                albedo = f_dir*alphasdir+f_dif*alphasdif+0.006                   !equ.15
+!
+!                    ! foam corrected alternative
+!                    !fwc = 2.95e-6*wind**3.52                                          !equ.16
+!                    !albedoe = 0.55*fwc+albedo*(1-fwc)    !foam corrected albedo  (Koepkw,1984)    !equ.17
+!                !       albedo = qdir_frac*alphasdir+qdiff_frac*alphasdif+0.006  !?
+!
+!            end if
+!    else
+!        albedo = 0.
+!    end if
+!---------------------------------------- end Jin et al. (2011)
+
+       !SH  calculate cosine of angle of direct refracted entrant radiation
        cosr = cos(asin((3./4.)*sin(acos(coszen))))
 
        !  radiation as from Reed(1977), Simpson and Paulson(1979)
