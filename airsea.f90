@@ -45,6 +45,10 @@ module airsea
   use time, only: julian_day, time_diff, calendar_date, write_time_string 
   use time, only: UTC_to_local, tz !WT new function
   use observations, only: read_obs
+
+  !WT Added the following for the copy-and-pasted extinct_method=9, 15, 16 codes
+  use observations, only: fsen,zdeta
+  
   !
   IMPLICIT NONE
   !  default: all is private.
@@ -156,7 +160,8 @@ module airsea
   integer, public                   :: sst_method2
   integer, public                   :: sss_method
   integer, public                   :: airt_method
-
+  !WT New stuff as per email with SP 2017-12-22
+  integer, public                   :: albedo_method=-999, coolskin_method=-999 ! Implies case default.
 
   !!HK - make meteo_file public)
   character(len=255), public   :: meteo_file
@@ -671,6 +676,7 @@ contains
     ! !USES:
 
     use meanflow,     only:  gravity,rho_0,cp
+    use observations, only: extinct_method,chlo,abp_coe,bb
 
     IMPLICIT NONE
     !
@@ -701,9 +707,29 @@ contains
     double precision                  ::rr,zoq,zot,zL,L,psu,pst
     double precision                  ::usrold,tsrold,qsrold,conusr,contsr,conqsr
     double precision                  ::hsb,hlb,qout,dels,qcol,alq,xlamx
+    double precision                  ::f_c=0.
+! Formula coefficients for extinct_method = 12
+double precision                  :: C1(16) = &
+(/.026,-.009,-.015,-.003,.063,.278,3.91,16.64, &
+.033,-.01,-.019,-.006,.066,.396,7.68,51.27/)
+double precision                  :: C2(16) = &
+(/.112,.034,-.006,-.131,-.015,-.562,-12.91,-478.28, &
+.0,.0,.0,.0,.0,.0,.0,.0/)
+double precision                  :: C3(16) = &
+(/.0,.0,.0,.0,.0,.0,.0,.0, &
+-.025,-.007,-.003,-.004,.006,-.027,-2.49,13.14/)
+double precision                  :: C4(16) = &
+(/.366,.207,.188,.169,.082,1.02,16.62,736.56, &
+.419,.231,.195,.154,.066,.886,17.81,665.19/)
+
+! Parameters for extinct_method 12
+double precision		:: para_A,para_K
+! Parameters for extinct_method 13
+double precision              :: K_ir,K_vis,K1,K2
+
     integer                           ::iter
-    
-    integer                           ::i,ios,count=1,count2=1,count3=0
+
+    integer                           ::i,j,ios,count=1,count2=1,count3=0
 
     !
     !
@@ -737,7 +763,7 @@ contains
     END IF
     !SP end wind errors section
 
-    w = sqrt(wx*wx+wy*wy)
+    w = sqrt(wx*wx+wy*wy) ! wind speed
 
     !  set up fixed instrument levels
     zu=wind_h                 !height of wind measurement Arabian Sea
@@ -915,19 +941,175 @@ contains
        hsb=-rho_air*cpa*usr*tsr
        hlb=-rho_air*xlv*usr*qsr
        qout=rnl+hsb+hlb
-       dels=rns*(.065+11.*tkt-6.6e-5/tkt*(1.-dexp(-tkt/8.0e-4))) !Eq.16 Ohlmann 
-       qcol=qout-dels
-       alq=Al*qcol+be*hlb*cpw/xlv                      !Eq. 7 Buoy flux water
-       if(alq.gt.0.) then                              !originally (qcol.gt.0)
-          xlamx=6./(1.+(bigc*alq/usr**4)**.75)**.333      !Eq 13 Saunders coeff.
-          tkt=xlamx*visw/(sqrt(rho_air/rhow)*usr)          !Eq.11 Sublayer thickness
-       else
-          xlamx=6.                                      !prevent excessive warm skins
-          tkt=min(.01,xlamx*visw/(sqrt(rho_air/rhow)*usr)) !Limit tkt
-       end if
-       dter=qcol*tkt/tcw                                 ! Eq.12 Cool skin
+
+       ! calculate the fraction of solar radiation absorbed in the skin layer
+       ! this depends on extinction method
+        select case (extinct_method)
+
+        case(9)
+            !Eq. (16) from Fairall et al., 1996b, using the full Paulson & Simpson (1981) 9-band scheme
+            do j=1,9
+                f_c = f_c + fsen(j)*( 1 - (zdeta(j)/tkt)*(1-exp(-tkt/zdeta(j))) )
+            end do
+            dels=rns*f_c
+            f_c=0.
+
+        case(12)
+            !Eq. (7) in Ohlmann & Siegel (2000)
+            if(coszen.lt. 0.2588) then
+                coszen=0.2588
+            end if
+            if(cloud.gt.0.1) then
+                do j=1,4
+                    para_A=C1(j)*chlo+C2(j)*cloud+C4(j)
+                    para_K=C1(j+4)*chlo+C2(j+4)*cloud+C4(j+4)
+                    f_c = f_c + ( para_A*tkt - (para_A/para_K)*(1-exp(-para_K*tkt)) )/tkt
+                end do
+            else
+                do j=9,12
+                    para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
+                    para_K=C1(j+4)*chlo+(C3(j+4)/coszen)+C4(j+4)
+                    f_c = f_c + ( para_A*tkt - (para_A/para_K)*(1-exp(-para_K*tkt)) )/tkt
+                end do
+            end if
+            dels=(rns/(1.-albedo))*f_c  ! this scheme implicitly includes albedo
+            f_c=0.
+
+        case(13)
+            !uses Eq. (11) in Lee et al., 2005
+            K1 = (-0.057+0.482*sqrt(abp_coe)+4.221*bb)*(1+0.09*sin(acos(coszen)))
+            K2 = (0.183+0.702*abp_coe-2.567*bb)*(1.465-0.667*coszen)
+
+            !K_vis = K1+K2/sqrt(1+z)
+            !K_ir = (0.560+2.304/(0.001+z)**0.65)*(1+0.002*acos(coszen)*180/(3.1415926))
+            
+            !WT At sea surface, use z=0
+            K_vis = K1+K2
+            K_ir = (0.560+2.304/(0.001)**0.65)*(1+0.002*acos(coszen)*180/(3.1415926))
+            
+            
+            f_c = 1 - 0.576*exp(-K_ir*(tkt/2))+0.424*exp(-K_vis*(tkt/2))  ! crude numerical approx. of integral, i.e. 1-T(z=tkt/2)
+            dels=rns*f_c
+            f_c=0.
+
+        case(15)
+            !Eq. (16) from Fairall et al., 1996b, using the full Paulson & Simpson (1981) 9-band scheme
+            zdeta(1)=24.1;  ! Jerlov water type I
+            zdeta(2)=0.673; ! Jerlov water type I
+            !zdeta(1)=11;    ! Jerlov water type II
+            !zdeta(2)=0.664; ! Jerlov water type II
+            !zdeta(1)=6.54;  ! Jerlov water type III
+            !zdeta(2)=0.654; ! Jerlov water type III
+            !zdeta(1)=3.36;  ! Jerlov water type 1
+            !zdeta(2)=0.653; ! Jerlov water type 1
+            !zdeta(1)=2.27;  ! Jerlov water type 3
+            !zdeta(2)=0.645; ! Jerlov water type 3
+            !zdeta(1)=1.56;  ! Jerlov water type 5
+            !zdeta(2)=0.627; ! Jerlov water type 5
+            !zdeta(1)=1.13;  ! Jerlov water type 7
+            !zdeta(2)=0.606; ! Jerlov water type 7
+            !zdeta(1)=0.736;  ! Jerlov water type 9
+            !zdeta(2)=0.58; ! Jerlov water type 9
+            do j=1,9
+                f_c = f_c + fsen(j)*( 1 - (zdeta(j)/tkt)*(1-exp(-tkt/zdeta(j))) )
+            end do
+            dels=rns*f_c
+            f_c=0.
+
+        case(16)
+            !Eq. (16) from Fairall et al., 1996b, using the full Paulson & Simpson (1981) 9-band scheme
+            zdeta(1)=1/0.066;  ! Jerlov water type I
+            !zdeta(1)=1/0.076;  ! Jerlov water type IA
+            !zdeta(1)=1/0.088;  ! Jerlov water type IB
+            !zdeta(1)=1/0.132;  ! Jerlov water type II
+            !zdeta(1)=1/0.382;  ! Jerlov water type III
+            !zdeta(1)=1/0.49;   ! Jerlov water type 1
+            !zdeta(1)=1/0.7;    ! Jerlov water type 3
+            !zdeta(1)=1/1.0;    ! Jerlov water type 5
+            !zdeta(1)=1/1.09;   ! Jerlov water type 7
+            !zdeta(1)=1/1.6;    ! Jerlov water type 9
+            do j=1,9
+                f_c = f_c + fsen(j)*( 1 - (zdeta(j)/tkt)*(1-exp(-tkt/zdeta(j))) )
+            end do
+            dels=rns*f_c
+            f_c=0.0
+
+        case default
+
+            !Eq. (17) from Fairall et al., 1996b (an approximation of Paulson & Simpson (1981) 9-band scheme)
+            !f_c = .137+11.*tkt-6.6e-5/tkt*(1.-dexp(-tkt/8.0e-4))
+
+            !Eq. (17) from Fairall et al., 1996b, first term is changed based on suggestion by Wick et al., 2005 (who used the Ohlmann & Siegel (2000) scheme)
+            f_c = .067+11.*tkt-6.6e-5/tkt*(1.-dexp(-tkt/8.0e-4))
+
+            dels=rns*f_c
+            f_c=0.
+
+        end select
+
+!------ Coolskin parametrization options  ------------------------------------        
+        qcol=qout-dels
+        
+        if (qcol.le.0) then
+           !no cool-skin, we do not model a possible warm-skin
+           dter = 0
+        else
+           select case (coolskin_method) 
+           case (1)
+              !---------------------------------------- Artale et al (2002)    HX
+              !WT Split casing w.r.t to wind speed.
+              if (w.le.7.5) then
+                 xlamx = usr*von*86400/((0.2*w+0.5)*rhow*10*cpw*visw)
+              end if
+              if (w.gt.7.5.and.u10.lt.10) then
+                 xlamx = usr*von*86400/((1.6*w-10)*rhow*10*cpw*visw)
+              end if
+              if (w.ge.10) then
+                 xlamx = usr*von*86400/(6*rhow*10*cpw*visw)
+              end if
+              tkt=xlamx*visw/(sqrt(rho_air/rhow)*usr)
+              
+              !WT Seem to be common to Fairall et al (1996b) and Artale et al (2002).
+              dter=qcol*tkt/tcw                                 ! Cool skin (Eq. 13 in Fairall et al. (1996b))
+              !------------------------end Artale et al (2002)------------
+
+!---------------------------------------------------PS81  !HX
+!        xlamx = 6.5
+!        tkt=xlamx*visw/(sqrt(rho_air/rhow)*usr)
+!-----------------------end PS81-------------------------
+
+!---------------------------------------------------W85   !HX
+!        if (u10.le.7) then
+!           xlamx = 2+(5/7)*u10
+!        else
+!           xlamx = 7.
+!        end if
+!        tkt=xlamx*visw/(sqrt(rho_air/rhow)*usr)
+!----------------------end W85--------------------------
+
+          case default
+             !---------------------------------------- Fairall et al (1996b)
+             alq=Al*qcol+be*hlb*cpw/xlv                      !Eq. 8 in Fairall et al. (1996b)
+             if(alq.gt.0.) then                              !originally (qcol.gt.0)
+                xlamx=6./(1.+(bigc*alq/usr**4)**.75)**.333      !Eq 14 Saunders coeff.
+                tkt=xlamx*visw/(sqrt(rho_air/rhow)*usr)          !Eq.12 Sublayer thickness
+             else
+                xlamx=6.                                      !prevent excessive warm skins
+                tkt=min(.01,xlamx*visw/(sqrt(rho_air/rhow)*usr)) !Limit tkt
+             end if
+             dter=qcol*tkt/tcw                                 ! Cool skin (Eq. 13 in Fairall et al. (1996b))
+             !------------------------end Fairall et al (1996b)------------
+            
+         end select
+
+         end if
+         
        dqer=wetc*dter
 
+
+       !WT Following should be immediately after computations of conusr, contsr, conqsr
+       ! for readability up to the second 'continue' statement (jump out point)
+       
        !(sxj) check for convergence and leave loop if met
        IF((iter==iter_max).AND.(max(abs(conusr),abs(contsr),abs(conqsr)).gt.err_max)) THEN
           PRINT*,'convergence error: consur, constr, conqsr = ', conusr, contsr, conqsr
@@ -1196,6 +1378,7 @@ contains
        !  (hence the same latitudinal band of the Mediterranean Sea).
        !
        ! !USES:
+       use observations, only: chlo
        IMPLICIT NONE
        !
        ! !INPUT PARAMETERS:
@@ -1263,6 +1446,23 @@ contains
             88.,90./)
        !
        !
+!-----------------Albedo Options-------------------------HX
+        double precision             ::fmiusigma,alphasdif,alphasdir,coszent,rpara,rperp,Rtotal,sigma,n_a,n_o,f_dir,f_dif
+        double precision         ::sigmasquare,wind,fwc,albedoe,para_A,Trans_1
+        integer                   ::j
+        double precision                  :: C1(16) = &
+            (/.026,-.009,-.015,-.003,.063,.278,3.91,16.64, &
+            .033,-.01,-.019,-.006,.066,.396,7.68,51.27/)
+        double precision                  :: C2(16) = &
+            (/.112,.034,-.006,-.131,-.015,-.562,-12.91,-478.28, &
+            .0,.0,.0,.0,.0,.0,.0,.0/)
+        double precision                  :: C3(16) = &
+            (/.0,.0,.0,.0,.0,.0,.0,.0, &
+            -.025,-.007,-.003,-.004,.006,-.027,-2.49,13.14/)
+        double precision                  :: C4(16) = &
+            (/.366,.207,.188,.169,.082,1.02,16.62,736.56, &
+            .419,.231,.195,.154,.066,.886,17.81,665.19/)
+!-------------------------------------------HX
        !-----------------------------------------------------------------------
        !BOC
 
@@ -1403,12 +1603,15 @@ contains
        !(Rosati(88) eq. 3.4 :
        !coszen =sin(alat)*sin(sundec)+cos(alat)*cos(sundec)*cos(thsun)
        coszen =sin(alat)*sin(decl)+cos(alat)*cos(decl)*cos(ha) ! ha, decl not needed anymore from now on
+
+       !SH  calculate cosine of angle of direct refracted entrant radiation 
+       cosr = cos(asin((3./4.)*sin(acos(coszen)))) !WT An output as a public variable for unspecified use.
+
        !WT 20170316 Consider moving the above to time.f90 or a new solar.f90 for later reuse (e.g. assimilation
        ! at sunrise or sunset, compare the SST turnaround times with solar sunrise and sunset...)
        !We could also use NREL's solpos C code also if we know how to recompile everything in separate dynamic linkable
        !library files. 
        
-
        if (coszen .le. 0.0) then
           coszen = 0.0           !SP-this is when sun is below horizon
           qatten = 0.0           !i.e between dusk and dawn
@@ -1439,22 +1642,107 @@ contains
        sunbet=sin(alat)*sin(eclips*sin(tjul))+cos(alat)*cos(eclips*sin(tjul))
        !  solar noon altitude in degrees :
        sunbet = asin(sunbet)*rad2deg
+      
+! --------------------------------- Albedo parametrization options ---------------
+       select case (albedo_method)
 
-       !  calculates the albedo as a function of sun altitude :
-       !  (after Payne jas 1972)
-       !  solar zenith angle in degrees :
-       zen=(180./pi)*acos(coszen)
-       !  sun altitude :
-       altitude=90.-zen
+       case (1)
+          !---------------------------------------- Ohlmann & Siegel (2000)
+          !WT The O-S. formula implicitly includes surface albedo, and when evaluated at z=0 gives surface albedo.
 
-       jab=0.5*altitude + 1.
+          ! code by HX
+          if(cloud.gt.0.1) then
+             do j=1,4
+                para_A=C1(j)*chlo+C2(j)*cloud+C4(j)
+                Trans_1 = Trans_1 + para_A
+             end do
+          else
+             do j=9,12
+                if(coszen.lt. 0.2588) then
+                   coszen=0.2588
+                end if
+                para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
+                Trans_1 = Trans_1+para_A
+             end do
+          end if
+          albedo = 1 - Trans_1
 
-       !linear interpolation
-       albedo=alb1(jab)+.5*(alb1(jab+1)-alb1(jab))*(altitude-alt(jab))      
+          ! WT The above should be equivalent to the following, if the function is properly imported from
+          ! the temperature subroutine under meanflow module. But we better wait until a better organization
+          ! of code.
+          !albedo = trans(0,extinct_method)
+          !---------------------------------------- end Ohlmann & Siegel (2000)
 
-       !SH  calculate cosine of angle of direct refracted entrant radiation 
-       cosr = cos(asin((3./4.)*sin(acos(coszen))))
+          case (2)
+             !---------------------------------------- Jin et al. (2011)
+             !new albedo calculation for broadband from Jin(2011) (HX 30/05/2017)
+             n_a = 1.               !refractive index of air
+             n_o = 1.34             !refractive index of seawater
+             f_dir = 0.7            !coefficient for direct radiance
+             f_dif = 0.3            !coefficient for diffuse radiance
+             
+             if (qtot.gt.0) then
+                if (coszen==0.0) then
+                   coszent=0.0
+                   albedo=0.0
+                else
+                   coszent = abs(cos(abs(asin(abs(sin(abs(acos(coszen))))*n_a/n_o))))
+                   rpara = (n_a*coszen-n_o*coszent)/(n_a*coszen+n_o*coszent)     !Fresnel's equations for reflection
+                   rperp = (n_o*coszen-n_a*coszent)/(n_o*coszen+n_a*coszent)
+                   
+                   Rtotal = 0.5*(rpara**2. + rperp**2.)    !Unpolarised light
+                   wind = sqrt(wx_obs**2.+wy_obs**2.)
+                   if (wind.eq.0) then
+                      sigmasquare = 0
+                      sigma = 0
+                   else
+                      sigmasquare = 0.003+0.00512*wind                  !equ.2
+                      sigma = sqrt(sigmasquare)
+                   end if
+                   
+                   fmiusigma = (0.0152-1.7873*coszen+6.8972*coszen**2.0  &
+                        - 8.5778*coszen**3.0+4.071*sigma-7.6446*coszen*sigma) &
+                        *exp(0.1643-7.8409*coszen-3.5639*coszen**2.0-2.3588*sigma  &
+                        +10.0538*coszen*sigma)                                         !equ.4
+                   
+                   alphasdir = Rtotal-fmiusigma
+                   if (cloud.eq.0) then
+                      alphasdif = -0.1482-0.012*sigma+0.1608*n_o-0.0193*n_o*sigma    !equ.5a
+                   else
+                      alphasdif = -0.1479+0.1502*n_o-0.0176*n_o*sigma                !equ.5b
+                   end if
+                   
+                   albedo = f_dir*alphasdir+f_dif*alphasdif+0.006                   !equ.15
+                   
+                   ! foam corrected alternative
+                   !fwc = 2.95e-6*wind**3.52                                          !equ.16
+                   !albedoe = 0.55*fwc+albedo*(1-fwc)    !foam corrected albedo  (Koepkw,1984)    !equ.17
+               !       albedo = qdir_frac*alphasdir+qdiff_frac*alphasdif+0.006  !?
 
+                end if
+
+             else
+                albedo = 0.
+             end if
+             !---------------------------------------- end Jin et al. (2011)
+             
+          case default
+             !------------------------------------- Payne (1972)
+             !  calculates the albedo as a function of sun altitude :
+             !  (after Payne jas 1972)
+             !  solar zenith angle in degrees :
+             zen=(180./pi)*acos(coszen)
+             !  sun altitude :
+             altitude=90.-zen
+             
+             jab=0.5*altitude + 1.
+             
+             !linear interpolation
+             albedo=alb1(jab)+.5*(alb1(jab+1)-alb1(jab))*(altitude-alt(jab))      
+             !-------------------------------------- end Payne (1972)
+          end select
+! --------------------------------- End albedo parametrization options ------------
+          
        !  radiation as from Reed(1977), Simpson and Paulson(1979)
        !  calculates SHORT WAVE FLUX ( watt/m*m )
        !  Rosati,Miyakoda 1988 ; eq. 3.8

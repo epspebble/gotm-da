@@ -9,6 +9,9 @@
 
 !------------------------------------------------------------
 
+
+!WT Part of the 'meanflow' module.
+
 !------------------------------------------------------------
 subroutine temperature(nlev,dt,cnpar,I_0,heat,advect,qdir_frac,qdiff_frac,cosr,nuh,rad)
   !
@@ -128,14 +131,16 @@ subroutine temperature(nlev,dt,cnpar,I_0,heat,advect,qdir_frac,qdiff_frac,cosr,n
   !
   !EOP
   !
+    
   ! !LOCAL VARIABLES:
   integer                   :: i,j,Bcup,Bcdw,flag
+  double precision          :: trans ! From function
   ! SH removed Qsource from local since now public for output 22/10/2003 @ 15:00
   !   double precision          :: Qsour(0:nlev) 
   double precision          :: Tup,Tdw,z
   logical                   :: surf_flux,bott_flux
   double precision		:: absfac_dir=0.,absfac_diff=0.
-  double precision          :: trans !WT Solar transmission rate for case 12, 13, 14
+  
   !
   !-----------------------------------------------------------------------
   !BOC
@@ -280,8 +285,50 @@ subroutine temperature(nlev,dt,cnpar,I_0,heat,advect,qdir_frac,qdiff_frac,cosr,n
         else
            rad(i) = I_0*trans(z,extinct_method)/(rho_0*cp)                    
         end if
-       
-     case default 
+
+     case (15)
+        ! same as case (9) [Paulson & Simpson (1981)], except change the first two absorption coefficients based on data from Verevochkin & Startsev, J. Fluid Mech. (2005).
+        zdeta(1)=24.1;  ! Jerlov water type I
+        zdeta(2)=0.673; ! Jerlov water type I
+        !zdeta(1)=11;    ! Jerlov water type II
+        !zdeta(2)=0.664; ! Jerlov water type II
+        !zdeta(1)=6.54;  ! Jerlov water type III
+        !zdeta(2)=0.654; ! Jerlov water type III
+        !zdeta(1)=3.36;  ! Jerlov water type 1
+        !zdeta(2)=0.653; ! Jerlov water type 1
+        !zdeta(1)=2.27;  ! Jerlov water type 3
+        !zdeta(2)=0.645; ! Jerlov water type 3
+        !zdeta(1)=1.56;  ! Jerlov water type 5
+        !zdeta(2)=0.627; ! Jerlov water type 5
+        !zdeta(1)=1.13;  ! Jerlov water type 7
+        !zdeta(2)=0.606; ! Jerlov water type 7
+        !zdeta(1)=0.736;  ! Jerlov water type 9
+        !zdeta(2)=0.58; ! Jerlov water type 9
+        do j=1,9
+            absfac_dir=absfac_dir+fsen(j)*exp(-z/(zdeta(j)))
+        end do
+        rad(i)=I_0*absfac_dir/(rho_0*cp)
+        absfac_dir=0.
+
+    case (16)
+        ! same as case (9) [Paulson & Simpson (1981)], except change the first absorption coefficient based on data from Soloviev & Schlussel, Boundary-Layer Meteorology (1996).
+        zdeta(1)=1/0.066;  ! Jerlov water type I
+        !zdeta(1)=1/0.076;  ! Jerlov water type IA
+        !zdeta(1)=1/0.088;  ! Jerlov water type IB
+        !zdeta(1)=1/0.132;  ! Jerlov water type II
+        !zdeta(1)=1/0.382;  ! Jerlov water type III
+        !zdeta(1)=1/0.49;   ! Jerlov water type 1
+        !zdeta(1)=1/0.7;    ! Jerlov water type 3
+        !zdeta(1)=1/1.0;    ! Jerlov water type 5
+        !zdeta(1)=1/1.09;   ! Jerlov water type 7
+        !zdeta(1)=1/1.6;    ! Jerlov water type 9
+        do j=1,9
+            absfac_dir=absfac_dir+fsen(j)*exp(-z/(zdeta(j)))
+        end do
+        rad(i)=I_0*absfac_dir/(rho_0*cp)
+        absfac_dir=0.
+
+     case default
         ! extinct_methods 1-7 - these are defined in observations.f90
         ! leave out diffuse / direct discrimination
 
@@ -408,11 +455,11 @@ double precision function trans(z,extinct_method)
      K2 = (0.183+0.702*abp_coe-2.567*bb)*(1.465-0.667*coszen) 
      K_vis = K1+K2/sqrt(1+z)
      K_ir = (0.560+2.304/(0.001+z)**0.65)*(1+0.002*acos(coszen)*180/(3.1415926))
-     IF (z.gt. 3.0) then  ! E_IR is absorbed within the layer of top 3m.   
-        trans = 0.424*exp(-K_vis*z)            
-     ELSE
+     !IF (z.gt. 3.0) then  ! E_IR is absorbed within the layer of top 3m.
+     !   trans = 0.424*exp(-K_vis*z)
+     !ELSE
         trans = 0.576*exp(-K_ir*z)+0.424*exp(-K_vis*z)
-     end if
+     !end if
 
   case (14)
      A1 = 0.0268*log(chlo) + 0.5581                 !version for including albedo

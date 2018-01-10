@@ -9,6 +9,9 @@
 
 !------------------------------------------------------------
 
+
+!WT Part of the 'meanflow' module.
+
 !------------------------------------------------------------
 subroutine temperature(nlev,dt,cnpar,I_0,heat,advect,qdir_frac,qdiff_frac,cosr,nuh,rad)
   !
@@ -128,14 +131,16 @@ subroutine temperature(nlev,dt,cnpar,I_0,heat,advect,qdir_frac,qdiff_frac,cosr,n
   !
   !EOP
   !
+    
   ! !LOCAL VARIABLES:
   integer                   :: i,j,Bcup,Bcdw,flag
+  double precision          :: trans ! From function
   ! SH removed Qsource from local since now public for output 22/10/2003 @ 15:00
   !   double precision          :: Qsour(0:nlev) 
   double precision          :: Tup,Tdw,z
   logical                   :: surf_flux,bott_flux
   double precision		:: absfac_dir=0.,absfac_diff=0.
-  double precision          :: trans !WT Solar transmission rate for case 12, 13, 14
+  
   !
   !-----------------------------------------------------------------------
   !BOC

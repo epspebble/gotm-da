@@ -517,7 +517,7 @@
       case (7)
          A=0.7;g1=0.40;g2=8.0 ! Adolf Stips - Lago Maggiore
 
-      case (8,9,10,11)
+      case (8,9,10,11,15,16)
          !WT 20171031 Variants of 9 stream solar transmission, Paulson-Simpson (1931).
          !The actual computations are done in temperature.f90, in the temperature() subroutine.    
          write(0,*) 'Using 9-stream solar transmission [Paulson & Simpson, 1981]', &
