@@ -144,19 +144,30 @@ run_profiles = {
     # * 'albedo_method', default is the built-in Payne (1972)
     # * 'coolskin_method', default is Fairall (1996a)
     # Recall also that 'extinct_method' default is Jerlov water type I (1976)
-    'ASM3.1a-75m': dict(albedo_method = 1, # Ohlmann-Siegel (2000)'s approximation
-                        extinct_method = 12, extinct_file='chlo.dat',
+    'ASM3.1a-75m': dict(albedo_method = 1, albedo_file = 'chlo.dat', # Ohlmann-Siegel (2000)'s approximation
+                        extinct_method = 12, extinct_file = 'chlo.dat',
                         coolskin_method = 1, # Artale (2002)
+                        assimilation_type=2, assim_window=1,
+                        depth = 74.539324233308434, nlev = 122,
                         grid_method = 2, grid_file = 'grid_75m.dat'),
-    'ASM4.1-75m': dict(albedo_method = 1, # Ohlmann-Siegel (2000)'s approximation
-                       extinct_method = 16, # Paulson-Simption 9-band with coefficients modified to that of Jerlov I water-type
+    'ASM4.1-75m': dict(albedo_method = 1, albedo_file = 'chlo.dat', # Ohlmann-Siegel (2000)'s approximation
+                       extinct_method = 15, # Paulson-Simption 9-band with Jerlov type I modification due to Verevochkin & Startsev, J. Fluid Mech. (2005)
+                       coolskin_method = 0, # Fairall (1996a)
                        # No extinct_file needed
+                       assimilation_type=2, assim_window=1,
+                       depth = 74.539324233308434, nlev = 122,
                        grid_method = 2, grid_file = 'grid_75m.dat'),
-    'ASM5.1-75m': dict(albedo_method = 1, # Ohlmann-Siegel (2000)'s approximatio
+    'ASM5.1-75m': dict(albedo_method = 1, albedo_file = 'chlo.dat', # Ohlmann-Siegel (2000)'s approximatio
                        extinct_method = 13, extinct_file='iop.dat',
+                       coolskin_method = 0, # Fairall (1996a)
+                       assimilation_type=2, assim_window=1,
+                       depth = 74.539324233308434, nlev = 122,
                        grid_method = 2, grid_file = 'grid_75m.dat'),
     'ASM5.2-75m': dict(albedo_method = 2, # Jin et al. (2011)
                        extinct_method = 13, extinct_file='iop.dat',
+                       coolskin_method = 0, # Fairall (1996a)
+                       assimilation_type=2, assim_window=1,
+                       depth = 74.539324233308434, nlev = 122,
                        grid_method = 2, grid_file = 'grid_75m.dat'),
     
 }
@@ -689,8 +700,8 @@ def prepare_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or 
             dat_list.remove('sprof')
     if ('extinct_method' in gotm_user_args):
         em = gotm_user_args['extinct_method']
-        if em <= 11:
-            pass # Either Jerlov or Paulson. Data file not needed.
+        if em <= 11 or em == 15 or em == 16:
+            pass # Either Jerlov or variants of Paulson-Simpson. Data file not needed.
         elif em == 12:
             dat_list.append('chlo')
         elif em == 13:
