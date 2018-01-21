@@ -296,10 +296,17 @@ contains
     ! silently run it!
     !------------------------------------------------------------------------
     select case (albedo_method)
+    case (0)
+       write(0,*) '       ', 'Using default albedo calculation by table due to Payne (1976).'
+       write(0,*) '       ', ' No external data needed.'
     case (1)
        open(albedo_unit,file=albedo_file,action='read',status='old',err=100)
+       write(0,*) '       ', 'Using the implicit albedio due to Ohlmann-Siegel (2000).'
        write(0,*) '       ', 'Chlorophyll-a data requied for computing Ohlmann-Siegel (2000) albedo. Reading from:'
        write(0,*) '           ', trim(albedo_file)
+    case (2)
+       write(0,*) '       ', 'Using four-component albedo by Jin et al. (2011).'
+       write(0,*) '       ', '   No external data needed.'
     case default
        print *, 'Unexpected albedo_method = ', albedo_method
        stop 'NotImplementedError'
@@ -343,7 +350,7 @@ contains
     case (FROMFILE)
        open(p_e_unit,file=p_e_flux_file,action='read', &
             status='old',err=95)
-       write(0,*) '       ', 'Reading precipitatio/evaporation data from:'
+       write(0,*) '       ', 'Reading precipitation / evaporation data from:'
        write(0,*) '           ', trim(p_e_flux_file)
     case default
     end select
@@ -1476,7 +1483,7 @@ double precision              :: K_ir,K_vis,K1,K2
        !
        !
 !-----------------Albedo Options-------------------------HX
-        double precision             ::fmiusigma,alphasdif,alphasdir,coszent,rpara,rperp,Rtotal,sigma,n_a,n_o,f_dir,f_dif
+        double precision             ::fmiusigma,alphasdif,alphasdir,sinzent,sinzen,coszent,rpara,rperp,Rtotal,sigma,n_a,n_o,f_dir,f_dif
         double precision         ::sigmasquare,wind,fwc,albedoe,para_A,Trans_1
         integer                   ::j
         double precision                  :: C1(16) = &
@@ -1674,6 +1681,21 @@ double precision              :: K_ir,K_vis,K1,K2
       
 ! --------------------------------- Albedo parametrization options ---------------
        select case (albedo_method)
+          
+       case (0)
+          !------------------------------------- Payne (1972)
+          !  calculates the albedo as a function of sun altitude :
+          !  (after Payne jas 1972)
+          !  solar zenith angle in degrees :
+          zen=(180./pi)*acos(coszen)
+          !  sun altitude :
+          altitude=90.-zen
+          
+          jab=0.5*altitude + 1.
+          
+          !linear interpolation
+          albedo=alb1(jab)+.5*(alb1(jab+1)-alb1(jab))*(altitude-alt(jab))      
+          !-------------------------------------- end Payne (1972)
 
        case (1)
           !---------------------------------------- Ohlmann & Siegel (2000)
@@ -1702,77 +1724,71 @@ double precision              :: K_ir,K_vis,K1,K2
           !albedo = trans(0,extinct_method)
           !---------------------------------------- end Ohlmann & Siegel (2000)
 
-          case (2)
-             !---------------------------------------- Jin et al. (2011)
-             !new albedo calculation for broadband from Jin(2011) (HX 30/05/2017)
-             n_a = 1.               !refractive index of air
-             n_o = 1.34             !refractive index of seawater
-             f_dir = 0.7            !coefficient for direct radiance
-             f_dif = 0.3            !coefficient for diffuse radiance
-             
-             if (qtot.gt.0) then
-                if (coszen==0.0) then
-                   coszent=0.0
-                   albedo=0.0
-                else
-                   ! WT This seems overly complicated, e.g. acos is nonnegative, why abs?.
-                   ! I think abs(sin(abs(acos(coszen)))) = sqrt(1-coszen**2)
-                   coszent = abs(cos(abs(asin(abs(sin(abs(acos(coszen))))*n_a/n_o))))
-                   rpara = (n_a*coszen-n_o*coszent)/(n_a*coszen+n_o*coszent)     !Fresnel's equations for reflection
-                   rperp = (n_o*coszen-n_a*coszent)/(n_o*coszen+n_a*coszent)
-                   
-                   Rtotal = 0.5*(rpara**2. + rperp**2.)    !Unpolarised light
-                   wind = sqrt(wx_obs**2.+wy_obs**2.)
-                   if (wind.eq.0) then
-                      sigmasquare = 0
-                      sigma = 0
-                   else
-                      sigmasquare = 0.003+0.00512*wind                  !equ.2
-                      sigma = sqrt(sigmasquare)
-                   end if
-                   
-                   fmiusigma = (0.0152-1.7873*coszen+6.8972*coszen**2.0  &
-                        - 8.5778*coszen**3.0+4.071*sigma-7.6446*coszen*sigma) &
-                        *exp(0.1643-7.8409*coszen-3.5639*coszen**2.0-2.3588*sigma  &
-                        +10.0538*coszen*sigma)                                         !equ.4
-                   
-                   alphasdir = Rtotal-fmiusigma
-                   if (cloud.eq.0) then
-                      alphasdif = -0.1482-0.012*sigma+0.1608*n_o-0.0193*n_o*sigma    !equ.5a
-                   else
-                      alphasdif = -0.1479+0.1502*n_o-0.0176*n_o*sigma                !equ.5b
-                   end if
-                   
-                   albedo = f_dir*alphasdir+f_dif*alphasdif+0.006                   !equ.15
-                   
-                   ! foam corrected alternative
-                   !fwc = 2.95e-6*wind**3.52                                          !equ.16
-                   !albedoe = 0.55*fwc+albedo*(1-fwc)    !foam corrected albedo  (Koepkw,1984)    !equ.17
-               !       albedo = qdir_frac*alphasdir+qdiff_frac*alphasdif+0.006  !?
-
-                end if
-
+       case (2)
+          !---------------------------------------- Jin et al. (2011)
+          !new albedo calculation for broadband from Jin(2011) (HX 30/05/2017)
+          n_a = 1.               !refractive index of air
+          n_o = 1.34             !refractive index of seawater
+          f_dir = 0.7            !coefficient for direct radiance
+          f_dif = 0.3            !coefficient for diffuse radiance
+          
+          if (qtot.gt.0) then
+             if (coszen==0.0) then
+                coszent=0.0
+                albedo=0.0
              else
-                albedo = 0.
+                ! WT This seems overly complicated, e.g. acos is nonnegative, why abs?.
+                ! I think abs(sin(abs(acos(coszen)))) = sqrt(1-coszen**2)
+                !coszent = abs(cos(abs(asin(abs(sin(abs(acos(coszen))))*n_a/n_o))))
+                ! WT 20180120 Make the formula more transparent...
+                sinzen = sqrt(1-coszen**2)
+                sinzent = sinzen*n_a/n_o
+                coszent = sqrt(1-sinzent**2)
+                
+                rpara = (n_a*coszen-n_o*coszent)/(n_a*coszen+n_o*coszent)     !Fresnel's equations for reflection
+                rperp = (n_o*coszen-n_a*coszent)/(n_o*coszen+n_a*coszent)
+                
+                Rtotal = 0.5*(rpara**2. + rperp**2.)    !Unpolarised light
+                wind = sqrt(wx_obs**2.+wy_obs**2.)
+                if (wind.eq.0) then !WT maybe revise where to split case.
+                   sigmasquare = 0
+                   sigma = 0
+                else
+                   sigmasquare = 0.003+0.00512*wind                  !equ.2
+                   sigma = sqrt(sigmasquare)
+                end if
+                
+                fmiusigma = (0.0152-1.7873*coszen+6.8972*coszen**2.0  &
+                     - 8.5778*coszen**3.0+4.071*sigma-7.6446*coszen*sigma) &
+                     *exp(0.1643-7.8409*coszen-3.5639*coszen**2.0-2.3588*sigma  &
+                     +10.0538*coszen*sigma)                                         !equ.4
+                
+                alphasdir = Rtotal-fmiusigma
+                if (cloud.eq.0) then !WT maybe revise where to split case.
+                   alphasdif = -0.1482-0.012*sigma+0.1608*n_o-0.0193*n_o*sigma    !equ.5a !WT last coefficient is -0.0244 from p.5
+                else
+                   alphasdif = -0.1479+0.1502*n_o-0.0176*n_o*sigma                !equ.5b
+                end if
+                
+                albedo = f_dir*alphasdir+f_dif*alphasdif+0.006                   !equ.15
+                
+                ! foam corrected alternative
+                !fwc = 2.95e-6*wind**3.52                                          !equ.16
+                !albedoe = 0.55*fwc+albedo*(1-fwc)    !foam corrected albedo  (Koepkw,1984)    !equ.17
+                !       albedo = qdir_frac*alphasdir+qdiff_frac*alphasdif+0.006  !?
+                
              end if
-             !---------------------------------------- end Jin et al. (2011)
              
-          case default
-             !------------------------------------- Payne (1972)
-             !  calculates the albedo as a function of sun altitude :
-             !  (after Payne jas 1972)
-             !  solar zenith angle in degrees :
-             zen=(180./pi)*acos(coszen)
-             !  sun altitude :
-             altitude=90.-zen
-             
-             jab=0.5*altitude + 1.
-             
-             !linear interpolation
-             albedo=alb1(jab)+.5*(alb1(jab+1)-alb1(jab))*(altitude-alt(jab))      
-             !-------------------------------------- end Payne (1972)
-          end select
-! --------------------------------- End albedo parametrization options ------------
+          else
+             albedo = 0.
+          end if
+          !---------------------------------------- end Jin et al. (2011)
+          
+       case default
+          stop 'NotImplementedError'
+          
+       end select
+       ! --------------------------------- End albedo parametrization options ------------
           
        !  radiation as from Reed(1977), Simpson and Paulson(1979)
        !  calculates SHORT WAVE FLUX ( watt/m*m )
