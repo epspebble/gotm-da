@@ -39,7 +39,7 @@
   ddu=          3.0,
   ddl=          0.,
   grid_method=  0,
-  grid_file=    'new_grid.dat',
+  grid_file=    'grid.dat',
   rho_0=        1025.,
   cp=           3994.,
   avmolu=       1.2e-6,

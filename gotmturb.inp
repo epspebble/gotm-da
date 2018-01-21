@@ -94,7 +94,7 @@
   lbc_type=	1
  /
 !-------------------------------------------------------------------------------
-! What turbulence parameters have been described?
+! What turbulence parameters have been described?
 !
 ! cm0_fix=      value of cm0, if stab_method=11-14
 ! Prandtl0_fix= value of the turbulent Prandtl-number, if stab_method=11-14

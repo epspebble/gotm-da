@@ -6,21 +6,21 @@
   buoy_method=           1,
  /
  &station
-  name=                  "SUB"
-  latitude=              26.0,
-  longitude=             -29.0,
-  depth=                 150.0,
+  name=                  "STATION_NAME"
+  latitude=              STATION_LAT,
+  longitude=             STATION_LON,
+  depth=                 150,
  /
  &time
   timefmt=               2,
   MaxN=                  800,
-  start=                 "1991-06-24 00:00:00",
-  stop=                  "1993-06-16 00:00:00",
+  start=                 "RUN_START",
+  stop=                  "RUN_END",
  /
  &output
   out_fmt=               2,
   out_dir=               ".",
-  out_fn=                "../RESULTS/SUB/6hourly",
+  out_fn=                "results",
   nsave=                 120,
   variances=             .false.,
   diagnostics=           .false.,
@@ -34,6 +34,8 @@
   profile_obs=           1,
   obs_level=             145,
   assim_window=          1,
+  daily_stat_fn=	 "daily_stat.dat"
+  sst_event_fn=		 "sst_event.dat"
  /
  &eqstate
   eq_state_method=       1,
