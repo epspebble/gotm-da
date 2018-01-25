@@ -605,8 +605,11 @@ contains
                 day_cycle = 0
              else
                 ! Check whether the assimilation was done or not every day for
-                ! assim_window that depend on local day cycle, currently 0 (local midnight) and 1 (local sunrise).
-                if ((mark.ne.1) .and. (assim_window.lt.2))then
+                ! assim_window that depend on local day cycle, currently:
+                ! 0 (local midnight) and
+                ! 1 (local sunrise), AND
+                ! 2 (data timestamp)
+                if ((mark.ne.1) .and. (assim_window.le.2)) then
                    stop "Assimilation not performed in one full cycle. STOP"
                 endif
 
