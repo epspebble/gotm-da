@@ -674,24 +674,11 @@
 
    call get_int_pressure(int_press_method,int_press_unit,julday,secs,nlev,z)
 
-   if(extinct_method .eq. 0) then
+   select case(extinct_method)
+   case (0,12,13,14) ! WT See read_extinct.f90
       call read_extinction(extinct_unit,julday,secs,extinct_method)
-   end if
-
-   !WT For 'extincti_method' equalling 12, 13, 14. See read_extinct.f90
-   if(extinct_method .ge. 12) then
-      call read_extinction(extinct_unit,julday,secs,extinct_method)
-   end if
-   
-   ! if(extinct_method .eq. 12) then
-   !    call read_chlo(extinct_unit,julday,secs)
-   ! end if
-   ! if(extinct_method .eq. 13) then
-   !    call read_IOP(extinct_unit,julday,secs)
-   ! end if
-   ! if(extinct_method .eq. 14) then
-   !    call read_chlo(extinct_unit,julday,secs)
-   ! end if
+   case default
+   end select
    
    call get_w_adv(w_adv_method,w_adv_unit,julday,secs)
 
