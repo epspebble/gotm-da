@@ -1729,6 +1729,10 @@ double precision              :: K_ir,K_vis,K1,K2
           !new albedo calculation for broadband from Jin(2011) (HX 30/05/2017)
           n_a = 1.               !refractive index of air
           n_o = 1.34             !refractive index of seawater
+
+          !WT Wouldn't this fraction correlates strongly with our cloud fraction (and coszen as well)? i.e.
+          ! when sky is clear, f_dir is close to 1, and during overcast, f_dir might be close to 0.
+          ! Compare last rows of Fig.8, Fig.9.
           f_dir = 0.7            !coefficient for direct radiance
           f_dif = 0.3            !coefficient for diffuse radiance
           
@@ -1765,8 +1769,9 @@ double precision              :: K_ir,K_vis,K1,K2
                 
                 alphasdir = Rtotal-fmiusigma
                 if (cloud.eq.0) then !WT maybe revise where to split case.
+                   ! WT For "clear-sky" according to Jin et al.
                    alphasdif = -0.1482-0.012*sigma+0.1608*n_o-0.0193*n_o*sigma    !equ.5a !WT last coefficient is -0.0244 from p.5
-                else
+                else ! WT For "overcast" condition according to Jin et al.
                    alphasdif = -0.1479+0.1502*n_o-0.0176*n_o*sigma                !equ.5b
                 end if
                 
