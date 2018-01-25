@@ -16,7 +16,56 @@ from netCDF4 import Dataset, MFDataset, num2date, date2num
 from numpy import loadtxt
 from numpy.ma import masked_all, masked_invalid, masked_equal
 from datetime import date, datetime, timedelta
-    
+
+def print_usage():
+    print('Usage: ' + sys.argv[0] + ' <grid> <run> <GOTM_version> <year> [month] [--biannual={True|False}]')
+    sys.exit(0)
+
+def get_args():
+    if len(sys.argv) < 5:
+        print_usage()
+    else:
+        grid,run,ver,year = sys.argv[1:5]
+        year = int(year)
+        
+    if len(sys.argv) >= 6:
+        month = int(sys.argv[5])
+        unparsed_kwargs = sys.argv[6:]
+    else:
+        month = None
+        unparsed_kwargs = None
+
+    # Maybe don't reinvent the wheel... see: https://docs.python.org/3/library/argparse.html
+    kwargs_syntax = dict(biannual=bool)
+    kwargs = dict()
+    if unparsed_kwargs:
+        for each in unparsed_kwargs:
+            sep = each.find('=') # returns -1 if not found
+            if each[:2] != '--' or sep == -1: 
+                print('Invalid argument: ' + each)
+                print_usage()
+            else:
+                key = each[:sep]
+                val = each[sep+1:]
+                try:
+                    val_type = kwargs_syntax(key)
+                    kwargs[key] = val_type(val)
+                except Exception as e:
+                    print(e)
+                    print_usage()
+    return grid, run, ver, year, month, kwargs
+
+### Getting a configured medsea module instance.
+# This was a portion of original main program brought forward.
+if __name__=='__main__':
+    from pyGOTM import medsea
+    grid, run, ver, year, month, kwargs = get_args()
+    medsea.set_grid(grid)
+    medsea.run = run
+    medsea.ver = ver
+
+### End setting the medsea module instance into this global namespace.
+
 def hour_range(year,month=None,skip_year_end=False):
     if month is None:
         first = datetime(year,1,1,1,0,0)
@@ -36,7 +85,9 @@ def hour_range(year,month=None,skip_year_end=False):
     hours = [first + timedelta(hours=i) for i in range(nrec)]
     return hours
 
-def read_results(varnames,year,month=None,skip_year_end=False):
+def read_results(varnames,year,
+#                 medsea, # temporary hack to pass on configs
+                 month=None,skip_year_end=False):
     fn = 'results_{0.run}_{0.GOTM_version}.nc'.format(medsea)
     
     hours = hour_range(year,month=month,skip_year_end=skip_year_end)
@@ -381,52 +432,10 @@ def combine_stat(*args,biannual=False):
         print('Done writing out data to {:s}.'.format(outfn))
         elapsed += medsea.toc()
 
-def print_usage():
-    print('Usage: ' + sys.argv[0] + ' <grid> <run> <GOTM_version> <year> [month] [--biannual={True|False}]')
-    sys.exit(0)
-
-def get_args():
-    if len(sys.argv) < 5:
-        print_usage()
-    else:
-        grid,run,ver,year = sys.argv[1:5]
-        year = int(year)
-        
-    if len(sys.argv) >= 6:
-        month = int(sys.argv[5])
-        unparsed_kwargs = sys.argv[6:]
-    else:
-        month = None
-        unparsed_kwargs = None
-
-    # Maybe don't reinvent the wheel... see: https://docs.python.org/3/library/argparse.html
-    kwargs_syntax = dict(biannual=bool)
-    kwargs = dict()
-    if unparsed_kwargs:
-        for each in unparsed_kwargs:
-            sep = each.find('=') # returns -1 if not found
-            if each[:2] != '--' or sep == -1: 
-                print('Invalid argument: ' + each)
-                print_usage()
-            else:
-                key = each[:sep]
-                val = each[sep+1:]
-                try:
-                    val_type = kwargs_syntax(key)
-                    kwargs[key] = val_type(val)
-                except Exception as e:
-                    print(e)
-                    print_usage()
-    return grid, run, ver, year, month, kwargs
-    
+# If called as a script.        
 if __name__=='__main__':
-
-    grid, run, ver, year, month, kwargs = get_args()
-
-    from pyGOTM import medsea
-    medsea.set_grid(grid)
-    medsea.run = run
-    medsea.ver = ver
+    # Main program separated into two parts, just to initialize pyGOTM.medsea
+    # earlier on.
 
     # Temporary code.
     if year in [2013, 2014]:
