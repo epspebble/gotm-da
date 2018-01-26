@@ -102,6 +102,7 @@ module airsea
   integer, parameter                  :: sst_unit2=27
   integer, parameter                  :: sss_unit=25
   integer, parameter                  :: airt_unit=26
+  integer, parameter                  :: albedo_unit=28
 
   double precision, parameter                :: cpa=1004.67 !J/kg/K specific heat of dry air (Businger 1982)
   !   double precision, parameter                :: cp=3995   !3985.
@@ -172,6 +173,7 @@ module airsea
   character(len=255), public   :: sst_file
   character(len=255), public   :: sst_file2
   character(len=255), public   :: airt_file
+  character(len=255), public   :: albedo_file ! WT When using Ohlmann-Siegel (2000), needs chlo.dat
 
   double precision                  :: wx,wy
   double precision                  :: wx_obs,wy_obs
@@ -268,7 +270,9 @@ contains
          sst_method, sst_file, &
          sst_method2, sst_file2, &
          sss_method, sss_file, &
-         airt_method, airt_file
+         airt_method, airt_file, &
+         albedo_method, albedo_file, & !WT
+         coolskin_method !WT
     
     namelist /coolskin/ iter_max,err_max !WT
     !
@@ -286,6 +290,36 @@ contains
     open(namlst,file='airsea.inp',action='read',status='old',err=90)
     read(namlst,nml=airsea,err=91)
     close(namlst)
+
+
+    !WT 20180120 Edited the behavior when exception occurs: STOP and don't
+    ! silently run it!
+    !------------------------------------------------------------------------
+    select case (albedo_method)
+    case (0)
+       write(0,*) '       ', 'Using default albedo calculation by table due to Payne (1976).'
+       write(0,*) '       ', ' No external data needed.'
+    case (1)
+       open(albedo_unit,file=albedo_file,action='read',status='old',err=100)
+       write(0,*) '       ', 'Using the implicit albedio due to Ohlmann-Siegel (2000).'
+       write(0,*) '       ', 'Chlorophyll-a data requied for computing Ohlmann-Siegel (2000) albedo. Reading from:'
+       write(0,*) '           ', trim(albedo_file)
+    case (2)
+       write(0,*) '       ', 'Using four-component albedo by Jin et al. (2011).'
+       write(0,*) '       ', '   No external data needed.'
+    case default
+       print *, 'Unexpected albedo_method = ', albedo_method
+       stop 'NotImplementedError'
+    end select
+
+    select case (coolskin_method)
+    case (0) ! The default Fairall method
+    case (1) ! Altare's modification of thickness
+    case default
+       print *, 'Unexpected coolskin_method = ', coolskin_method
+       stop 'NotImplementedError'
+    end select
+    !------------------------------------------------------------------------
 
     if (calc_fluxes) then
        open(meteo_unit,file=meteo_file,action='read',status='old',err=92)
@@ -316,7 +350,7 @@ contains
     case (FROMFILE)
        open(p_e_unit,file=p_e_flux_file,action='read', &
             status='old',err=95)
-       write(0,*) '       ', 'Reading precipitatio/evaporation data from:'
+       write(0,*) '       ', 'Reading precipitation / evaporation data from:'
        write(0,*) '           ', trim(p_e_flux_file)
     case default
     end select
@@ -385,11 +419,13 @@ contains
     stop 'init_airsea'
 96  write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(sst_file)
     stop 'init_airsea'
-99  write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(sst_file2)
-    stop 'init_airsea'
 97  write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(sss_file)
     stop 'init_airsea'
 98  write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(airt_file)
+    stop 'init_airsea'
+99  write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(sst_file2)
+    stop 'init_airsea'
+100 write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(albedo_file)
     stop 'init_airsea'
 
 !WT 20171026
@@ -1087,7 +1123,7 @@ double precision              :: K_ir,K_vis,K1,K2
 !        tkt=xlamx*visw/(sqrt(rho_air/rhow)*usr)
 !----------------------end W85--------------------------
 
-          case default
+           case default
              !---------------------------------------- Fairall et al (1996b)
              alq=Al*qcol+be*hlb*cpw/xlv                      !Eq. 8 in Fairall et al. (1996b)
              if(alq.gt.0.) then                              !originally (qcol.gt.0)
@@ -1446,8 +1482,12 @@ double precision              :: K_ir,K_vis,K1,K2
             88.,90./)
        !
        !
-!-----------------Albedo Options-------------------------HX
-        double precision             ::fmiusigma,alphasdif,alphasdir,coszent,rpara,rperp,Rtotal,sigma,n_a,n_o,f_dir,f_dif,k_t,EI
+       !-----------------Albedo Options-------------------------HX
+       
+       double precision             ::fmiusigma,alphasdif,alphasdir,rpara,rperp,Rtotal,sigma,n_a,n_o
+       ! WT EI = 'extraterrestrial radiation', k_t 'clearness index' for ERBS model code by SP, see https://plantpredict.com/algorithm/irradiance-radiation/#erbs-model for reference.
+       double precision             :: f_dir, f_dif, k_t, EI ! WT Note f_dir is related to qdir / qtot from Rosati's formulas. 
+       double precision             :: sinzen, sinzent, coszent !WT Extra auxiliaries for clarity
         double precision         ::sigmasquare,wind,fwc,albedoe,para_A,Trans_1
         integer                   ::j
         double precision                  :: C1(16) = &
@@ -1605,8 +1645,8 @@ double precision              :: K_ir,K_vis,K1,K2
        coszen =sin(alat)*sin(decl)+cos(alat)*cos(decl)*cos(ha) ! ha, decl not needed anymore from now on
 
        !SH  calculate cosine of angle of direct refracted entrant radiation 
-       cosr = cos(asin((3./4.)*sin(acos(coszen)))) !WT An output as a public variable for unspecified use.
-
+       cosr = cos(asin((3./4.)*sin(acos(coszen)))) !WT An output as a public variable for variants of 9-band Paulson et al. light extinction.
+       
        !WT 20170316 Consider moving the above to time.f90 or a new solar.f90 for later reuse (e.g. assimilation
        ! at sunrise or sunset, compare the SST turnaround times with solar sunrise and sunset...)
        !We could also use NREL's solpos C code also if we know how to recompile everything in separate dynamic linkable
@@ -1645,6 +1685,21 @@ double precision              :: K_ir,K_vis,K1,K2
       
 ! --------------------------------- Albedo parametrization options ---------------
        select case (albedo_method)
+          
+       case (0)
+          !------------------------------------- Payne (1972)
+          !  calculates the albedo as a function of sun altitude :
+          !  (after Payne jas 1972)
+          !  solar zenith angle in degrees :
+          zen=(180./pi)*acos(coszen)
+          !  sun altitude :
+          altitude=90.-zen
+          
+          jab=0.5*altitude + 1.
+          
+          !linear interpolation
+          albedo=alb1(jab)+.5*(alb1(jab+1)-alb1(jab))*(altitude-alt(jab))      
+          !-------------------------------------- end Payne (1972)
 
        case (1)
           !---------------------------------------- Ohlmann & Siegel (2000)
@@ -1673,94 +1728,101 @@ double precision              :: K_ir,K_vis,K1,K2
           !albedo = trans(0,extinct_method)
           !---------------------------------------- end Ohlmann & Siegel (2000)
 
-          case (2)
-             !---------------------------------------- Jin et al. (2011)
-             !new albedo calculation for broadband from Jin(2011) (HX 30/05/2017)
-             n_a = 1.               !refractive index of air
-             n_o = 1.34             !refractive index of seawater
+       case (2)
+          !---------------------------------------- Jin et al. (2011)
+          !new albedo calculation for broadband from Jin(2011) (HX 30/05/2017)
+          n_a = 1.               !refractive index of air
+          n_o = 1.34             !refractive index of seawater
 
-!             f_dir = 0.7            !fraction of direct radiance
-!             f_dif = 0.3            !fraction of diffuse radiance
+          !WT According to last rows of Fig. 8, Fig. 9 in Jin et al.  (2011),
+          ! when sky is clear, f_dir is close to 1, and
+          ! when overcast, f_dir is could be close to 0.
+          ! Compare last rows of Fig.8, Fig.9.
+          !f_dir = 0.7            !coefficient for direct radiance
+          !f_dif = 0.3            !coefficient for diffuse radiance
+          ! WT An alternative is to use Rosati (88) formula and put f_dir = qdir / qtot, f_dif = 1 - f_dir
+          
+          !SP compute fraction of diffuse radiation
+          ! Erbs, et al, Estimation of the diffuse radiation fraction for hourly, daily and monthly-average global radiation. Solar Energy, 28:293-302, 1982.
+          ! extraterrestrial irradiance:
+          EI = solar*(1.00011 + 0.034221*cos(gamma) + 0.00128*sin(gamma) + 0.000719*cos(2.*gamma) + 0.000077*sin(2.*gamma))
+          ! clearness index:
+          !WT I_0 yet to be defined, which will have a cloud factor applied, but NOT the albedo (circular reference).
+          !k_t = I_0/(EI*coszen)
 
-! compute fraction of diffuse radiation (code by SP)
-! Erbs, et al, Estimation of the diffuse radiation fraction for hourly, daily and monthly-average global radiation. Solar Energy, 28:293-302, 1982.
-            ! extraterrestrial irradiance:
-            EI = solar*(1.00011 + 0.034221*cos(gamma) + 0.00128*sin(gamma) + 0.000719*cos(2.*gamma) + 0.000077*sin(2.*gamma))
-            ! clearness index:
-            k_t = I_0/(EI*coszen)
+          !WT Replacing I_0 by qtot*cloud to be the (Global Horizontal Irradiance (i.e. total downward swr in our case))
+          k_t = qtot*cloud/(EI*coszen) !WT Suggested change that accounts for the overall reduction of radiation.
+          
+          if (k_t.le.0.22) then
+             f_dif = 1. - 0.09*k_t
+          else if (k_t.gt.0.22 .and. k_t.le.0.8) then
+             f_dif = 0.9511-0.1604*k_t + 0.4388*k_t**2. - 16.638*k_t**3. + 12.338*k_t**4.
+          else
+             f_dif = 0.165
+          end if
+          f_dir = 1. - f_dif
+          ! end compute fraction of diffuse radiation
 
-            if (k_t.le.0.22) then
-                f_dif = 1. - 0.09*k_t
-            elseif (k_t.gt.0.22 .and. k_t.le.0.8) then
-                f_dif = 0.9511-0.1604*k_t + 0.4388*k_t**2. - 16.638*k_t**3. + 12.338*k_t**4.
-            elseif
-                f_dif = 0.165
-            end
-            f_dir = 1. - f_dif
-! end compute fraction of diffuse radiation
-
-             
-             if (I_0.gt.0) then
-                if (coszen==0.0) then
-                   coszent=0.0
-                   albedo=0.0
-                else
-                   coszent = abs(cos(abs(asin(abs(sin(abs(acos(coszen))))*n_a/n_o))))
-                   rpara = (n_a*coszen-n_o*coszent)/(n_a*coszen+n_o*coszent)     !Fresnel's equations for reflection
-                   rperp = (n_o*coszen-n_a*coszent)/(n_o*coszen+n_a*coszent)
-                   
-                   Rtotal = 0.5*(rpara**2. + rperp**2.)    !Unpolarised light
-                   wind = sqrt(wx_obs**2.+wy_obs**2.)
-                   if (wind.eq.0) then
-                      sigmasquare = 0
-                      sigma = 0
-                   else
-                      sigmasquare = 0.003+0.00512*wind                  !equ.2
-                      sigma = sqrt(sigmasquare)
-                   end if
-                   
-                   fmiusigma = (0.0152-1.7873*coszen+6.8972*coszen**2.0  &
-                        - 8.5778*coszen**3.0+4.071*sigma-7.6446*coszen*sigma) &
-                        *exp(0.1643-7.8409*coszen-3.5639*coszen**2.0-2.3588*sigma  &
-                        +10.0538*coszen*sigma)                                         !equ.4
-                   
-                   alphasdir = Rtotal-fmiusigma
-                   if (cloud.eq.0) then
-                      alphasdif = -0.1482-0.012*sigma+0.1608*n_o-0.0193*n_o*sigma    !equ.5a
-                   else
-                      alphasdif = -0.1479+0.1502*n_o-0.0176*n_o*sigma                !equ.5b
-                   end if
-                   
-                   albedo = f_dir*alphasdir+f_dif*alphasdif+0.006                   !equ.15
-                   
-                   ! foam corrected alternative
-                   !fwc = 2.95e-6*wind**3.52                                          !equ.16
-                   !albedoe = 0.55*fwc+albedo*(1-fwc)    !foam corrected albedo  (Koepkw,1984)    !equ.17
-               !       albedo = qdir_frac*alphasdir+qdiff_frac*alphasdif+0.006  !?
-
-                end if
-
+          if (qtot.gt.0) then
+             if (coszen==0.0) then
+                coszent=0.0
+                albedo=0.0
              else
-                albedo = 0.
+                ! WT This seems overly complicated, e.g. acos is nonnegative, why abs?.
+                ! I think abs(sin(abs(acos(coszen)))) = sqrt(1-coszen**2)
+                !coszent = abs(cos(abs(asin(abs(sin(abs(acos(coszen))))*n_a/n_o))))
+                ! WT 20180120 Make the formula more transparent...
+                sinzen = sqrt(1-coszen**2)
+                sinzent = sinzen*n_a/n_o
+                coszent = sqrt(1-sinzent**2)
+                
+                rpara = (n_a*coszen-n_o*coszent)/(n_a*coszen+n_o*coszent)     !Fresnel's equations for reflection
+                rperp = (n_o*coszen-n_a*coszent)/(n_o*coszen+n_a*coszent)
+                
+                Rtotal = 0.5*(rpara**2. + rperp**2.)    !Unpolarised light
+                wind = sqrt(wx_obs**2.+wy_obs**2.)
+                sigma = sqrt(0.003+0.00512*wind)                  !eq.2
+                !WT The following case splitting seem unnecessary and also inconsistent with the IDL code from Jin (2001)'s paper.
+                ! if (wind.eq.0) then
+                !    sigmasquare = 0
+                !    sigma = 0
+                ! else
+                !    sigmasquare = 0.003+0.00512*wind                  !eq.2
+                !    sigma = sqrt(sigmasquare)
+                !end if
+                
+                fmiusigma = (0.0152-1.7873*coszen+6.8972*coszen**2.0  &
+                     - 8.5778*coszen**3.0+4.071*sigma-7.6446*coszen*sigma) &
+                     *exp(0.1643-7.8409*coszen-3.5639*coszen**2.0-2.3588*sigma  &
+                     +10.0538*coszen*sigma)                                         !eq.4
+                
+                alphasdir = Rtotal-fmiusigma
+                if (cloud.eq.0) then !WT maybe revise where to split case.
+                   ! WT For "clear-sky" according to Jin et al.
+                   alphasdif = -0.1482-0.012*sigma+0.1608*n_o-0.0244*n_o*sigma    !eq.5a !WT Modified last coefficient from -0.0193 to -0.0244 (the equation is found on p.5)
+                else ! WT For "overcast" condition according to Jin et al.
+                   alphasdif = -0.1479+0.1502*n_o-0.0176*n_o*sigma                !eq.5b
+                end if
+                
+                albedo = f_dir*alphasdir+f_dif*alphasdif+0.006                   !eq.15
+                
+                ! foam corrected alternative
+                !fwc = 2.95e-6*wind**3.52                                          !eq.16
+                !albedoe = 0.55*fwc+albedo*(1-fwc)    !foam corrected albedo  (Koepkw,1984)    !eq.17
+                !       albedo = qdir_frac*alphasdir+qdiff_frac*alphasdif+0.006  !?
+                
              end if
-             !---------------------------------------- end Jin et al. (2011)
              
-          case default
-             !------------------------------------- Payne (1972)
-             !  calculates the albedo as a function of sun altitude :
-             !  (after Payne jas 1972)
-             !  solar zenith angle in degrees :
-             zen=(180./pi)*acos(coszen)
-             !  sun altitude :
-             altitude=90.-zen
-             
-             jab=0.5*altitude + 1.
-             
-             !linear interpolation
-             albedo=alb1(jab)+.5*(alb1(jab+1)-alb1(jab))*(altitude-alt(jab))      
-             !-------------------------------------- end Payne (1972)
-          end select
-! --------------------------------- End albedo parametrization options ------------
+          else
+             albedo = 0.
+          end if
+          !---------------------------------------- end Jin et al. (2011)
+          
+       case default
+          stop 'NotImplementedError'
+          
+       end select
+       ! --------------------------------- End albedo parametrization options ------------
           
        !  radiation as from Reed(1977), Simpson and Paulson(1979)
        !  calculates SHORT WAVE FLUX ( watt/m*m )
