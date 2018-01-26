@@ -503,17 +503,6 @@ contains
        call flux_from_meteo(jul,secs)     
     end if
 
-    !WT Need to output I_0_calc? otherwise it stays 0!
-    ! print *,'Before calling short_wave_radiation()...'
-    ! print *,'I_0_calc=',I_0_calc
-    call short_wave_radiation(jul,secs,alat,alon,I_0_calc)
-    ! print *,'After...'
-    ! print *,'I_0_calc=',I_0_calc
-
-    !Net shortwave radiation
-    !  I_0=I_0_calc
-    !     The heat fluxes
-
     select case (flux_method)
     case (CONSTVAL)
        heat=const_qout
@@ -524,22 +513,37 @@ contains
        call read_heat_flux(jul,secs,adjustment,cloud_factor,qb_down)
     case default
     end select
-
+    
     select case (swr_method)
     case (CONSTVAL)
        I_0=const_qin
     case (FROMFILE)
        if (flux_method .ne. FROMFILE ) then
-          PRINT*,'ERROR'
-          READ*
+          !PRINT*,'ERROR'
+          !READ*
+          !WT Better error output and should stop the program without holding it up for input.
+          print *, "swr_method =", swr_method
+          print *, "BUT flux_method =", flux_method
+          print *, "The flux_method must equal ", FROMFILE, " as well."
+          stop "RuntimeError"
        else
-          !              I_0=adjustment*(1.-albedo) ! adjustment comes from heat.dat 3rd column
-          !WT 20170315 Should we fix cloud factor between 0 and 1 BEFORE setting I_0?
-          !print *, "secs, cloud_factor", secs, cloud_factor
-          !print *, "I_0_calc, I_0", I_0_calc, I_0 
+          
+          ! WT Calculate "clear-sky downward SWR according to Rosati (88)"
+          ! Output saved as I_0_calc. It should not include albedo calculation here. Revision needed.
+          call short_wave_radiation(jul,secs,alat,alon,I_0_calc)
 
+          ! WT Use an adjustment factor to find the actuall downward SWR
+          !!! WT Possible misnomer below!!! 
           I_0=cloud_factor*I_0_calc  ! cloud_factor comes from heat.dat 2nd column
           cloud = min(1.,max(0.,cloud_factor))  ! fixed fraction cloud values between 0 and 1
+          !!! WT Possible misnomer above.
+          
+          ! WT Some other previous comments not by me.
+          !Net shortwave radiation
+          !  I_0=I_0_calc
+          !     The heat fluxes
+          
+          !              I_0=adjustment*(1.-albedo) ! adjustment comes from heat.dat 3rd column
 
           ! SP June 2016 - determine cloud fraction
           !		if(I_0_calc .ne. 0) then
@@ -557,6 +561,8 @@ contains
 
        end if
     case default
+       print *,"swr_method=",swr_method
+       stop "NotImplementedError"
     end select
 
     select case (lwr_method)
@@ -1751,6 +1757,7 @@ double precision              :: K_ir,K_vis,K1,K2
           !k_t = I_0/(EI*coszen)
 
           !WT Replacing I_0 by qtot*cloud to be the (Global Horizontal Irradiance (i.e. total downward swr in our case))
+          !WT Note that cloud is restriction of cloud_factor in [0,1] but it is 1 when there is clear-sky, i.e. no cloud, misnomer!!!
           k_t = qtot*cloud/(EI*coszen) !WT Suggested change that accounts for the overall reduction of radiation.
           
           if (k_t.le.0.22) then
@@ -1797,7 +1804,7 @@ double precision              :: K_ir,K_vis,K1,K2
                      +10.0538*coszen*sigma)                                         !eq.4
                 
                 alphasdir = Rtotal-fmiusigma
-                if (cloud.eq.0) then !WT maybe revise where to split case.
+                if (cloud.gt.0.8) then !WT Revision on when to split may be needed.
                    ! WT For "clear-sky" according to Jin et al.
                    alphasdif = -0.1482-0.012*sigma+0.1608*n_o-0.0244*n_o*sigma    !eq.5a !WT Modified last coefficient from -0.0193 to -0.0244 (the equation is found on p.5)
                 else ! WT For "overcast" condition according to Jin et al.
