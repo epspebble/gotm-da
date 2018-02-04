@@ -1014,7 +1014,7 @@ double precision              :: K_ir,K_vis,K1,K2
                     f_c = f_c + ( para_A*tkt - (para_A/para_K)*(1-exp(-para_K*tkt)) )/tkt
                 end do
             end if
-            dels=(rns/(1.-albedo))*f_c  ! this scheme implicitly includes albedo
+            dels=rns*f_c
             f_c=0.
 
         case(13)
@@ -1022,15 +1022,10 @@ double precision              :: K_ir,K_vis,K1,K2
             K1 = (-0.057+0.482*sqrt(abp_coe)+4.221*bb)*(1+0.09*sin(acos(coszen)))
             K2 = (0.183+0.702*abp_coe-2.567*bb)*(1.465-0.667*coszen)
 
-            !K_vis = K1+K2/sqrt(1+z)
-            !K_ir = (0.560+2.304/(0.001+z)**0.65)*(1+0.002*acos(coszen)*180/(3.1415926))
+            K_vis = K1+K2/sqrt(1+(tkt/2))
+            K_ir = (0.560+2.304/(0.001+(tkt/2))**0.65)*(1+0.002*acos(coszen)*180/(3.1415926))
             
-            !WT At sea surface, use z=0
-            K_vis = K1+K2
-            K_ir = (0.560+2.304/(0.001)**0.65)*(1+0.002*acos(coszen)*180/(3.1415926))
-            
-            
-            f_c = 1 - 0.576*exp(-K_ir*(tkt/2))+0.424*exp(-K_vis*(tkt/2))  ! crude numerical approx. of integral, i.e. 1-T(z=tkt/2)
+            f_c = 1 - ( 0.576*exp(-K_ir*(tkt/2)) + 0.424*exp(-K_vis*(tkt/2)) ) ! crude numerical approx. of integral, i.e. 1-T(z=tkt/2)
             dels=rns*f_c
             f_c=0.
 
@@ -1101,13 +1096,13 @@ double precision              :: K_ir,K_vis,K1,K2
               !---------------------------------------- Artale et al (2002)    HX
               !WT Split casing w.r.t to wind speed.
               if (w.le.7.5) then
-                 xlamx = usr*von*86400/((0.2*w+0.5)*rhow*10*cpw*visw)
+                 xlamx = (sqrt(rho_air/rhow)*usr)*von*86400/((0.2*w+0.5)*rhow*10*cpw*visw)
               end if
-              if (w.gt.7.5.and.u10.lt.10) then
-                 xlamx = usr*von*86400/((1.6*w-10)*rhow*10*cpw*visw)
+              if (w.gt.7.5.and.w.lt.10) then
+                 xlamx = (sqrt(rho_air/rhow)*usr)*von*86400/((1.6*w-10)*rhow*10*cpw*visw)
               end if
               if (w.ge.10) then
-                 xlamx = usr*von*86400/(6*rhow*10*cpw*visw)
+                 xlamx = (sqrt(rho_air/rhow)*usr)*von*86400/(6*rhow*10*cpw*visw)
               end if
               tkt=xlamx*visw/(sqrt(rho_air/rhow)*usr)
               
