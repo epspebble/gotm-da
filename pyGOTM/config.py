@@ -36,7 +36,7 @@ userhome = os.getenv('HOME')
 
 # Global "input" variables.
 project_name = 'medsea_GOTM'
-GOTM_version = 'v3d'
+GOTM_version = 'latest'
 
 # Some essential GOTM settings overrider
 #timestep = 30
