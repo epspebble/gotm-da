@@ -203,8 +203,8 @@ def write_results(data,year,month=None,varname=None,fn=None,skip_year_end=False)
         #2. variable name
         if varname is not None:
             fn += '_' + varname        
-        #3. run code and grid code
-        fn += '_' + medsea.run + '_' + medsea.grid
+        #3. codenames: run profile, grid, GOTM_version
+        fn += '_' + medsea.run + '_' + medsea.grid + '_' + medsea.ver
         #4. time range
         if month is None:
             fn += '_{:d}.nc'.format(year)
@@ -297,7 +297,7 @@ def combine_stat(*args,biannual=False):
     if not(os.path.isdir(outdir)):
           os.mkdir(outdir)
 
-    basename = 'daily_stat_{0.run}_{0.grid}_'.format(medsea)
+    basename = 'daily_stat_{0.run}_{0.grid}_{0.ver}'.format(medsea)
     if year is None: # A start-stop based time range:
         basename += '{0.year:d}{0.month:02d}{0.day:02d}'.format(start) + '_' + \
                     '{0.year:d}{0.month:02d}{0.day:02d}'.format(stop) + '.nc'
