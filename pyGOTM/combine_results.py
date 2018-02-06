@@ -58,11 +58,19 @@ def get_args():
 ### Getting a configured medsea module instance.
 # This was a portion of original main program brought forward.
 if __name__=='__main__':
-    from pyGOTM import medsea
     grid, run, ver, year, month, kwargs = get_args()
-    medsea.set_grid(grid)
-    medsea.run = run
-    medsea.ver = ver
+    from pyGOTM import config
+    config.GOTM_version = ver
+    
+    from pyGOTM import medsea
+
+    # Old method:
+    #medsea.set_grid(grid)
+    #medsea.run = run
+
+    # New method:
+    assert run[:3] == 'ASM'
+    medsea.set_grid(grid,run[3:]) # the string skipping to leading characters 'ASM'
 
 ### End setting the medsea module instance into this global namespace.
 
