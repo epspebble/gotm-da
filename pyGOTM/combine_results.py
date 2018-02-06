@@ -212,7 +212,7 @@ def write_results(data,year,month=None,varname=None,fn=None,skip_year_end=False)
         if varname is not None:
             fn += '_' + varname        
         #3. codenames: run profile, grid, GOTM_version
-        fn += '_' + medsea.run + '_' + medsea.grid + '_' + medsea.ver
+        fn += '_{.run}_{.grid}_{.GOTM_version}'.format(medsea)
         #4. time range
         if month is None:
             fn += '_{:d}.nc'.format(year)
