@@ -396,7 +396,7 @@ contains
     rh=0.
     spec_hum=0.
     dew_pt=0.
-    cloud=0.
+    !cloud=0. ! Leave it uninitialized.
     sss=0.
     airt=0.
 
@@ -479,7 +479,7 @@ contains
 
     !
     ! !LOCAL VARIABLES:
-    double precision  :: dummy,adjustment,qb_down,lwrcloud,top,bottom,cloud_factor
+    double precision  :: dummy,swrd,adjustment,qb_down,lwrcloud,top,bottom!WT ,cloud_factor
     integer           :: i,ios,count=1,count2=1,count3=0
     !
     !
@@ -510,7 +510,7 @@ contains
        !WT 20170402 With the precomputation of cloud_factor, the "adjustment" column, which is
        ! the ERA swrd values are not used at all, and they have been used when cloud_factor was
        ! calculated.
-       call read_heat_flux(jul,secs,adjustment,cloud_factor,qb_down)
+       call read_heat_flux(jul,secs,swrd,adjustment,qb_down)
     case default
     end select
     
@@ -532,11 +532,12 @@ contains
           ! Output saved as I_0_calc. It should not include albedo calculation here. Revision needed.
           call short_wave_radiation(jul,secs,alat,alon,I_0_calc)
 
-          ! WT Use an adjustment factor to find the actuall downward SWR
-          !!! WT Possible misnomer below!!! 
-          I_0=cloud_factor*I_0_calc  ! cloud_factor comes from heat.dat 2nd column
-          cloud = min(1.,max(0.,cloud_factor))  ! fixed fraction cloud values between 0 and 1
-          !!! WT Possible misnomer above.
+          ! WT Use an adjustment factor from low-res data and adjust our high-res I_0_calc
+          I_0=adjustment*I_0_calc
+
+          ! WT Deduce a cloud value from the adjustment factor restricted to [0,1]
+          !    We are effectively assuming the reduction of swrd in the atmosphere is due purely to 'cloud'
+          cloud = 1 - min(1.,max(0.,adjustment))
           
           ! WT Some other previous comments not by me.
           !Net shortwave radiation
@@ -986,104 +987,114 @@ double precision              :: K_ir,K_vis,K1,K2
 
        ! calculate the fraction of solar radiation absorbed in the skin layer
        ! this depends on extinction method
-        select case (extinct_method)
+       select case (extinct_method)
+          
+       case(9)
+          !Eq. (16) from Fairall et al., 1996b, using the full Paulson & Simpson (1981) 9-band scheme
+          do j=1,9
+             f_c = f_c + fsen(j)*( 1 - (zdeta(j)/tkt)*(1-exp(-tkt/zdeta(j))) )
+          end do
+          dels=rns*f_c
+          f_c=0.
+          
+       case(12)
 
-        case(9)
-            !Eq. (16) from Fairall et al., 1996b, using the full Paulson & Simpson (1981) 9-band scheme
-            do j=1,9
-                f_c = f_c + fsen(j)*( 1 - (zdeta(j)/tkt)*(1-exp(-tkt/zdeta(j))) )
-            end do
-            dels=rns*f_c
-            f_c=0.
 
-        case(12)
-            !Eq. (7) in Ohlmann & Siegel (2000)
-            if(coszen.lt. 0.2588) then
-                coszen=0.2588
-            end if
-            if(cloud.gt.0.1) then
-                do j=1,4
-                    para_A=C1(j)*chlo+C2(j)*cloud+C4(j)
-                    para_K=C1(j+4)*chlo+C2(j+4)*cloud+C4(j+4)
-                    f_c = f_c + ( para_A*tkt - (para_A/para_K)*(1-exp(-para_K*tkt)) )/tkt
-                end do
-            else
-                do j=9,12
-                    para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
-                    para_K=C1(j+4)*chlo+(C3(j+4)/coszen)+C4(j+4)
-                    f_c = f_c + ( para_A*tkt - (para_A/para_K)*(1-exp(-para_K*tkt)) )/tkt
-                end do
-            end if
-            dels=rns*f_c
-            f_c=0.
+          !WT 20180217 Avoid changing coszen directly, we put an if-else below for the coszen cut-off.
+          !if(coszen.lt. 0.2588) then
+          !   coszen=0.2588
+          !end if
+          
+          !Eq. (7) in Ohlmann & Siegel (2000)
+          if(cloud.gt.0.1) then
+             do j=1,4
+                para_A=C1(j)*chlo+C2(j)*cloud+C4(j)
+                para_K=C1(j+4)*chlo+C2(j+4)*cloud+C4(j+4)
+                f_c = f_c + ( para_A*tkt - (para_A/para_K)*(1-exp(-para_K*tkt)) )/tkt
+             end do
+          else
+             do j=9,12
+                !WT 20180217, see comment a few lines above.
+                if (coszen .lt. 0.2588) then
+                   para_A=C1(j)*chlo+(C3(j)/0.2588)+C4(j)
+                   para_K=C1(j+4)*chlo+(C3(j+4)/0.2588)+C4(j+4)
+                else                     
+                   para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
+                   para_K=C1(j+4)*chlo+(C3(j+4)/coszen)+C4(j+4)
+                end if
+                f_c = f_c + ( para_A*tkt - (para_A/para_K)*(1-exp(-para_K*tkt)) )/tkt
+             end do
+          end if
+          dels=rns*f_c
+          f_c=0.
 
-        case(13)
-            !uses Eq. (11) in Lee et al., 2005
-            K1 = (-0.057+0.482*sqrt(abp_coe)+4.221*bb)*(1+0.09*sin(acos(coszen)))
-            K2 = (0.183+0.702*abp_coe-2.567*bb)*(1.465-0.667*coszen)
-
-            K_vis = K1+K2/sqrt(1+(tkt/2))
-            K_ir = (0.560+2.304/(0.001+(tkt/2))**0.65)*(1+0.002*acos(coszen)*180/(3.1415926))
-            
-            f_c = 1 - ( 0.576*exp(-K_ir*(tkt/2)) + 0.424*exp(-K_vis*(tkt/2)) ) ! crude numerical approx. of integral, i.e. 1-T(z=tkt/2)
-            dels=rns*f_c
-            f_c=0.
-
-        case(15)
-            !Eq. (16) from Fairall et al., 1996b, using the full Paulson & Simpson (1981) 9-band scheme
-            zdeta(1)=24.1;  ! Jerlov water type I
-            zdeta(2)=0.673; ! Jerlov water type I
-            !zdeta(1)=11;    ! Jerlov water type II
-            !zdeta(2)=0.664; ! Jerlov water type II
-            !zdeta(1)=6.54;  ! Jerlov water type III
-            !zdeta(2)=0.654; ! Jerlov water type III
-            !zdeta(1)=3.36;  ! Jerlov water type 1
-            !zdeta(2)=0.653; ! Jerlov water type 1
-            !zdeta(1)=2.27;  ! Jerlov water type 3
-            !zdeta(2)=0.645; ! Jerlov water type 3
-            !zdeta(1)=1.56;  ! Jerlov water type 5
-            !zdeta(2)=0.627; ! Jerlov water type 5
-            !zdeta(1)=1.13;  ! Jerlov water type 7
-            !zdeta(2)=0.606; ! Jerlov water type 7
-            !zdeta(1)=0.736;  ! Jerlov water type 9
-            !zdeta(2)=0.58; ! Jerlov water type 9
-            do j=1,9
-                f_c = f_c + fsen(j)*( 1 - (zdeta(j)/tkt)*(1-exp(-tkt/zdeta(j))) )
-            end do
-            dels=rns*f_c
-            f_c=0.
-
-        case(16)
-            !Eq. (16) from Fairall et al., 1996b, using the full Paulson & Simpson (1981) 9-band scheme
-            zdeta(1)=1/0.066;  ! Jerlov water type I
-            !zdeta(1)=1/0.076;  ! Jerlov water type IA
-            !zdeta(1)=1/0.088;  ! Jerlov water type IB
-            !zdeta(1)=1/0.132;  ! Jerlov water type II
-            !zdeta(1)=1/0.382;  ! Jerlov water type III
-            !zdeta(1)=1/0.49;   ! Jerlov water type 1
-            !zdeta(1)=1/0.7;    ! Jerlov water type 3
-            !zdeta(1)=1/1.0;    ! Jerlov water type 5
-            !zdeta(1)=1/1.09;   ! Jerlov water type 7
-            !zdeta(1)=1/1.6;    ! Jerlov water type 9
-            do j=1,9
-                f_c = f_c + fsen(j)*( 1 - (zdeta(j)/tkt)*(1-exp(-tkt/zdeta(j))) )
-            end do
-            dels=rns*f_c
-            f_c=0.0
-
-        case default
-
-            !Eq. (17) from Fairall et al., 1996b (an approximation of Paulson & Simpson (1981) 9-band scheme)
-            !f_c = .137+11.*tkt-6.6e-5/tkt*(1.-dexp(-tkt/8.0e-4))
-
-            !Eq. (17) from Fairall et al., 1996b, first term is changed based on suggestion by Wick et al., 2005 (who used the Ohlmann & Siegel (2000) scheme)
-            f_c = .067+11.*tkt-6.6e-5/tkt*(1.-dexp(-tkt/8.0e-4))
-
-            dels=rns*f_c
-            f_c=0.
-
-        end select
-
+       case(13)
+          !uses Eq. (11) in Lee et al., 2005
+          K1 = (-0.057+0.482*sqrt(abp_coe)+4.221*bb)*(1+0.09*sin(acos(coszen)))
+          K2 = (0.183+0.702*abp_coe-2.567*bb)*(1.465-0.667*coszen)
+          
+          K_vis = K1+K2/sqrt(1+(tkt/2))
+          K_ir = (0.560+2.304/(0.001+(tkt/2))**0.65)*(1+0.002*acos(coszen)*180/(3.1415926))
+          
+          f_c = 1 - ( 0.576*exp(-K_ir*(tkt/2)) + 0.424*exp(-K_vis*(tkt/2)) ) ! crude numerical approx. of integral, i.e. 1-T(z=tkt/2)
+          dels=rns*f_c
+          f_c=0.
+          
+       case(15)
+          !Eq. (16) from Fairall et al., 1996b, using the full Paulson & Simpson (1981) 9-band scheme
+          zdeta(1)=24.1;  ! Jerlov water type I
+          zdeta(2)=0.673; ! Jerlov water type I
+          !zdeta(1)=11;    ! Jerlov water type II
+          !zdeta(2)=0.664; ! Jerlov water type II
+          !zdeta(1)=6.54;  ! Jerlov water type III
+          !zdeta(2)=0.654; ! Jerlov water type III
+          !zdeta(1)=3.36;  ! Jerlov water type 1
+          !zdeta(2)=0.653; ! Jerlov water type 1
+          !zdeta(1)=2.27;  ! Jerlov water type 3
+          !zdeta(2)=0.645; ! Jerlov water type 3
+          !zdeta(1)=1.56;  ! Jerlov water type 5
+          !zdeta(2)=0.627; ! Jerlov water type 5
+          !zdeta(1)=1.13;  ! Jerlov water type 7
+          !zdeta(2)=0.606; ! Jerlov water type 7
+          !zdeta(1)=0.736;  ! Jerlov water type 9
+          !zdeta(2)=0.58; ! Jerlov water type 9
+          do j=1,9
+             f_c = f_c + fsen(j)*( 1 - (zdeta(j)/tkt)*(1-exp(-tkt/zdeta(j))) )
+          end do
+          dels=rns*f_c
+          f_c=0.
+          
+       case(16)
+          !Eq. (16) from Fairall et al., 1996b, using the full Paulson & Simpson (1981) 9-band scheme
+          zdeta(1)=1/0.066;  ! Jerlov water type I
+          !zdeta(1)=1/0.076;  ! Jerlov water type IA
+          !zdeta(1)=1/0.088;  ! Jerlov water type IB
+          !zdeta(1)=1/0.132;  ! Jerlov water type II
+          !zdeta(1)=1/0.382;  ! Jerlov water type III
+          !zdeta(1)=1/0.49;   ! Jerlov water type 1
+          !zdeta(1)=1/0.7;    ! Jerlov water type 3
+          !zdeta(1)=1/1.0;    ! Jerlov water type 5
+          !zdeta(1)=1/1.09;   ! Jerlov water type 7
+          !zdeta(1)=1/1.6;    ! Jerlov water type 9
+          do j=1,9
+             f_c = f_c + fsen(j)*( 1 - (zdeta(j)/tkt)*(1-exp(-tkt/zdeta(j))) )
+          end do
+          dels=rns*f_c
+          f_c=0.0
+          
+       case default
+          
+          !Eq. (17) from Fairall et al., 1996b (an approximation of Paulson & Simpson (1981) 9-band scheme)
+          !f_c = .137+11.*tkt-6.6e-5/tkt*(1.-dexp(-tkt/8.0e-4))
+          
+          !Eq. (17) from Fairall et al., 1996b, first term is changed based on suggestion by Wick et al., 2005 (who used the Ohlmann & Siegel (2000) scheme)
+          f_c = .067+11.*tkt-6.6e-5/tkt*(1.-dexp(-tkt/8.0e-4))
+          
+          dels=rns*f_c
+          f_c=0.
+          
+       end select
+       
 !------ Coolskin parametrization options  ------------------------------------        
         qcol=qout-dels
         
@@ -1715,9 +1726,10 @@ double precision              :: K_ir,K_vis,K1,K2
           else
              do j=9,12
                 if(coszen.lt. 0.2588) then
-                   coszen=0.2588
+                   para_A=C1(j)*chlo+(C3(j)/0.2588)+C4(j)
+                else
+                   para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
                 end if
-                para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
                 Trans_1 = Trans_1+para_A
              end do
           end if
@@ -1751,17 +1763,22 @@ double precision              :: K_ir,K_vis,K1,K2
           !WT I_0 yet to be defined, which will have a cloud factor applied, but NOT the albedo (circular reference).
           !k_t = I_0/(EI*coszen)
 
-          !WT Replacing I_0 by qtot*cloud to be the (Global Horizontal Irradiance (i.e. total downward swr in our case))
-          !WT Note that cloud is restriction of cloud_factor in [0,1] but it is 1 when there is clear-sky, i.e. no cloud, misnomer!!!
-          k_t = qtot*cloud/(EI*coszen) !WT Suggested change that accounts for the overall reduction of radiation.
+          !WT Tracing back to short_wave_radiation(), one sees I_0 = qtot*adjustment
+          k_t = I_0/(EI*coszen) !WT Suggested change that accounts for the overall reduction of radiation.
           
           if (k_t.le.0.22) then
              f_dif = 1. - 0.09*k_t
           else if (k_t.gt.0.22 .and. k_t.le.0.8) then
-             f_dif = 0.9511-0.1604*k_t + 0.4388*k_t**2. - 16.638*k_t**3. + 12.338*k_t**4.
+             f_dif = 0.9511-0.1604*k_t + 4.388*k_t**2. - 16.638*k_t**3. + 12.338*k_t**4.
           else
              f_dif = 0.165
           end if
+
+          ! WT Previously, the coefficient 4.388 was recorded as 0.4388 causing the f_dir to be negative.
+          if ((f_dif .gt. 1) .or. (f_dir .lt. 0)) then
+             stop 'ValueERror'
+          endif
+       
           f_dir = 1. - f_dif
           ! end compute fraction of diffuse radiation
 
@@ -1775,7 +1792,7 @@ double precision              :: K_ir,K_vis,K1,K2
                 !coszent = abs(cos(abs(asin(abs(sin(abs(acos(coszen))))*n_a/n_o))))
                 ! WT 20180120 Make the formula more transparent...
                 sinzen = sqrt(1-coszen**2)
-                sinzent = sinzen*n_a/n_o
+                sinzent = sinzen*n_a/n_o ! WT Snell's law.
                 coszent = sqrt(1-sinzent**2)
                 
                 rpara = (n_a*coszen-n_o*coszent)/(n_a*coszen+n_o*coszent)     !Fresnel's equations for reflection
@@ -1799,7 +1816,7 @@ double precision              :: K_ir,K_vis,K1,K2
                      +10.0538*coszen*sigma)                                         !eq.4
                 
                 alphasdir = Rtotal-fmiusigma
-                if (cloud.gt.0.8) then !WT Revision on when to split may be needed.
+                if (cloud.lt.0.1) then !WT Revision on when to split may be needed.
                    ! WT For "clear-sky" according to Jin et al.
                    alphasdif = -0.1482-0.012*sigma+0.1608*n_o-0.0244*n_o*sigma    !eq.5a !WT Modified last coefficient from -0.0193 to -0.0244 (the equation is found on p.5)
                 else ! WT For "overcast" condition according to Jin et al.
@@ -1842,6 +1859,11 @@ double precision              :: K_ir,K_vis,K1,K2
        ! print *, 'qtot, qshort, albedo', qtot, qshort, albedo
        qshort=qtot*(1.-albedo)
 
+       ! WT 'swr' is the output variable of this subroutine. So this if-else
+       ! clause is a purely programmatic control to (1) return a value through 'swr'
+       ! or (2) write two values to the global variables 'I_0_calc' and 'I_0_cs'.
+       ! Unfortunately, when this subroutine is called, the internal 'swr' output variable
+       ! is assigned to a variable with the name 'I_0_calc'. This may cause some confusion.
        if (present(swr)) then
           swr = qshort
        else
@@ -1953,7 +1975,9 @@ double precision              :: K_ir,K_vis,K1,K2
        !      dew_pt = obs1(5) + t*alpha(5)
        !      rh    = obs1(5) + t*alpha(5)
        alpha(6) = (obs2(6)-obs1(6))/dt
-       cloud = obs1(6) + t*alpha(6)
+
+       !SP Obsolete. 
+       !cloud= obs1(6) + t*alpha(6)
 
        call exchange_coefficients()
 
