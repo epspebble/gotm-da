@@ -27,7 +27,7 @@
   sss_file=               'sss.dat',
   airt_method=            0,
   airt_file=              'airt.dat',
-  albedo_method=	  1,
+  albedo_method=	  0,
   albedo_file=		  'chlo.dat',
   coolskin_method=	  0,
  /
