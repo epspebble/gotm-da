@@ -421,11 +421,6 @@ double precision function trans(z,extinct_method)
 
      !IF (coszen.lt. 2.49/(7.68*chlo+17.81)) then 
      !   coszen =2.49/(7.68*chlo+17.81)
-     IF(coszen.lt. 0.2588) THEN
-        !for very low value of coszen the parameterisation breaks down!  SP 22/02/06 revised 28/02/17
-        !revised again SP 20/06/17 setting the limit as theta=75degrees (cos(theta)=0.2588) the largest angle in Ohlmann&Siegel(2000)
-        coszen=0.2588   
-     END IF
 
      ! Begin summing for the tranmission coefficient.
      trans=0.0
@@ -441,8 +436,16 @@ double precision function trans(z,extinct_method)
         END DO
      ELSE
         DO j=9,12
-           para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
-           para_K=C1(j+4)*chlo+(C3(j+4)/coszen)+C4(j+4)
+           if (coszen.lt.0.2588) THEN
+              !for very low value of coszen the parameterisation breaks down!  SP 22/02/06 revised 28/02/17
+              !revised again SP 20/06/17 setting the limit as theta=75degrees (cos(theta)=0.2588) the largest angle in Ohlmann&Siegel(2000)
+              
+              para_A=C1(j)*chlo+(C3(j)/0.2588)+C4(j)
+              para_K=C1(j+4)*chlo+(C3(j+4)/0.2588)+C4(j+4)
+           else
+              para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
+              para_K=C1(j+4)*chlo+(C3(j+4)/coszen)+C4(j+4)
+           endif
            trans=trans+para_A*exp(-para_K*z)
            !WT For z=0, i.e. i=nlev, above is equivalent to:
            !para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
