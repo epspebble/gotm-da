@@ -301,7 +301,7 @@ def combine_stat(*args,biannual=False):
     print('Working on {!s} to {!s}...\n\n'.format(start, stop))  
     print('Daily statistics file: ' + dat_fn)
     
-    outdir = os.path.join(medsea.results_folder,medsea.run+'_'+medsea.grid)
+    outdir = medsea.results_folder
     if not(os.path.isdir(outdir)):
           os.mkdir(outdir)
 
