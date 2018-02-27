@@ -39,7 +39,7 @@ overwrite = True # True means running at the same grid point will overwrite file
 # print_lat_lon() named subfolder of the following, which should be symlinked to fast filesystem outside of the home folder,
 # e.g. /scratch/[name] on clusters, or /dev/shm/[name] on a system with sufficient RAM.
 p_sossta_folder = os.path.join(project_folder,'p_sossta')
-results_folder = os.path.join(project_folder,'results')
+results_folder = os.path.join(project_folder,'results','ASM{!s}-{!s}m_{:s}'.format(ASM,max_depth,grid))
 cache_folder = '/dev/shm'
 plots_folder = os.path.join(project_folder,'plots')
 
@@ -54,132 +54,199 @@ grid_folder = os.path.join(project_folder,'grid',grid)
 # Configs that are meant to be changed in runtime should go into medsea.py.
 #
 
+# TODO: We should specify the corresponding GOTM code version in the profiles as well.
+
+# Use a for-loop to regenerate profiles:
+
+ASM_level = {
+    # Assimilate at local midnight.
+    'ASM0': dict(assimilation_type=0, extinct_method=9), # Paulson-Simpson 9-band.
+    'ASM1': dict(assimilation_type=0, extinct_method=12, extinct_file='chlo.dat'), # Ohlmann-Siegel (2000) chlorophyll-a based
+    # Assimlate at I_0 > 1 after local midnight.
+    'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9), # Paulson-Simpson 9-band.
+    'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat'), # Ohlmann-Siegel (2000) chlorophyll-a based
+    'ASM4': dict(assimilation_type=2, assim_window=1, extinct_method=15), # Paulson-Simpson 9-band with Jerlov type I modification due to Verevochkin (2005)
+    'ASM5': dict(assimilation_type=2, assim_window=1, extinct_method=13, extinct_file='iop.dat'), # Lee et al. (2003) IOP-based
+    'ASM6': dict(assimilation_type=2, assim_window=1, extinct_method=16), # Paulson-Simpson 9-band with Jerlov type I modification due to Soloviev et al. (2005)
+}
+             
+albedo_method = {
+    # 0 : dict(albedo_method=0), # DEFAULT. Payne (1976)
+    '.1': dict(albedo_method=1, albedo_file='chlo.dat'), # Ohlmann-Siegel
+    '.2': dict(albedo_method=2),
+}
+
+coolskin_method = {
+    # 0 : dict(coolskin_method=0), # DEFAULT. Fairall et al. (1996a)
+    'a': dict(coolskin_method=1), # Artale (2002)
+}
+
+vgrid_choice = {
+    '75m': dict(depth = 74.539324233308434, nlev = 122, grid_method = 2, grid_file = 'grid_75m.dat'),
+    'HYB-75m': dict(depth = 74.389762997627258, nlev = 41, grid_method = 2, grid_file = 'grid_HYB_75m.dat'),
+    'MFC-75m': dict(depth = 74.389762997627258, nlev = 15, grid_method = 2, grid_file = 'grid_MFC_75m.dat'),
+    '100m': dict(depth = 99.282236525788903, nlev = 132, grid_method = 2, grid_file = 'grid_100m.dat'),
+    '75m_4t': dict(depth = 74.539324233308434, nlev = 122, grid_method = 2, grid_file = 'grid_75m.dat', nsave=30),
+}
+
+
+run_profiles = dict()
+# 5 grids x 7 x 3  = 105 combinations.
+for asm in ASM_level.keys():
+    for grd in vgrid_choice.keys():
+        # Base profiles using default albedo_method and default coolskin_method.
+        run_key = asm + '-' + grd
+        run_profiles[run_key] = dict(**ASM_level[asm],**vgrid_choice[grd])
+
+        # Add albedo sub-profiles:
+        for alb in albedo_method.keys():
+            run_key = asm + alb + '-' + grd
+            run_profiles[run_key] = dict(**ASM_level[asm],**vgrid_choice[grd],**albedo_method[alb])
+
+            # Add coolskin sub-sub-profiles.
+            # NOTE: the combinations like ASM3a-75m is not included in such a loop.
+            for csk in coolskin_method.keys():
+                run_key = asm + alb + csk + '-' + grd
+                run_profiles[run_key] = dict(**ASM_level[asm],**vgrid_choice[grd],**albedo_method[alb], **coolskin_method[csk])
+            #    run_key = asm + alb + csk
+
 # List of run_profiles done in the past.
 
-# TODO: We should specify the corresponding GOTM code version in the profiles as well.
-run_profiles = {
-    # The V2 runs. They were run at 150m deep with 150 levels.
-#    'ASM0': dict(assimilation_type=0, extinct_method=9),
-#    'ASM1': dict(assimilation_type=0, extinct_method=12),
-#    'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9),
-#    'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat',),
+# run_profiles = {
+#     # The V2 runs. They were run at 150m deep with 150 levels.
+# #    'ASM0': dict(assimilation_type=0, extinct_method=9),
+# #    'ASM1': dict(assimilation_type=0, extinct_method=12),
+# #    'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9),
+# #    'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat',),
 
-    # Alternative vertical grid runs.
-    # Maybe we should dynamically calculate 'nlev' and 'depth' from number of lines in the 'grid.dat' files.
-    'ASM3-100m': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat',
-                      depth = 99.282236525788903, nlev = 132,
-                      grid_method = 2, grid_file = 'grid_100m.dat'), 
-    'ASM3-75m': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat', 
-                     depth = 74.539324233308434, nlev = 122,
-                     grid_method = 2, grid_file = 'grid_75m.dat'),
-    'ASM3-MFC-75m': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat', 
-                         depth = 74.389762997627258, nlev = 15,
-                         grid_method = 2, grid_file = 'grid_MFC_75m.dat'),
+#     # Alternative vertical grid runs.
+#     # Maybe we should dynamically calculate 'nlev' and 'depth' from number of lines in the 'grid.dat' files.
+#     'ASM3-100m': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat',
+#                       depth = 99.282236525788903, nlev = 132,
+#                       grid_method = 2, grid_file = 'grid_100m.dat'), 
+#     'ASM3-75m': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat', 
+#                      depth = 74.539324233308434, nlev = 122,
+#                      grid_method = 2, grid_file = 'grid_75m.dat'),
+#     'ASM3-MFC-75m': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat', 
+#                          depth = 74.389762997627258, nlev = 15,
+#                          grid_method = 2, grid_file = 'grid_MFC_75m.dat'),
     
-    # Added for completion and comparison to ASM3-75m
-    'ASM0-75m': dict(assimilation_type=0, extinct_method=9, 
-                     depth = 74.539324233308434, nlev = 122,
-                     grid_method = 2, grid_file = 'grid_75m.dat'),
-    'ASM1-75m': dict(assimilation_type=0, extinct_method=12,
-                     depth = 74.539324233308434, nlev = 122,
-                     grid_method = 2, grid_file = 'grid_75m.dat'),
-    'ASM2-75m': dict(assimilation_type=2, assim_window=1, extinct_method=9, 
-                     depth = 74.539324233308434, nlev = 122,
-                     grid_method = 2, grid_file = 'grid_75m.dat'),
-    # 20171031 Previously ASM4-75m uses extinct_method=13, but the GOTM code
-    # has not incorporated this case and it fell through to the default case
-    # which is extinct_method=1, Jerlev (1976) water type 1.
-    'ASM4-75m': dict(assimilation_type=2, assim_window=1,
-                     extinct_method=1,  
-                     depth = 74.539324233308434, nlev = 122,
-                     grid_method = 2, grid_file = 'grid_75m.dat'),
-    # 20170912 Hybrid grid
-    'ASM3-HYB-75m': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat', 
-                         depth = 74.389762997627258, nlev = 41,
-                         grid_method = 2, grid_file = 'grid_HYB_75m.dat'),
-    # 20171031 Two levels as per email with Sam Pimentel, 2017-10-27.
-    # This is identical to the previous ASM4-75m, now should properly use iop.dat
-    'ASM5-75m': dict(assimilation_type=2, assim_window=1,
-                     extinct_method=13, extinct_file='iop.dat', 
-                     depth = 74.539324233308434, nlev = 122,
-                     grid_method = 2, grid_file = 'grid_75m.dat'),
+#     # Added for completion and comparison to ASM3-75m
+#     'ASM0-75m': dict(assimilation_type=0, extinct_method=9, 
+#                      depth = 74.539324233308434, nlev = 122,
+#                      grid_method = 2, grid_file = 'grid_75m.dat'),
+#     'ASM1-75m': dict(assimilation_type=0, extinct_method=12,
+#                      depth = 74.539324233308434, nlev = 122,
+#                      grid_method = 2, grid_file = 'grid_75m.dat'),
+#     'ASM2-75m': dict(assimilation_type=2, assim_window=1, extinct_method=9, 
+#                      depth = 74.539324233308434, nlev = 122,
+#                      grid_method = 2, grid_file = 'grid_75m.dat'),
+#     # 20171031 Previously ASM4-75m uses extinct_method=13, but the GOTM code
+#     # has not incorporated this case and it fell through to the default case
+#     # which is extinct_method=1, Jerlev (1976) water type 1.
+#     'ASM4-75m': dict(assimilation_type=2, assim_window=1,
+#                      extinct_method=15,  
+#                      depth = 74.539324233308434, nlev = 122,
+#                      grid_method = 2, grid_file = 'grid_75m.dat'),
+#     # 20170912 Hybrid grid
+#     'ASM3-HYB-75m': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat', 
+#                          depth = 74.389762997627258, nlev = 41,
+#                          grid_method = 2, grid_file = 'grid_HYB_75m.dat'),
+#     # 20171031 Two levels as per email with Sam Pimentel, 2017-10-27.
+#     # This is identical to the previous ASM4-75m, now should properly use iop.dat
+#     'ASM5-75m': dict(assimilation_type=2, assim_window=1,
+#                      extinct_method=13, extinct_file='iop.dat', 
+#                      depth = 74.539324233308434, nlev = 122,
+#                      grid_method = 2, grid_file = 'grid_75m.dat'),
 
-    # This is identical to ASM3-75m, the difference lies in the GOTM code. The fixed GOTM
-    # code has the albedo issue fixed, so that Payne's albedo is not applied to Ohlmann-Siegel (2000)
-    # formulas which implicitly include albedo.
-    'ASM3.1-75m': dict(albedo_method=1, albedo_file='chlo.dat', # Now albedo method defaults to Payne's, so we need to change it explicitly.
-                       assimilation_type=2, assim_window=1, 
-                       extinct_method=12, extinct_file='chlo.dat', 
-                       depth = 74.539324233308434, nlev = 122,
-                       grid_method = 2, grid_file = 'grid_75m.dat'),
+#     # This is identical to ASM3-75m, the difference lies in the GOTM code. The fixed GOTM
+#     # code has the albedo issue fixed, so that Payne's albedo is not applied to Ohlmann-Siegel (2000)
+#     # formulas which implicitly include albedo.
+#     'ASM3.1-75m': dict(albedo_method=1, albedo_file='chlo.dat', # Now albedo method defaults to Payne's, so we need to change it explicitly.
+#                        assimilation_type=2, assim_window=1, 
+#                        extinct_method=12, extinct_file='chlo.dat', 
+#                        depth = 74.539324233308434, nlev = 122,
+#                        grid_method = 2, grid_file = 'grid_75m.dat'),
 
-    # 20171106, same as the previous, except with a higher resolution output.
-    'ASM5-75m_4t': dict(assimilation_type=2, assim_window=1,
-                        extinct_method=13, extinct_file='iop.dat', 
-                        depth = 74.539324233308434, nlev = 122,
-                        grid_method = 2, grid_file = 'grid_75m.dat',
-                        nsave=30),
-    'ASM3.1-75m_4t': dict(assimilation_type=2, assim_window=1,
-                          extinct_method=12, extinct_file='chlo.dat', 
-                          depth = 74.539324233308434, nlev = 122,
-                          grid_method = 2, grid_file = 'grid_75m.dat',
-                          nsave=30),
+#     # 20171106, same as the previous, except with a higher resolution output.
+#     'ASM5-75m_4t': dict(assimilation_type=2, assim_window=1,
+#                         extinct_method=13, extinct_file='iop.dat', 
+#                         depth = 74.539324233308434, nlev = 122,
+#                         grid_method = 2, grid_file = 'grid_75m.dat',
+#                         nsave=30),
+#     'ASM3.1-75m_4t': dict(assimilation_type=2, assim_window=1,
+#                           extinct_method=12, extinct_file='chlo.dat', 
+#                           depth = 74.539324233308434, nlev = 122,
+#                           grid_method = 2, grid_file = 'grid_75m.dat',
+#                           nsave=30),
     
-    # assim_window=2 means use the tprof profile time as assimilation time.
-    'ASM5-75m_no_salt': dict(assimilation_type=2, assim_window=2,
-                               s_prof_method=0, # skip s_prof 
-                               extinct_method=13, extinct_file='iop.dat', 
-                               depth = 74.539324233308434, nlev = 122,
-                               grid_method = 2, grid_file = 'grid_75m.dat'),
-    'ASM3.1-75m_no_salt': dict(assimilation_type=2, assim_window=2,
-                                 s_prof_method=0, # skip s_prof 
-                                 extinct_method=12, extinct_file='chlo.dat', 
-                                 depth = 74.539324233308434, nlev = 122,
-                                 grid_method = 2, grid_file = 'grid_75m.dat'),
-    'ASM2-75m_no_salt': dict(assimilation_type=2, assim_window=2, extinct_method=9, 
-                             s_prof_method=0, # skip s_prof
-                             depth = 74.539324233308434, nlev = 122,
-                             grid_method = 2, grid_file = 'grid_75m.dat'),
+#     # # assim_window=2 means use the tprof profile time as assimilation time.
+#     # 'ASM5-75m_no_salt': dict(assimilation_type=2, assim_window=2,
+#     #                            s_prof_method=0, # skip s_prof 
+#     #                            extinct_method=13, extinct_file='iop.dat', 
+#     #                            depth = 74.539324233308434, nlev = 122,
+#     #                            grid_method = 2, grid_file = 'grid_75m.dat'),
+#     # 'ASM3.1-75m_no_salt': dict(assimilation_type=2, assim_window=2,
+#     #                              s_prof_method=0, # skip s_prof 
+#     #                              extinct_method=12, extinct_file='chlo.dat', 
+#     #                              depth = 74.539324233308434, nlev = 122,
+#     #                              grid_method = 2, grid_file = 'grid_75m.dat'),
+#     # 'ASM2-75m_no_salt': dict(assimilation_type=2, assim_window=2, extinct_method=9, 
+#     #                          s_prof_method=0, # skip s_prof
+#     #                          depth = 74.539324233308434, nlev = 122,
+#     #                          grid_method = 2, grid_file = 'grid_75m.dat'),
 
-    # As per emails conversations with Sam on 2017-12-20,
-    # New GOTM switches:
-    # * 'albedo_method', default is the built-in Payne (1972)
-    # * 'coolskin_method', default is Fairall (1996a)
-    # Recall also that 'extinct_method' default is Jerlov water type I (1976)
-    'ASM3.1a-75m': dict(albedo_method = 1, albedo_file = 'chlo.dat', # Ohlmann-Siegel (2000)'s approximation
-                        extinct_method = 12, extinct_file = 'chlo.dat',
-                        coolskin_method = 1, # Artale (2002)
-                        assimilation_type=2, assim_window=1,
-                        depth = 74.539324233308434, nlev = 122,
-                        grid_method = 2, grid_file = 'grid_75m.dat'),
-    'ASM4.1-75m': dict(albedo_method = 1, albedo_file = 'chlo.dat', # Ohlmann-Siegel (2000)'s approximation
-                       extinct_method = 15, # Paulson-Simption 9-band with Jerlov type I modification due to Verevochkin & Startsev, J. Fluid Mech. (2005)
-                       coolskin_method = 0, # Fairall (1996a)
-                       # No extinct_file needed
-                       assimilation_type=2, assim_window=1,
-                       depth = 74.539324233308434, nlev = 122,
-                       grid_method = 2, grid_file = 'grid_75m.dat'),
-    'ASM5.1-75m': dict(albedo_method = 1, albedo_file = 'chlo.dat', # Ohlmann-Siegel (2000)'s approximatio
-                       extinct_method = 13, extinct_file='iop.dat',
-                       coolskin_method = 0, # Fairall (1996a)
-                       assimilation_type=2, assim_window=1,
-                       depth = 74.539324233308434, nlev = 122,
-                       grid_method = 2, grid_file = 'grid_75m.dat'),
-    'ASM5.2-75m': dict(albedo_method = 2, # Jin et al. (2011)
-                       extinct_method = 13, extinct_file='iop.dat',
-                       coolskin_method = 0, # Fairall (1996a)
-                       assimilation_type=2, assim_window=1,
-                       depth = 74.539324233308434, nlev = 122,
-                       grid_method = 2, grid_file = 'grid_75m.dat'),
+#     # As per emails conversations with Sam on 2017-12-20,
+#     # New GOTM switches:
+#     # * 'albedo_method', default is the built-in Payne (1972)
+#     # * 'coolskin_method', default is Fairall (1996a)
+#     # Recall also that 'extinct_method' default is Jerlov water type I (1976)
+#     'ASM3.1a-75m': dict(albedo_method = 1, albedo_file = 'chlo.dat', # Ohlmann-Siegel (2000)'s approximation
+#                         extinct_method = 12, extinct_file = 'chlo.dat',
+#                         coolskin_method = 1, # Artale (2002)
+#                         assimilation_type=2, assim_window=1,
+#                         depth = 74.539324233308434, nlev = 122,
+#                         grid_method = 2, grid_file = 'grid_75m.dat'),
+#     'ASM4.1-75m': dict(albedo_method = 1, albedo_file = 'chlo.dat', # Ohlmann-Siegel (2000)'s approximation
+#                        extinct_method = 15, # Paulson-Simption 9-band with Jerlov type I modification due to Verevochkin & Startsev, J. Fluid Mech. (2005)
+#                        coolskin_method = 0, # Fairall (1996a)
+#                        # No extinct_file needed
+#                        assimilation_type=2, assim_window=1,
+#                        depth = 74.539324233308434, nlev = 122,
+#                        grid_method = 2, grid_file = 'grid_75m.dat'),
+#     'ASM5.1-75m': dict(albedo_method = 1, albedo_file = 'chlo.dat', # Ohlmann-Siegel (2000)'s approximatio
+#                        extinct_method = 13, extinct_file='iop.dat',
+#                        coolskin_method = 0, # Fairall (1996a)
+#                        assimilation_type=2, assim_window=1,
+#                        depth = 74.539324233308434, nlev = 122,
+#                        grid_method = 2, grid_file = 'grid_75m.dat'),
+#     'ASM5.2-75m': dict(albedo_method = 2, # Jin et al. (2011)
+#                        extinct_method = 13, extinct_file='iop.dat',
+#                        coolskin_method = 0, # Fairall (1996a)
+#                        assimilation_type=2, assim_window=1,
+#                        depth = 74.539324233308434, nlev = 122,
+#                        grid_method = 2, grid_file = 'grid_75m.dat'),
     
 
-    # 20180227 Accidentally ran "ASM2.1", might as well include it.
-    'ASM2.1-75m': dict(albedo_method = 1, albedo_file = 'chlo.dat', # Ohlmann-Siegel (2000)'s approximatio
-                       assimilation_type=2, assim_window=1, extinct_method=9, 
-                       depth = 74.539324233308434, nlev = 122,
-                       grid_method = 2, grid_file = 'grid_75m.dat'),
+#     # 20180227 Accidentally ran "ASM2.1", might as well include it.
+#     'ASM2.1-75m': dict(albedo_method = 1, albedo_file = 'chlo.dat', # Ohlmann-Siegel (2000)'s approximatio
+#                        assimilation_type=2, assim_window=1, extinct_method=9, 
+#                        depth = 74.539324233308434, nlev = 122,
+#                        grid_method = 2, grid_file = 'grid_75m.dat'),
 
-}
+#     # Completing the run matrix for Jin albedo.
+#     'ASM2.2-75m': dict(albedo_method = 2, # Jin et al. (2011)
+#                        assimilation_type=2, assim_window=1, extinct_method=9, 
+#                        depth = 74.539324233308434, nlev = 122,
+#                        grid_method = 2, grid_file = 'grid_75m.dat'),
+    
+#     'ASM3.1-75m': dict(albedo_method=1, albedo_file='chlo.dat', # Now albedo method defaults to Payne's, so we need to change it explicitly.
+#                        assimilation_type=2, assim_window=1, 
+#                        extinct_method=12, extinct_file='chlo.dat', 
+#                        depth = 74.539324233308434, nlev = 122,
+#                        grid_method = 2, grid_file = 'grid_75m.dat'),
+    
+# }
 
 
 # Routines to set global values in this module. Can be used in interactive session to change config.
@@ -214,7 +281,7 @@ def set_grid(new_grid=grid, new_ASM=ASM,
     global grid_lats, grid_lons, medsea_flags, max_depth
     global medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth
     global M, N, sea_mn, sea_m, sea_n
-    global grid_folder, data_folder
+    global grid_folder, data_folder, results_folder
 
     # For plotting heatmaps more conveniently
     global extent
@@ -247,7 +314,9 @@ def set_grid(new_grid=grid, new_ASM=ASM,
     else:
         print('WARNING: unknown run profile: ' + run)
 
-
+    # Update the results folder
+    results_folder = os.path.join(project_folder,'results','ASM{!s}-{!s}m_{:s}'.format(ASM,max_depth,grid))
+    
     # Set up the slices for the subgrid using the name.
     if new_grid in ['9x_{:d}'.format(i) for i in range(16)]:
         k = int(new_grid[3:])
