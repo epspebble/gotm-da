@@ -797,7 +797,10 @@ def prepare_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or 
 
     updatecfg(path=local_folder, **gotm_args)
     return local_folder, out_fn, gotm_args
-                  
+
+#def buoy_run():
+    
+        
 def local_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or (lat,lon); and start/stop,
 #              run, # A name for this run, if it matches a key in run_profile, the settings will be loaded. Should specify when loading the module.
               year = None, month = None, # Provided to compute start, stop.
@@ -959,10 +962,17 @@ class buoy:
         self.grid_lat, self.grid_lon = get_lat_lon(self.m,self.n,silent=True)
         self.run_GOTM = lambda start, stop: local_run(self.m,self.n,start,stop,plotvars=['swr','sst'])
         
-buoy_UTC0 = buoy('61430',39.56,2.1,'1x')
-buoy_UTC1 = buoy('ADN-E2M3A',41.5277,18.0824,'1x')
-buoy_UTC2 = buoy('61277',35.723,25.462,'1x')
-buoys = [buoy_UTC0,buoy_UTC1,buoy_UTC2]
+# buoy_UTC0 = buoy('61430',39.56,2.1,'1x')
+# buoy_UTC1 = buoy('ADN-E2M3A',41.5277,18.0824,'1x')
+# buoy_UTC2 = buoy('61277',35.723,25.462,'1x')
+# buoys = [buoy_UTC0,buoy_UTC1,buoy_UTC2]
+
+buoys = [buoy('61277',35.723,25.462),
+         buoy('61280',40.6875,1.472),
+         buoy('61281',39.5215,0.2075),
+         buoy('61430',39.555,2.105),
+         buoy('68422',36.829,21.608),
+         buoy('SARON',37.61,23.569)]
 
 ## Rewrite and put in another file, not here.
 # def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
