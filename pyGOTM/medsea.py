@@ -292,11 +292,17 @@ def set_grid(new_grid=grid, new_ASM=ASM,
     grid_folder = os.path.join(project_folder,'grid',grid)
     if not os.path.isdir(grid_folder):
         print('Creating new grid folder: {!s}'.format(grid_folder))
-        os.mkdir(grid_folder)
+        try:
+            os.mkdir(grid_folder)
+        except Exception as e:
+            print(e)
     data_folder = os.path.join(project_folder,'data',grid)
     if not os.path.isdir(data_folder):
         print('Creating new data folder: {!s}'.format(data_folder))
-        os.mkdir(data_folder)    
+        try:
+            os.mkdir(data_folder)
+        except Exception as e:
+            print(e)
 
     max_depth = new_max_depth
 
@@ -798,7 +804,165 @@ def prepare_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or 
     updatecfg(path=local_folder, **gotm_args)
     return local_folder, out_fn, gotm_args
 
-#def buoy_run():
+def buoy_run(code,start,stop,run,cached=False):
+
+    from datetime import datetime
+    from netCDF4 import Dataset, num2date
+    from os.path import join, isfile, isdir, getsize
+    import shutil
+    from shutil import copyfile
+    
+
+    if not isinstance(code,str):
+        code = str(code)
+            
+    ### Configure parameters.
+    local_folder = join(project_folder,'buoys',code)
+    
+    lat = buoys[code].lat
+    lon = buoys[code].lon
+    
+    # Put a tag to generated file names.
+    tag = run + '_' + GOTM_version
+    out_fn = 'results_' + tag
+    out_dir = '.' if not cached else cache_folder
+    
+    daily_stat_fn='daily_stat_'+tag+'.txt'
+
+        
+  
+    # Set up GOTM arguments.
+    gotm_args = dict(name = code + '_' + tag, # Just use the run name / profile instead of run_name
+                     start = str(start), stop = str(stop),
+                     latitude = float(lat), longitude = float(lon),
+                     out_dir = out_dir, out_fn = out_fn,
+                     daily_stat_fn = daily_stat_fn)
+
+    if run in run_profiles.keys():
+        gotm_args.update(run_profiles[run])
+    else:
+        raise NotImplementedError('A profile must be specified and hard-coded.')
+
+
+    ### Prepare the local_folder.
+    
+    ## Step 1.
+    for each in GOTM_nml:
+        # All config files are overwritten every time GOTM is run.
+        src = join(GOTM_nml_path,each)
+        dst = join(local_folder,each)
+        # print('Copying {:s} to {:s}'.format(src,dst))
+        copyfile(src,dst)
+
+    # The grid data file too if necessary.
+    if 'grid_method' in gotm_args.keys() and gotm_args['grid_method'] == 2:
+        assert 'grid_file' in gotm_args.keys()
+        # Get the externally specified sea level widths if method is 2.
+        grid_file = gotm_args['grid_file']
+        src = join(GOTM_nml_path,grid_file)
+        dst = join(local_folder,grid_file)
+        # print('Copying {:s} to {:s}'.format(src,dst))
+        copyfile(src,dst)
+
+    ## Step 2.
+    # GOTM_executable, default to be at [project_folder]/bin/[GOTM_executable], should have been checked for existence when pyGOTM.config was loaded
+    if not(isfile(dst)):
+        symlink(join(GOTM_executable_path,GOTM_executable),
+                join(local_folder,GOTM_executable))
+
+    ## Step 3.
+    # Create a list of dat files we expect to see.
+    dat_list = ['tprof','sprof','heat','met'] # Usual set.
+    if ('t_prof_method' in gotm_args):
+        tm = gotm_args['t_prof_method']
+        if tm != 2: # 2 indicates read from file.
+            dat_list.remove('tprof')
+    if ('s_prof_method' in gotm_args):
+        sm = gotm_args['s_prof_method']
+        if sm != 2: # 2 indicates read from file.
+            dat_list.remove('sprof')
+    if ('extinct_method' in gotm_args):
+        em = gotm_args['extinct_method']
+        if em <= 11 or em == 15 or em == 16:
+            pass # Either Jerlov or variants of Paulson-Simpson. Data file not needed.
+        elif em == 12:
+            dat_list.append('chlo')
+        elif em == 13:
+            dat_list.append('iop')
+        else:
+            raise NotImplementedError('Not implemented for extinct_method={:d} yet.'.format(em))
+
+    # Now whether each dat file exists and has nonzero size (not just 'touched' by an erroneous read by GOTM)
+    for each in dat_list:
+        datfn = join(local_folder,each+'.dat')
+        try:
+            assert getsize(datfn) > 0
+        except:
+            print(datfn)
+            raise OSError(each+'.dat not found or has zero length. Check overall grid data integrity. ')
+
+    # Actually update the namelists: after this, local_folder is really configured to run GOTM.
+    updatecfg(path=local_folder, **gotm_args)
+
+    ### Actual run.
+    curdir = os.getcwd()
+    os.chdir(local_folder)
+    stat = dict()
+    try:
+        tic()
+
+        # 1. Run GOTM keeping the output to log.
+        logfn = 'GOTM_' + run + '_' + print_ctime(sep='_') + '.log'
+        print('GOTM running... ')
+        print('  Working from: {:s}...'.format(local_folder))
+        gotm(verbose=verbose,logfn=logfn)
+        print('  Results written to {:s}.nc...'.format(join(out_dir,out_fn)))
+
+        # 2. Transfer the results nc immediately.
+        if cached:
+            src = join(out_dir,out_fn+'.nc')
+            dst = join(local_folder,out_fn+'.nc')
+            try:
+                print('Moving {:s} to {:s}...'.format(src,dst))
+                shutil.move(src,dst)
+            except:
+                raise
+
+        # 3. Print out GOTM execution statistics.
+        stat['elapsed'] = toc()
+        # statfn = 'stat_{:d}{:02d}.dat'.format(year,month)
+        statfn = 'STAT_' + run + '_' + print_ctime(sep='_') + '.log'
+        with open(statfn,'w') as f:
+            print('Writing diagnostic statistics to {0}...\n'.format(statfn))
+            f.write('--------------------------------------------------------------\n')
+            f.write('Run parameters:\n')
+            for key, val in gotm_args.items():
+                f.write('    {:s} = {!s}\n'.format(key,val))
+            f.write('--------------------------------------------------------------\n')
+            f.write('Run statistics:\n')
+            f.write('Elapsed: {:.2f} seconds.\n'.format(stat['elapsed']))
+            f.write('--------------------------------------------------------------\n')
+            f.write('Data statisitics:\n')
+            with Dataset(join(local_folder,gotm_args['out_fn']+'.nc'),'r') as ds:
+                sst = ds['sst'][:]
+                time = ds['time']
+                stat.update(sst_mean = sst.mean(),
+                            sst_max = sst.max(),
+                            sst_time_max = num2date(time[sst.argmax()],time.units),
+                            sst_min = sst.min(),
+                            sst_time_min = num2date(time[sst.argmin()],time.units))
+                f.write('   SST:\n')
+                f.write('      Mean: {sst_mean:.4g}\n'.format(**stat))
+                f.write('      Max: {sst_max:.4g} at {sst_time_max!s}\n'.format(**stat))
+                f.write('      Min: {sst_min:.4g} at {sst_time_min!s}\n'.format(**stat))
+            f.write('--------------------------------------------------------------\n')
+    except:
+        os.chdir(curdir)
+        raise
+    os.chdir(curdir)
+    
+    return stat
+
     
         
 def local_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or (lat,lon); and start/stop,
@@ -954,25 +1118,26 @@ def create_variable(nc,varname,datatype,dimensions=('time','lat','lon'),zlib=Tru
 
 # Taking from scratch notebook. Good to saving buoy information in this module.
 class buoy:
-    def __init__(self,name,lat,lon,grid='1x'):
-        self.name = name
+    def __init__(self,code,lat,lon,grid='1x'):
+        self.code = code
         self.lat = lat
         self.lon = lon
         self.m, self.n = get_m_n(lat,lon,silent=True)
         self.grid_lat, self.grid_lon = get_lat_lon(self.m,self.n,silent=True)
-        self.run_GOTM = lambda start, stop: local_run(self.m,self.n,start,stop,plotvars=['swr','sst'])
+        self.run_GOTM = lambda start, stop: buoy_run(self.code,start,stop,run)
         
 # buoy_UTC0 = buoy('61430',39.56,2.1,'1x')
 # buoy_UTC1 = buoy('ADN-E2M3A',41.5277,18.0824,'1x')
 # buoy_UTC2 = buoy('61277',35.723,25.462,'1x')
 # buoys = [buoy_UTC0,buoy_UTC1,buoy_UTC2]
 
-buoys = [buoy('61277',35.723,25.462),
-         buoy('61280',40.6875,1.472),
-         buoy('61281',39.5215,0.2075),
-         buoy('61430',39.555,2.105),
-         buoy('68422',36.829,21.608),
-         buoy('SARON',37.61,23.569)]
+buoys = { '61277' : buoy('61277',35.723,25.462),
+          '61280' : buoy('61280',40.6875,1.472),
+          '61281' : buoy('61281',39.5215,0.2075),
+          '61430' : buoy('61430',39.555,2.105),
+          '68422' : buoy('68422',36.829,21.608),
+          'SARON' : buoy('SARON',37.61,23.569)
+}
 
 ## Rewrite and put in another file, not here.
 # def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
