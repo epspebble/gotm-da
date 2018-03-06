@@ -60,7 +60,7 @@ grid_folder = os.path.join(project_folder,'grid',grid)
 
 ASM_level = {
     # Assimilate at local midnight.
-    'ASM0': dict(assimilation_type=0, extinct_method=9), # Paulson-Simpson 9-band.
+    'ASM-1': dict(assimilation_type=0, extinct_method=9), # Paulson-Simpson 9-band.
     'ASM1': dict(assimilation_type=0, extinct_method=12, extinct_file='chlo.dat'), # Ohlmann-Siegel (2000) chlorophyll-a based
     # Assimlate at I_0 > 1 after local midnight.
     'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9), # Paulson-Simpson 9-band.
@@ -804,34 +804,42 @@ def prepare_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or 
     updatecfg(path=local_folder, **gotm_args)
     return local_folder, out_fn, gotm_args
 
-def buoy_run(code,start,stop,run,cached=False):
+def buoy_run(code,start,stop,run,cached=True):
 
     from datetime import datetime
     from netCDF4 import Dataset, num2date
-    from os.path import join, isfile, isdir, getsize
+    from os.path import join, isfile, isdir, getsize, basename
     import shutil
-    from shutil import copyfile
-    
+    from shutil import copyfile, rmtree
+    from glob import glob
+    from tempfile import mkdtemp
 
     if not isinstance(code,str):
         code = str(code)
             
-    ### Configure parameters.
-    local_folder = join(project_folder,'buoys',code)
-    
-    lat = buoys[code].lat
-    lon = buoys[code].lon
-    
+    ### Configure the folder where GOTM is run
+    buoy_dir = join(project_folder,'buoys',code)
+    if cached:
+        dat_src = glob(join(buoy_dir,'*.dat'))
+        out_dir = mkdtemp(prefix='medsea_buoy_' + code + '_', dir=cache_folder)
+        # Copy the .dat files over
+        for src in dat_src:
+            fn = basename(src)
+            dst = join(out_dir,fn)
+            copyfile(src,dst)
+    else:
+        out_dir = buoy_dir
+
     # Put a tag to generated file names.
     tag = run + '_' + GOTM_version
     out_fn = 'results_' + tag
-    out_dir = '.' if not cached else cache_folder
-    
     daily_stat_fn='daily_stat_'+tag+'.txt'
-
         
   
     # Set up GOTM arguments.
+    lat = buoys[code].lat
+    lon = buoys[code].lon
+   
     gotm_args = dict(name = code + '_' + tag, # Just use the run name / profile instead of run_name
                      start = str(start), stop = str(stop),
                      latitude = float(lat), longitude = float(lon),
@@ -843,14 +851,13 @@ def buoy_run(code,start,stop,run,cached=False):
     else:
         raise NotImplementedError('A profile must be specified and hard-coded.')
 
-
-    ### Prepare the local_folder.
+    ### Prepare the run_dir.
     
     ## Step 1.
     for each in GOTM_nml:
         # All config files are overwritten every time GOTM is run.
         src = join(GOTM_nml_path,each)
-        dst = join(local_folder,each)
+        dst = join(out_dir,each)
         # print('Copying {:s} to {:s}'.format(src,dst))
         copyfile(src,dst)
 
@@ -860,7 +867,7 @@ def buoy_run(code,start,stop,run,cached=False):
         # Get the externally specified sea level widths if method is 2.
         grid_file = gotm_args['grid_file']
         src = join(GOTM_nml_path,grid_file)
-        dst = join(local_folder,grid_file)
+        dst = join(out_dir,grid_file)
         # print('Copying {:s} to {:s}'.format(src,dst))
         copyfile(src,dst)
 
@@ -868,7 +875,7 @@ def buoy_run(code,start,stop,run,cached=False):
     # GOTM_executable, default to be at [project_folder]/bin/[GOTM_executable], should have been checked for existence when pyGOTM.config was loaded
     if not(isfile(dst)):
         symlink(join(GOTM_executable_path,GOTM_executable),
-                join(local_folder,GOTM_executable))
+                join(out_dir,GOTM_executable))
 
     ## Step 3.
     # Create a list of dat files we expect to see.
@@ -894,19 +901,19 @@ def buoy_run(code,start,stop,run,cached=False):
 
     # Now whether each dat file exists and has nonzero size (not just 'touched' by an erroneous read by GOTM)
     for each in dat_list:
-        datfn = join(local_folder,each+'.dat')
+        datfn = join(out_dir,each+'.dat')
         try:
             assert getsize(datfn) > 0
         except:
             print(datfn)
             raise OSError(each+'.dat not found or has zero length. Check overall grid data integrity. ')
 
-    # Actually update the namelists: after this, local_folder is really configured to run GOTM.
-    updatecfg(path=local_folder, **gotm_args)
+    # Actually update the namelists: after this, out_dir is really configured to run GOTM.
+    updatecfg(path=out_dir, **gotm_args)
 
     ### Actual run.
     curdir = os.getcwd()
-    os.chdir(local_folder)
+    os.chdir(out_dir)
     stat = dict()
     try:
         tic()
@@ -914,36 +921,44 @@ def buoy_run(code,start,stop,run,cached=False):
         # 1. Run GOTM keeping the output to log.
         logfn = 'GOTM_' + run + '_' + print_ctime(sep='_') + '.log'
         print('GOTM running... ')
-        print('  Working from: {:s}...'.format(local_folder))
+        print('  Working from: {:s}...'.format(out_dir))
         gotm(verbose=verbose,logfn=logfn)
         print('  Results written to {:s}.nc...'.format(join(out_dir,out_fn)))
 
-        # 2. Transfer the results nc immediately.
+        # 2. Transfer the results nc and daily_stats txt files immediately.
         if cached:
-            src = join(out_dir,out_fn+'.nc')
-            dst = join(local_folder,out_fn+'.nc')
-            try:
-                print('Moving {:s} to {:s}...'.format(src,dst))
-                shutil.move(src,dst)
-            except:
-                raise
+            def move(src_dir,dst_dir,fn):
+                src = join(src_dir,fn)
+                dst = join(dst_dir,fn)
+                try:
+                    print('Moving {:s} to {:s}...'.format(src,dst))
+                    shutil.move(src,dst)
+                except:
+                    raise
+            move(out_dir,buoy_dir,out_fn+'.nc')
+            move(out_dir,buoy_dir,daily_stat_fn)
+        else:
+            assert out_dir == buoy_dir
+            print('GOTM has been run at {:s} uncached, with I/O at every nsave interval. '.format(buoy_dir))
+            
 
         # 3. Print out GOTM execution statistics.
         stat['elapsed'] = toc()
         # statfn = 'stat_{:d}{:02d}.dat'.format(year,month)
-        statfn = 'STAT_' + run + '_' + print_ctime(sep='_') + '.log'
-        with open(statfn,'w') as f:
-            print('Writing diagnostic statistics to {0}...\n'.format(statfn))
+        #statfn = 'STAT_' + run + '_' + print_ctime(sep='_') + '.log'
+        statfn = 'STAT_' + run + '_' + '.log'
+        with open(join(buoy_dir,statfn),'a+') as f:
+            print('{:s}: Writing diagnostic statistics to {:s}...\n'.format(print_ctime(sep=' '),statfn))
             f.write('--------------------------------------------------------------\n')
-            f.write('Run parameters:\n')
+            f.write('Run parameters supplied to override defaults in medsea_GOTM/config/*.inp :\n')
             for key, val in gotm_args.items():
                 f.write('    {:s} = {!s}\n'.format(key,val))
             f.write('--------------------------------------------------------------\n')
             f.write('Run statistics:\n')
             f.write('Elapsed: {:.2f} seconds.\n'.format(stat['elapsed']))
             f.write('--------------------------------------------------------------\n')
-            f.write('Data statisitics:\n')
-            with Dataset(join(local_folder,gotm_args['out_fn']+'.nc'),'r') as ds:
+            f.write('Data statistics:\n')
+            with Dataset(join(buoy_dir,gotm_args['out_fn']+'.nc'),'r') as ds:
                 sst = ds['sst'][:]
                 time = ds['time']
                 stat.update(sst_mean = sst.mean(),
@@ -959,11 +974,14 @@ def buoy_run(code,start,stop,run,cached=False):
     except:
         os.chdir(curdir)
         raise
+    
     os.chdir(curdir)
-    
+    if cached:
+        print("Removing the cached files at {:s}, containing: ".format(out_dir))
+        for each in glob(join(out_dir,'*')):
+            print('\t {:s}'.format(basename(each)))
+        rmtree(out_dir)
     return stat
-
-    
         
 def local_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or (lat,lon); and start/stop,
 #              run, # A name for this run, if it matches a key in run_profile, the settings will be loaded. Should specify when loading the module.
