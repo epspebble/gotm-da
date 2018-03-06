@@ -60,7 +60,7 @@ grid_folder = os.path.join(project_folder,'grid',grid)
 
 ASM_level = {
     # Assimilate at local midnight.
-    'ASM-1': dict(assimilation_type=0, extinct_method=9), # Paulson-Simpson 9-band.
+    'ASM0': dict(assimilation_type=0, extinct_method=9), # Paulson-Simpson 9-band.
     'ASM1': dict(assimilation_type=0, extinct_method=12, extinct_file='chlo.dat'), # Ohlmann-Siegel (2000) chlorophyll-a based
     # Assimlate at I_0 > 1 after local midnight.
     'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9), # Paulson-Simpson 9-band.
@@ -87,6 +87,8 @@ vgrid_choice = {
     'MFC-75m': dict(depth = 74.389762997627258, nlev = 15, grid_method = 2, grid_file = 'grid_MFC_75m.dat'),
     '100m': dict(depth = 99.282236525788903, nlev = 132, grid_method = 2, grid_file = 'grid_100m.dat'),
     '75m_4t': dict(depth = 74.539324233308434, nlev = 122, grid_method = 2, grid_file = 'grid_75m.dat', nsave=30),
+    'EXT-75m': dict(depth = 74.539324233308434, nlev = 125, grid_method = 2, grid_file = 'grid_EXT_75m.dat'),    
+    'EXT-75m_4t': dict(depth = 74.539324233308434, nlev = 125, grid_method = 2, grid_file = 'grid_EXT_75m.dat', nsave=30),
 }
 
 
@@ -849,6 +851,7 @@ def buoy_run(code,start,stop,run,cached=True):
     if run in run_profiles.keys():
         gotm_args.update(run_profiles[run])
     else:
+        print('Run profile name given: {:s}'.format(run))
         raise NotImplementedError('A profile must be specified and hard-coded.')
 
     ### Prepare the run_dir.
@@ -946,7 +949,7 @@ def buoy_run(code,start,stop,run,cached=True):
         stat['elapsed'] = toc()
         # statfn = 'stat_{:d}{:02d}.dat'.format(year,month)
         #statfn = 'STAT_' + run + '_' + print_ctime(sep='_') + '.log'
-        statfn = 'STAT_' + run + '_' + '.log'
+        statfn = 'STAT_' + run + '.log'
         with open(join(buoy_dir,statfn),'a+') as f:
             print('{:s}: Writing diagnostic statistics to {:s}...\n'.format(print_ctime(sep=' '),statfn))
             f.write('--------------------------------------------------------------\n')
