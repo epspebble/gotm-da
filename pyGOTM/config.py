@@ -45,7 +45,7 @@ GOTM_version = 'latest'
 # For setting unit of combined result files.
 epoch = datetime(1981,1,1)
 
-def setup(**overrides):
+def setup(verbose=verbose,**overrides):
     """
     Set up other global variables including: 
 

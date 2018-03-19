@@ -255,7 +255,8 @@ for asm in ASM_level.keys():
 def set_grid(new_grid=grid, new_ASM=ASM,
              new_max_depth=max_depth, # These names just need to be different... Because we cannot declare an input name global below...
              subindices=None,
-             plot = False, stat = True, return_grid_data = False,
+             return_grid_data = False,
+             verbose = verbose, stat = True, plot = False
              ):
     """ Obtain the 1/16 degree grid used in medsea_rea, and classify each grid points according to 'max_depth'.
         A sub-grid is set to the global variables in the module, and also returned by specifying 'subindices':
@@ -311,14 +312,15 @@ def set_grid(new_grid=grid, new_ASM=ASM,
     # Update the run
     run = 'ASM{!s}-{!s}m'.format(ASM,max_depth)
     if run in run_profiles.keys():
-        print('Preset run profile: ' + run + ' selected:')
-            # Print run profile details.
         run_config = run_profiles[run]
-        if 'tabulate' not in sys.modules.keys():
-            for key in run_config:
-                print('\t',key,':\t', run_config[key])
-        else:
-            print(tabulate([[name,val] for name, val in run_config.items()]))
+        if verbose:
+            print('Preset run profile: ' + run + ' selected:')
+            # Print run profile details.
+            if 'tabulate' not in sys.modules.keys():
+                for key in run_config:
+                    print('\t',key,':\t', run_config[key])
+                else:
+                    print(tabulate([[name,val] for name, val in run_config.items()]))
     else:
         print('WARNING: unknown run profile: ' + run)
 
@@ -366,7 +368,8 @@ def set_grid(new_grid=grid, new_ASM=ASM,
     #print(medsea_rea_lat_ind)
     #print(medsea_rea_lon_ind)
 
-    print('Initializing grid...')
+    if verbose:
+        print('Initializing grid...')
     # Load the rea grid, and a sample set of data for its masks.
     with Dataset(os.path.join(p_sossta_folder, 'medsea_rea/2013/20130101_TEMP_re-fv6.nc'),'r') as ds:
         lat_rea = ds['lat'][:]
@@ -398,9 +401,10 @@ def set_grid(new_grid=grid, new_ASM=ASM,
 
     #print(grid_lats.size,grid_lons.size,grid_lats.min(),grid_lats.max(),grid_lons.min(),grid_lons.max())
     extent = (grid_lats.min(),grid_lats.max(),grid_lons.min(),grid_lons.max())
-    print('Finished setting up a subgrid of shape {!s} x {!s} with {!s} <= latitude <= {!s}, {!s} <= longitude <= {!s}.'.format(\
-                                                                                                                                M,N,*extent))
-    if stat:
+    if verbose:
+        print('Finished setting up a subgrid of shape {!s} x {!s} '.format(M,N) +
+              'with {!s} <= latitude <= {!s}, {!s} <= longitude <= {!s}.'.format(*extent))
+    if verbose and stat:
         # The following are for the current subgrid.
         def print_stat(bl_array):
             drei = bl_array.size
