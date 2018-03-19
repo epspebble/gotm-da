@@ -63,11 +63,19 @@ ASM_level = {
     'ASM0': dict(assimilation_type=0, extinct_method=9), # Paulson-Simpson 9-band.
     'ASM1': dict(assimilation_type=0, extinct_method=12, extinct_file='chlo.dat'), # Ohlmann-Siegel (2000) chlorophyll-a based
     # Assimlate at I_0 > 1 after local midnight.
-    'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9), # Paulson-Simpson 9-band.
-    'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat'), # Ohlmann-Siegel (2000) chlorophyll-a based
-    'ASM4': dict(assimilation_type=2, assim_window=1, extinct_method=15), # Paulson-Simpson 9-band with Jerlov type I modification due to Verevochkin (2005)
-    'ASM5': dict(assimilation_type=2, assim_window=1, extinct_method=13, extinct_file='iop.dat'), # Lee et al. (2003) IOP-based
-    'ASM6': dict(assimilation_type=2, assim_window=1, extinct_method=16), # Paulson-Simpson 9-band with Jerlov type I modification due to Soloviev et al. (2005)
+    # 'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9), # Paulson-Simpson 9-band.
+    # 'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat'), # Ohlmann-Siegel (2000) chlorophyll-a based
+    # 'ASM4': dict(assimilation_type=2, assim_window=1, extinct_method=15), # Paulson-Simpson 9-band with Jerlov type I modification due to Verevochkin (2005)
+    # 'ASM5': dict(assimilation_type=2, assim_window=1, extinct_method=13, extinct_file='iop.dat'), # Lee et al. (2003) IOP-based
+    # 'ASM6': dict(assimilation_type=2, assim_window=1, extinct_method=16), # Paulson-Simpson 9-band with Jerlov type I modification due to Soloviev et al. (2005)
+
+    # switch to assimilation at "sunrise" by coszen \approx 0.
+    'ASM2': dict(assimilation_type=2, assim_window=3, extinct_method=9), # Paulson-Simpson 9-band.
+    'ASM3': dict(assimilation_type=2, assim_window=3, extinct_method=12, extinct_file='chlo.dat'), # Ohlmann-Siegel (2000) chlorophyll-a based
+    'ASM4': dict(assimilation_type=2, assim_window=3, extinct_method=15), # Paulson-Simpson 9-band with Jerlov type I modification due to Verevochkin (2005)
+    'ASM5': dict(assimilation_type=2, assim_window=3, extinct_method=13, extinct_file='iop.dat'), # Lee et al. (2003) IOP-based
+    'ASM6': dict(assimilation_type=2, assim_window=3, extinct_method=16), # Paulson-Simpson 9-band with Jerlov type I modification due to Soloviev et al. (2005)
+
 }
              
 albedo_method = {

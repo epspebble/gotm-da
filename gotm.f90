@@ -40,9 +40,8 @@ module gotm
   use airsea, only: init_air_sea,air_sea_interaction
   use airsea, only: set_sst,integrated_fluxes
   use airsea, only: calc_fluxes
-  use airsea, only: tx,ty,I_0,heat,qh,qb,qe,cloud,int_cs
-  !HK 
-  use airsea, only: qdir_frac, qdiff_frac,cosr
+  use airsea, only: tx,ty,heat,qh,qb,qe,cloud,int_cs,I_0, coszen !WT I_0, coszen used in demarcating assimilation cycle boundaries.
+  use airsea, only: qdir_frac, qdiff_frac,cosr !HK 
 
   use meanflow
   use turbulence
@@ -582,6 +581,36 @@ contains
                    call assimilation(T(1:nlev),S(1:nlev),tprof(1:nlev),sprof(1:nlev),cloud,advect,int_cs)
                    mark = 1
                 endif
+                
+             case (3) ! assimilate at "sunrise" version two, when coszen changes sign from - to +.
+                if (coszen.gt.0) then
+                   !! WT 20180319 The following code is a copy-and-paste of case(1).
+                   
+                   ! The previous assimilation cycle has just completed. Write down the daily stats now.
+                   if (first) then
+                      ! This result is for the part of the day before the first assimilation event.
+                      call write_daily_stats(unit_daily_stat,0)
+                   else
+                      ! Theses result are for the assim cycle that is just completed, i.e. the previous day.
+                      call write_daily_stats(unit_daily_stat)
+                   end if
+                   
+                   ! Also reset aggregator variables
+                   count = 0
+                   daily_SST_mean = 0 
+                   daily_SST_max = -99
+                   daily_SST_min_day = 99
+                   daily_SST_min_night = 99
+
+                   call assimilation(T(1:nlev),S(1:nlev),tprof(1:nlev),sprof(1:nlev),cloud,advect,int_cs)
+                   ! WT Here the new assimilation cycle really begins. Record the time.
+                   ! This value may be negative (more likely) or greater than 60*60*24 = 86400 (less likely) which depend on timezone,
+                   ! when this happens, the true lsecs_assim_time in that day is the positive remainder after division by 86400, but the
+                   ! sign or value the quotient has significance being that this occurs in a day before or later compared to the date in
+                   ! UTC timezone.
+                   lsecs_assim_time = secondsofday + tz(longitude)*3600
+                   mark = 1
+                end if
              end select
           endif
 
