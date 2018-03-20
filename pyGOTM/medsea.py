@@ -60,14 +60,22 @@ grid_folder = os.path.join(project_folder,'grid',grid)
 
 ASM_level = {
     # Assimilate at local midnight.
-    'ASM-1': dict(assimilation_type=0, extinct_method=9), # Paulson-Simpson 9-band.
+    'ASM0': dict(assimilation_type=0, extinct_method=9), # Paulson-Simpson 9-band.
     'ASM1': dict(assimilation_type=0, extinct_method=12, extinct_file='chlo.dat'), # Ohlmann-Siegel (2000) chlorophyll-a based
     # Assimlate at I_0 > 1 after local midnight.
-    'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9), # Paulson-Simpson 9-band.
-    'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat'), # Ohlmann-Siegel (2000) chlorophyll-a based
-    'ASM4': dict(assimilation_type=2, assim_window=1, extinct_method=15), # Paulson-Simpson 9-band with Jerlov type I modification due to Verevochkin (2005)
-    'ASM5': dict(assimilation_type=2, assim_window=1, extinct_method=13, extinct_file='iop.dat'), # Lee et al. (2003) IOP-based
-    'ASM6': dict(assimilation_type=2, assim_window=1, extinct_method=16), # Paulson-Simpson 9-band with Jerlov type I modification due to Soloviev et al. (2005)
+    # 'ASM2': dict(assimilation_type=2, assim_window=1, extinct_method=9), # Paulson-Simpson 9-band.
+    # 'ASM3': dict(assimilation_type=2, assim_window=1, extinct_method=12, extinct_file='chlo.dat'), # Ohlmann-Siegel (2000) chlorophyll-a based
+    # 'ASM4': dict(assimilation_type=2, assim_window=1, extinct_method=15), # Paulson-Simpson 9-band with Jerlov type I modification due to Verevochkin (2005)
+    # 'ASM5': dict(assimilation_type=2, assim_window=1, extinct_method=13, extinct_file='iop.dat'), # Lee et al. (2003) IOP-based
+    # 'ASM6': dict(assimilation_type=2, assim_window=1, extinct_method=16), # Paulson-Simpson 9-band with Jerlov type I modification due to Soloviev et al. (2005)
+
+    # switch to assimilation at "sunrise" by coszen \approx 0.
+    'ASM2': dict(assimilation_type=2, assim_window=3, extinct_method=9), # Paulson-Simpson 9-band.
+    'ASM3': dict(assimilation_type=2, assim_window=3, extinct_method=12, extinct_file='chlo.dat'), # Ohlmann-Siegel (2000) chlorophyll-a based
+    'ASM4': dict(assimilation_type=2, assim_window=3, extinct_method=15), # Paulson-Simpson 9-band with Jerlov type I modification due to Verevochkin (2005)
+    'ASM5': dict(assimilation_type=2, assim_window=3, extinct_method=13, extinct_file='iop.dat'), # Lee et al. (2003) IOP-based
+    'ASM6': dict(assimilation_type=2, assim_window=3, extinct_method=16), # Paulson-Simpson 9-band with Jerlov type I modification due to Soloviev et al. (2005)
+
 }
              
 albedo_method = {
@@ -87,6 +95,8 @@ vgrid_choice = {
     'MFC-75m': dict(depth = 74.389762997627258, nlev = 15, grid_method = 2, grid_file = 'grid_MFC_75m.dat'),
     '100m': dict(depth = 99.282236525788903, nlev = 132, grid_method = 2, grid_file = 'grid_100m.dat'),
     '75m_4t': dict(depth = 74.539324233308434, nlev = 122, grid_method = 2, grid_file = 'grid_75m.dat', nsave=30),
+    'EXT-75m': dict(depth = 74.539324233308434, nlev = 125, grid_method = 2, grid_file = 'grid_EXT_75m.dat'),    
+    'EXT-75m_4t': dict(depth = 74.539324233308434, nlev = 125, grid_method = 2, grid_file = 'grid_EXT_75m.dat', nsave=30),
 }
 
 
@@ -253,7 +263,8 @@ for asm in ASM_level.keys():
 def set_grid(new_grid=grid, new_ASM=ASM,
              new_max_depth=max_depth, # These names just need to be different... Because we cannot declare an input name global below...
              subindices=None,
-             plot = False, stat = True, return_grid_data = False,
+             return_grid_data = False,
+             verbose = verbose, stat = True, plot = False
              ):
     """ Obtain the 1/16 degree grid used in medsea_rea, and classify each grid points according to 'max_depth'.
         A sub-grid is set to the global variables in the module, and also returned by specifying 'subindices':
@@ -309,14 +320,15 @@ def set_grid(new_grid=grid, new_ASM=ASM,
     # Update the run
     run = 'ASM{!s}-{!s}m'.format(ASM,max_depth)
     if run in run_profiles.keys():
-        print('Preset run profile: ' + run + ' selected:')
-            # Print run profile details.
         run_config = run_profiles[run]
-        if 'tabulate' not in sys.modules.keys():
-            for key in run_config:
-                print('\t',key,':\t', run_config[key])
-        else:
-            print(tabulate([[name,val] for name, val in run_config.items()]))
+        if verbose:
+            print('Preset run profile: ' + run + ' selected:')
+            # Print run profile details.
+            if 'tabulate' not in sys.modules.keys():
+                for key in run_config:
+                    print('\t',key,':\t', run_config[key])
+                else:
+                    print(tabulate([[name,val] for name, val in run_config.items()]))
     else:
         print('WARNING: unknown run profile: ' + run)
 
@@ -364,7 +376,8 @@ def set_grid(new_grid=grid, new_ASM=ASM,
     #print(medsea_rea_lat_ind)
     #print(medsea_rea_lon_ind)
 
-    print('Initializing grid...')
+    if verbose:
+        print('Initializing grid...')
     # Load the rea grid, and a sample set of data for its masks.
     with Dataset(os.path.join(p_sossta_folder, 'medsea_rea/2013/20130101_TEMP_re-fv6.nc'),'r') as ds:
         lat_rea = ds['lat'][:]
@@ -416,9 +429,10 @@ def set_grid(new_grid=grid, new_ASM=ASM,
     
     #print(grid_lats.size,grid_lons.size,grid_lats.min(),grid_lats.max(),grid_lons.min(),grid_lons.max())
     extent = (grid_lats.min(),grid_lats.max(),grid_lons.min(),grid_lons.max())
-    print('Finished setting up a subgrid of shape {!s} x {!s} with {!s} <= latitude <= {!s}, {!s} <= longitude <= {!s}.'.format(\
-                                                                                                                                M,N,*extent))
-    if stat:
+    if verbose:
+        print('Finished setting up a subgrid of shape {!s} x {!s} '.format(M,N) +
+              'with {!s} <= latitude <= {!s}, {!s} <= longitude <= {!s}.'.format(*extent))
+    if verbose and stat:
         # The following are for the current subgrid.
         def print_stat(bl_array):
             drei = bl_array.size
@@ -883,6 +897,7 @@ def buoy_run(code,start,stop,run,cached=True):
     if run in run_profiles.keys():
         gotm_args.update(run_profiles[run])
     else:
+        print('Run profile name given: {:s}'.format(run))
         raise NotImplementedError('A profile must be specified and hard-coded.')
 
     ### Prepare the run_dir.
@@ -980,7 +995,7 @@ def buoy_run(code,start,stop,run,cached=True):
         stat['elapsed'] = toc()
         # statfn = 'stat_{:d}{:02d}.dat'.format(year,month)
         #statfn = 'STAT_' + run + '_' + print_ctime(sep='_') + '.log'
-        statfn = 'STAT_' + run + '_' + '.log'
+        statfn = 'STAT_' + run + '.log'
         with open(join(buoy_dir,statfn),'a+') as f:
             print('{:s}: Writing diagnostic statistics to {:s}...\n'.format(print_ctime(sep=' '),statfn))
             f.write('--------------------------------------------------------------\n')
