@@ -269,7 +269,7 @@ def set_grid(new_grid=grid, new_ASM=ASM,
                NOTE: In medsea_ERA dataset, the latitudes are arranged, exceptionally, in descending order.
 
        Returns three tuples:
-            subgrid = (grid_lats, grid_lons, medsea_flags, max_depth)
+            subgrid = (grid_lats, grid_lons, medsea_flags, medsea_bdy, max_depth)
             rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth)
             grid_indices = (M, N, sea_mn, sea_m, sea_n)
     """
@@ -394,6 +394,26 @@ def set_grid(new_grid=grid, new_ASM=ASM,
     sea_mn = [(sea_m[i],sea_n[i]) for i in range(sea_m.size)]
     assert len(sea_mn) == sea_m.size
 
+    # Compute water body boundary used in this subgrid level.
+    medsea_bdy = zeros(medsea_flags.shape)
+    from itertools import product
+    for m,n in product(range(medsea.M), range(medsea.N)):
+        if medsea_flags[m,n] > 0:
+            continue
+        m_nbr = list()
+        n_nbr = list()
+        if m < medsea.M-1:
+            m_nbr.append(m+1)
+        if m > 0:
+            m_nbr.append(m-1)
+        if n < medsea.N-1:
+            n_nbr.append(n+1)
+        if n > 0:
+            n_nbr.append(n-1)
+        for mb, nb in product(m_nbr,n_nbr):
+            if medsea_flags[mb,nb] > 0:
+                medsea_bdy[m,n] = 1
+    
     #print(grid_lats.size,grid_lons.size,grid_lats.min(),grid_lats.max(),grid_lons.min(),grid_lons.max())
     extent = (grid_lats.min(),grid_lats.max(),grid_lons.min(),grid_lons.max())
     print('Finished setting up a subgrid of shape {!s} x {!s} with {!s} <= latitude <= {!s}, {!s} <= longitude <= {!s}.'.format(\
@@ -435,7 +455,7 @@ def set_grid(new_grid=grid, new_ASM=ASM,
 
     # These values have been written directly to global variables as well:
     subgrid = (grid_lats, grid_lons, medsea_flags, max_depth)
-    rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth)
+    rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth, loc_type)
     grid_indices = (M, N, sea_mn, sea_m, sea_n)
 
     if return_grid_data:
@@ -461,7 +481,21 @@ data_sources = dict(
     sprof = 'medsea_MFC_sunrise',
     chlo = 'medsea_MODIS',
     iop = 'medsea_MODIS')
+
+# Return a plot of the water mass:
+def plot_water(ax=None):
+    from netCDF4 import Dataset
+    from matplotlib import cm
+    with Dataset(os.path.join(p_sossta_folder, 'medsea_rea/2013/20130101_TEMP_re-fv6.nc'),'r') as ds:
+        temp_rea = ds['votemper'][:]
+    is_land  = temp_rea[0,0,:].mask
     
+    import matplotlib.pyplot as plt
+    if ax is None:
+        fig, ax = plt.subplots()
+    ax.imshow(is_land,origin='lower',cmap=cm.binary)
+    return fig, ax
+
 # GOTM dat files' netCDF reformatted dataset sources.
 def get_data_sources(dat, year=None, month=None, mode='r'):
 #                    dat=['heat','met','tprof','sprof','chlo','iop']):
