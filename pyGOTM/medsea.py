@@ -258,6 +258,9 @@ for asm in ASM_level.keys():
     
 # }
 
+# Alias
+def setup(*args,**kwargs):
+    return set_grid(*args,**kwargs)
 
 # Routines to set global values in this module. Can be used in interactive session to change config.
 def set_grid(new_grid=grid, new_ASM=ASM,
@@ -408,18 +411,20 @@ def set_grid(new_grid=grid, new_ASM=ASM,
     assert len(sea_mn) == sea_m.size
 
     # Compute water body boundary used in this subgrid level.
-    medsea_bdy = zeros(medsea_flags.shape)
+    from numpy import zeros
     from itertools import product
-    for m,n in product(range(medsea.M), range(medsea.N)):
+    medsea_bdy = zeros(medsea_flags.shape)
+
+    for m,n in product(range(M), range(N)):
         if medsea_flags[m,n] > 0:
             continue
         m_nbr = list()
         n_nbr = list()
-        if m < medsea.M-1:
+        if m < M-1:
             m_nbr.append(m+1)
         if m > 0:
             m_nbr.append(m-1)
-        if n < medsea.N-1:
+        if n < N-1:
             n_nbr.append(n+1)
         if n > 0:
             n_nbr.append(n-1)
@@ -508,6 +513,7 @@ def plot_water(ax=None):
     if ax is None:
         fig, ax = plt.subplots()
     ax.imshow(is_land,origin='lower',cmap=cm.binary)
+    fig = ax.get_figure()
     return fig, ax
 
 # GOTM dat files' netCDF reformatted dataset sources.
@@ -1205,6 +1211,19 @@ buoys = { '61277' : buoy('61277',35.723,25.462),
           '68422' : buoy('68422',36.829,21.608),
           'SARON' : buoy('SARON',37.61,23.569)
 }
+
+## Post-run helper functions.
+
+def get_daily_stats_by_year(year=2014):
+    from os.path import join
+    from netCDF4 import Dataset
+    return Dataset(join(results_folder,
+                        'daily_stat_ASM{!s}-{!s}m_{!s}_{!s}_{!s}.nc'.format(ASM,max_depth,grid,GOTM_version,year)))
+def get_hourly_results_by_year(year=2014):
+    from os.path import join
+    from netCDF4 import Dataset
+    return Dataset(join(results_folder,
+                        'medsea_GOTM_ASM{!s}-{!s}m_{!s}_{!s}_{!s}.nc'.format(ASM,max_depth,grid,GOTM_version,year)))   
 
 ## Rewrite and put in another file, not here.
 # def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
