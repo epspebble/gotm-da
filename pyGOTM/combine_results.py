@@ -453,7 +453,7 @@ if __name__=='__main__':
         biannual = False
         skip_year_end = False
     
-    varnames = ['sst','skint','x-taus','y-taus','swr','heat','total','lwr','sens','latent','albedo']
+    varnames = ['sst','skint','x-taus','y-taus','swr','heat','total','lwr','sens','latent','albedo','coszen']
     data = read_results(varnames,year,month=month,skip_year_end=skip_year_end)
     write_results(data,year,month=month,skip_year_end=skip_year_end)
     del data
