@@ -469,12 +469,12 @@ contains
           ! Will only be run if assimilation does not occur at midnight, (assim_window .gt. 0), 
           ! because mark is reset to 0 after momentarily after being setting to 1.
           ! Also note the order of statements below.
-          if (mark .eq. 1) then ! After assimilation event (i.e. sunrise if assimilating at sunrise)
+          if (mark .eqv. .true.) then ! After assimilation event (i.e. sunrise if assimilating at sunrise)
              if (T(nlev) < daily_SST_min_day) then
                 daily_SST_min_day = T(nlev)
                 lsecs_SST_min_day = lsecs
              end if
-          else if (mark .eq. 0) then ! After local midnight, before sunrise if assimilating at sunrise
+          else if (mark .eqv. .false.) then ! After local midnight, before sunrise if assimilating at sunrise
              if (T(nlev) < daily_SST_min_night) then
                 daily_SST_min_night = T(nlev)
                 lsecs_SST_min_night = lsecs
@@ -514,7 +514,7 @@ contains
                 !!! The daily_stats is not outputted for this assim_window. Not implemented.
                 call assimilation(T(1:nlev),S(1:nlev),tprof(1:nlev),sprof(1:nlev),cloud,advect,int_cs)
                 lsecs_assim_time = lsecs
-                mark = 1 
+                mark = .true. 
              endif
 
           case (1) ! assimiluate at "sunrise"
