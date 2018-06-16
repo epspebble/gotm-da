@@ -665,6 +665,23 @@ def get_results(region=None,run_key=None,grid=None,ver=None,year=2014):
     
     return Dataset(os.path.join(project_folder,'results',run_key + '_' + grid,fn),'r')
     
+def get_daily_stats(region=None,run_key=None,grid=None,ver=None,year=2014):
+    "If any of region, run_key, grid, ver are unspecified, they are taken from global module state." 
+    import sys
+    current_state = sys.modules[__name__]
+    if region is None:
+        region = current_state.region
+    if run_key is None:
+        run_key = current_state.run_key
+    if grid is None:
+        grid = current_state.grid       
+    if ver is None:
+        ver = current_state.GOTM_version    
+        
+    from netCDF4 import Dataset
+    fn = 'daily_stat_' + run_key + '_' + grid + '_' + ver + '_' + str(year) + '.nc'
+    
+    return Dataset(os.path.join(project_folder,'results',run_key + '_' + grid,fn),'r')
 
 def get_m_n(*args,silent=False):
     """
@@ -1254,16 +1271,16 @@ buoys = { '61277' : buoy('61277',35.723,25.462),
 
 ## Post-run helper functions.
 
-def get_daily_stats_by_year(year=2014):
-    from os.path import join
-    from netCDF4 import Dataset
-    return Dataset(join(results_folder,run_key,
-                        'daily_stat_{!s}_{!s}_{!s}_{!s}.nc'.format(run_key,grid,GOTM_version,year)))
-def get_hourly_results_by_year(year=2014):
-    from os.path import join
-    from netCDF4 import Dataset
-    return Dataset(join(results_folder,
-                        'medsea_GOTM_{!s}_{!s}_{!s}_{!s}.nc'.format(run_key,grid,GOTM_version,year)))   
+# def get_daily_stats_by_year(year=2014):
+#     from os.path import join
+#     from netCDF4 import Dataset
+#     return Dataset(join(results_folder,run_key,
+#                         'daily_stat_{!s}_{!s}_{!s}_{!s}.nc'.format(run_key,grid,GOTM_version,year)))
+# def get_hourly_results_by_year(year=2014):
+#     from os.path import join
+#     from netCDF4 import Dataset
+#     return Dataset(join(results_folder,
+#                         'medsea_GOTM_{!s}_{!s}_{!s}_{!s}.nc'.format(run_key,grid,GOTM_version,year)))   
 
 ## Rewrite and put in another file, not here.
 # def local_dat(mm,nn,dat=['heat','met','tprof','sprof','chlo','iop']):
