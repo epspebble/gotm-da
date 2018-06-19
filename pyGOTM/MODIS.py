@@ -21,7 +21,7 @@ from pyGOTM import medsea
 
 coverage_length = '8D'
 # Inherit options from pyGOTM.medsea
-src_folder = join(medsea.p_sossta_folder,'glo_MODIS',coverage_length)
+src_folder = join(medsea.external_folder,'glo_MODIS',coverage_length)
 dst_folder = join(medsea.data_folder,'medsea_MODIS')
 if not os.path.isdir(dst_folder):
     os.mkdir(dst_folder)

@@ -17,7 +17,7 @@ from pyGOTM.gotmks import subgrid_slice # Use this to subgrid a finer datset.
 from pyGOTM import medsea
 
 # Take a few settings from medsea.
-p_sossta_folder = medsea.p_sossta_folder
+external_folder = medsea.external_folder
 data_folder = medsea.data_folder
 dst_lats = medsea.grid_lats
 dst_lons = medsea.grid_lons
@@ -141,16 +141,16 @@ def get_src_dst_folders(dataset):
     assert isinstance(dataset,str), 'Check argument'
     
     if dataset == 'ERA-INTERIM':
-        src_folder = join(p_sossta_folder,'medsea_ERA-INTERIM','3-hourly')        
+        src_folder = join(external_folder,'medsea_ERA-INTERIM','3-hourly')        
         dst_folder = join(data_folder,'medsea_ERA-INTERIM')
     elif dataset == 'ECMWF':
-        src_folder = join(p_sossta_folder,'medsea_ECMWF','3-HOURLY')
+        src_folder = join(external_folder,'medsea_ECMWF','3-HOURLY')
         dst_folder = join(data_folder,'medsea_ECMWF')
     elif dataset == 'MFC_midnight':
-        src_folder = join(p_sossta_folder,'medsea_rea') # but stored in yearly subfolders
+        src_folder = join(external_folder,'medsea_rea') # but stored in yearly subfolders
         dst_folder = join(data_folder, 'medsea_MFC_midnight')
     elif dataset == 'MFC_sunrise':
-        src_folder = join(p_sossta_folder, 'medsea_rea','sunrise_nrt')
+        src_folder = join(external_folder, 'medsea_rea','sunrise_nrt')
         dst_folder = join(data_folder,'medsea_MFC_sunrise')
     else:
         raise NotImplementedError('Unknown dataset: ' + dataset)
@@ -270,7 +270,7 @@ def medsea_ECMWF_reformat(year,month):
     """
     ## Preparations.
     
-    src_folder = join(p_sossta_folder,'medsea_ECMWF','3-HOURLY')
+    src_folder = join(external_folder,'medsea_ECMWF','3-HOURLY')
     dst_folder = join(data_folder,'medsea_ECMWF')
     if not isdir(dst_folder):
         mkdir(dst_folder)

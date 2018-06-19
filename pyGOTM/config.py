@@ -29,7 +29,7 @@ from numpy import pi, cos, sin
 from os import getenv, mkdir
 from os.path import isfile, isdir, join
 
-### Global settings for the p_sossta project medsea runs.
+### Global settings for the project runs for the medsea.
 userhome = os.getenv('HOME')
 
 ## For general GOTM setup

@@ -33,7 +33,7 @@ overwrite = True # True means running at the same grid point will overwrite file
 # This replaces the ambiguous base_folder or run_folder used in the past, each run folder is a
 # print_lat_lon() named subfolder of the following, which should be symlinked to fast filesystem outside of the home folder,
 # e.g. /scratch/[name] on clusters, or /dev/shm/[name] on a system with sufficient RAM.
-p_sossta_folder = os.path.join(project_folder,'p_sossta')
+external_folder = os.path.join(project_folder,'external')
 #results_folder = os.path.join(project_folder,'results','ASM{!s}-{!s}m_{:s}'.format(ASM,max_depth,grid)
 results_folder = os.path.join(project_folder,'results')
 cache_folder = '/dev/shm'
@@ -403,7 +403,7 @@ def set_grid(new_grid=grid, #new_ASM=ASM,
     if verbose:
         print('Initializing grid...')
     # Load the rea grid, and a sample set of data for its masks.
-    with Dataset(os.path.join(p_sossta_folder, 'medsea_rea/2013/20130101_TEMP_re-fv6.nc'),'r') as ds:
+    with Dataset(os.path.join(external_folder, 'medsea_rea/2013/20130101_TEMP_re-fv6.nc'),'r') as ds:
         lat_rea = ds['lat'][:]
         lon_rea = ds['lon'][:]
         temp_rea = ds['votemper'][:]
@@ -526,7 +526,7 @@ data_sources = dict(
 def plot_water(ax=None):
     from netCDF4 import Dataset
     from matplotlib import cm
-    with Dataset(os.path.join(p_sossta_folder, 'medsea_rea/2013/20130101_TEMP_re-fv6.nc'),'r') as ds:
+    with Dataset(os.path.join(external_folder, 'medsea_rea/2013/20130101_TEMP_re-fv6.nc'),'r') as ds:
         temp_rea = ds['votemper'][:]
     is_land  = temp_rea[0,0,:].mask
     
