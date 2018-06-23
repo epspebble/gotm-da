@@ -59,18 +59,24 @@ def get_args():
 # This was a portion of original main program brought forward.
 if __name__=='__main__':
     grid, run, ver, year, month, kwargs = get_args()
-    from pyGOTM import config
-    config.GOTM_version = ver
-    
+    # from pyGOTM import config
+    # config.GOTM_version = ver
+
+    #20180622 After a short while, I've forgotten why I had "Old method" vs "New method" and
+    # There're some vestiges in pyGOTM.medsea for which the purpose is not clear. Before a
+    # refactoring happens, maybe it's just easier to pass all arguments every time rather than
+    # to set some "global settings". It might be more useful in an interactive environment, but
+    # as a script to do a fixed purpose, this is not really helping.
     from pyGOTM import medsea
+    medsea.set_grid(grid) # Still needed to set medsea.grid_lats, .grid_lons, .M, .N, .sea_mn, etc convenience grid related values.
 
     # Old method:
     #medsea.set_grid(grid)
     #medsea.run = run
 
     # New method:
-    assert run[:3] == 'ASM'
-    medsea.set_grid(grid,run[3:]) # the string skipping to leading characters 'ASM'
+    #assert run[:3] == 'ASM'
+    #medsea.set_grid(grid,run[3:]) # the string skipping to leading characters 'ASM'
 
 ### End setting the medsea module instance into this global namespace.
 
@@ -95,8 +101,8 @@ def hour_range(year,month=None,skip_year_end=False):
 
 def read_results(varnames,year,
 #                 medsea, # temporary hack to pass on configs
-                 month=None,skip_year_end=False):
-    fn = 'results_{0.run}_{0.GOTM_version}.nc'.format(medsea)
+                 month=None,skip_year_end=False): 
+    fn = 'results_{:s}_{:s}.nc'.format(run,ver)
     
     hours = hour_range(year,month=month,skip_year_end=skip_year_end)
     first, last = hours[0], hours[-1]
@@ -201,7 +207,8 @@ def write_results(data,year,month=None,varname=None,fn=None,skip_year_end=False)
     else:
         raise ValueError("Check 'data' and 'varname'")
 
-    dr = join(medsea.project_folder,'results','{0.run}_{0.grid}'.format(medsea))
+    dr = join(medsea.results_folder,run + '_' + grid)
+
     if not os.path.isdir(dr):
         os.mkdir(dr)
         
@@ -212,7 +219,7 @@ def write_results(data,year,month=None,varname=None,fn=None,skip_year_end=False)
         if varname is not None:
             fn += '_' + varname        
         #3. codenames: run profile, grid, GOTM_version
-        fn += '_{0.run}_{0.grid}_{0.GOTM_version}'.format(medsea)
+        fn += '_{:s}_{:s}_{:s}'.format(run,grid,ver)
         #4. time range
         if month is None:
             fn += '_{:d}.nc'.format(year)
@@ -295,17 +302,17 @@ def combine_stat(*args,biannual=False):
         start = date(year,1,1)
         stop = date(year+1,1,1)
         
-    dat_fn = 'daily_stat_{0.run}_{0.GOTM_version}.txt'.format(medsea)
+    dat_fn = 'daily_stat_{:s}_{:s}.txt'.format(run,ver)
                
     # Done defining start, stop.
     print('Working on {!s} to {!s}...\n\n'.format(start, stop))  
     print('Daily statistics file: ' + dat_fn)
     
-    outdir = medsea.results_folder
+    outdir = os.path.join(medsea.results_folder,run + '_' + grid)
     if not(os.path.isdir(outdir)):
           os.mkdir(outdir)
 
-    basename = 'daily_stat_{0.run}_{0.grid}_{0.GOTM_version}_'.format(medsea)
+    basename = 'daily_stat_{:s}_{:s}_{:s}_'.format(run,grid,ver)
     if year is None: # A start-stop based time range:
         basename += '{0.year:d}{0.month:02d}{0.day:02d}'.format(start) + '_' + \
                     '{0.year:d}{0.month:02d}{0.day:02d}'.format(stop) + '.nc'
