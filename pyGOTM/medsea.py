@@ -514,7 +514,7 @@ if not(os.path.isfile(os.path.join(grid_folder,'grid_data.npy'))):
 else: 
     subgrid, rea_indices, grid_indices = np.load(os.path.join(grid_folder,'grid_data.npy'))
     grid_lats, grid_lons, medsea_flags, max_depth = subgrid
-    medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth = rea_indices
+    medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth, loc_type = rea_indices
     M, N, sea_mn, sea_m, sea_n = grid_indices
 
 # Print some settings upon loading of this 
