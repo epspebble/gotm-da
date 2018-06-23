@@ -68,8 +68,12 @@ ASM_level = {
     # switch to assimilation at "sunrise" by coszen \approx 0.
     'ASM2': dict(assimilation_type=2, assim_window=3, extinct_method=9), # Paulson-Simpson 9-band.
     'ASM3': dict(assimilation_type=2, assim_window=3, extinct_method=12, extinct_file='chlo.dat'), # Ohlmann-Siegel (2000) chlorophyll-a based
+    'ASM3S': dict(assimilation_type=2, assim_window=3, extinct_method=12, extinct_file='chlo.dat',
+                  t_prof_file='tprof_SST_adjusted.dat'), # Same as ASM3, but with tprof adjutsed.
     'ASM4': dict(assimilation_type=2, assim_window=3, extinct_method=15), # Paulson-Simpson 9-band with Jerlov type I modification due to Verevochkin (2005)
     'ASM5': dict(assimilation_type=2, assim_window=3, extinct_method=13, extinct_file='iop.dat'), # Lee et al. (2003) IOP-based
+    'ASM5S': dict(assimilation_type=2, assim_window=3, extinct_method=13, extinct_file='iop.dat',
+                  t_prof_file='tprof_SST_adjusted.dat'), # Same as ASM5, but with tprof adjusted.
     'ASM6': dict(assimilation_type=2, assim_window=3, extinct_method=16), # Paulson-Simpson 9-band with Jerlov type I modification due to Soloviev et al. (2005)
 
 }
@@ -791,6 +795,7 @@ def get_local_folder(*args, create=False):
     return local_folder
 
 def prepare_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or (lat,lon); and start/stop,
+                run = set_run(),
                 year = None, month = None, # Provided to compute start, stop.
                 out_dir = '.', # Specifiy where to write GOTM ouputs if not the current folder... for caching purpose.
                 **gotm_user_args): # Extra GOTM arguments, e.g. from run_profiles):
@@ -1096,7 +1101,7 @@ def buoy_run(code,start,stop,run,cached=True):
     return stat
         
 def local_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or (lat,lon); and start/stop,
-#              run, # A name for this run, if it matches a key in run_profile, the settings will be loaded. Should specify when loading the module.
+              run=set_run(), # A name for this run, if it matches a key in run_profile, the settings will be loaded. Should specify when loading the module.
               year = None, month = None, # Provided to compute start, stop.
 #              create=False, # Should not run if the folder is not prepared.
               cached = False,
@@ -1126,13 +1131,13 @@ def local_run(*args, # Necessary GOTM run arguments: location i, or (m,n), or (l
             print(('{:s} = {!s}' * len(gotm_user_args)).format(*(gotm_user_args.items())))
             raise RuntimeError("A recorded run profile {:s} is specified, rejecting all user arguments for GOTM.\n")
         print('Using pre-defined profile: {:s}...'.format(run))
-        local_folder, out_fn, gotm_args = prepare_run(*args,
+        local_folder, out_fn, gotm_args = prepare_run(*args,run=run,
                                                       year=year, month=month,
                                                       out_dir=out_dir,
                                                       **run_profiles[run])
     else:
         print('Running without a pre-defined profile and tagging results with "{:s}"...'.format(run))
-        local_folder, out_fn, gotm_args = prepare_run(*args,
+        local_folder, out_fn, gotm_args = prepare_run(*args, run=run,
                                                     year=year, month=month,
                                                       out_dir=out_dir,
                                                       **gotm_user_args)
