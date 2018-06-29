@@ -68,16 +68,16 @@ ASM_level = {
     # switch to assimilation at "sunrise" by coszen \approx 0.
     'ASM2': dict(assimilation_type=2, assim_window=3, extinct_method=9), # Paulson-Simpson 9-band.
     'ASM3': dict(assimilation_type=2, assim_window=3, extinct_method=12, extinct_file='chlo.dat'), # Ohlmann-Siegel (2000) chlorophyll-a based
-    'ASM3S': dict(assimilation_type=2, assim_window=3, extinct_method=12, extinct_file='chlo.dat',
-                  t_prof_file='tprof_SST_adjusted.dat'), # Same as ASM3, but with tprof adjutsed.
     'ASM4': dict(assimilation_type=2, assim_window=3, extinct_method=15), # Paulson-Simpson 9-band with Jerlov type I modification due to Verevochkin (2005)
     'ASM5': dict(assimilation_type=2, assim_window=3, extinct_method=13, extinct_file='iop.dat'), # Lee et al. (2003) IOP-based
-    'ASM5S': dict(assimilation_type=2, assim_window=3, extinct_method=13, extinct_file='iop.dat',
-                  t_prof_file='tprof_SST_adjusted.dat'), # Same as ASM5, but with tprof adjusted.
     'ASM6': dict(assimilation_type=2, assim_window=3, extinct_method=16), # Paulson-Simpson 9-band with Jerlov type I modification due to Soloviev et al. (2005)
 
 }
-             
+
+ASM_level_original = ASM_level
+ASM_level_expanded = {k+'S': dict(**v,t_prof_file='tprof_SST_adjusted.dat') for k,v in ASM_level.items()} # Repeat the ASM levels with an extra argument.
+ASM_level = {**ASM_level_original,**ASM_level_expanded}
+
 albedo_method = {
     # 0 : dict(albedo_method=0), # DEFAULT. Payne (1976)
     '.1': dict(albedo_method=1, albedo_file='chlo.dat'), # Ohlmann-Siegel
