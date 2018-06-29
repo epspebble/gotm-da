@@ -323,9 +323,12 @@ contains
     do n=MinN,MaxN
 512    continue     
 
-       if (first .and. mark) then
-          call write_daily_stats(unit_daily_stat,0)
-       endif
+       !!WT 20180623 Not necessary.  
+       ! if (first .and. mark) then
+       !    print *, 'Line 328 is called.'
+       !    call write_daily_stats(unit_daily_stat,0)
+       !    first = .false.
+       ! endif
        
        ! This is the final step for something below... 
        if (n .eq. MaxN) then
@@ -501,7 +504,7 @@ contains
        ! end if
 
        ! 'mark' == 0 means assimilation not yet done in this cycle.
-       if (.not.mark) then
+       if (.not. mark) then
           !WT We assume simulation begins at 00:00:00.
 
           select case (assim_window)
