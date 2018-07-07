@@ -39,7 +39,7 @@ results_folder = os.path.join(project_folder,'results')
 cache_folder = '/dev/shm'
 plots_folder = os.path.join(project_folder,'plots')
 
-# Folders that depend on the grid hoice. Should be updated when set_grid() is run.
+# Folders that depend on the grid choice. Should be updated when set_grid() is run.
 data_folder = os.path.join(project_folder,'data',grid)
 grid_folder = os.path.join(project_folder,'grid',grid) 
 

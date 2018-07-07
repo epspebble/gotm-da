@@ -1378,8 +1378,21 @@
    
    !WT 20180706 3D variables ids in an array, along with an array of names
    integer, private, dimension(12) :: var_3d_id
-   character (len=65), dimension(12) :: var_3d_name = &
-        [character(len=65) :: 'sst','skint','x-taus','y-taus','swr','albedo','coszen','heat','total','lwr','sens','latent']
+   character (len=65), private, dimension(12) :: var_3d_name = &
+        [character(len=65) :: 'sst','skint',&
+        'x-taus','y-taus','albedo','coszen',&
+        'heat','total','swr',&
+        'lwr','sens','latent']
+   character (len=65), dimension(12) :: var_3d_longname = &
+        [character(len=65) :: 'sst','skint',&
+        'x-taus','y-taus','albedo','coszen',&
+        'surface heat flux','total surface heat exchange','short wave radiation',&
+        'long wave radiation','sensible heat flux','latent heat flux']   
+   character (len=65), dimension(12) :: var_3d_unit = &
+        [character(len=65) :: 'celsius','celsius',&
+        'N/m2','N/m2','dimensionless','dimensionless',&
+        'W/m2','W/m2','W/m2',&
+        'W/m2','W/m2','W/m2']
    
    !WT 20180706 Original ids, one by one.
    integer, private          :: sst_id,sss_id,skint_id,cloud_id
@@ -1686,8 +1699,25 @@
 
 !  x,y,t
 !   iret = set_attributes(ncid,zeta_id,units='m',long_name='sea surface elevation')
-   iret = set_attributes(ncid,sst_id,units='celsius',long_name='sea surface temperature')
-   iret = set_attributes(ncid,skint_id,units='celsius',long_name='skin sea surface temperature')
+
+   !   iret = set_attributes(ncid,sss_id,units='psu',long_name='sea surface salinity')
+   do i=1,12
+      iret = set_attributes(ncid,var_3d_id(i),units=trim(var_3d_unit(i)),long_name=trim(var_3d_longname(i)))
+   end do
+   
+   ! iret = set_attributes(ncid,sst_id,units='celsius',long_name='sea surface temperature')
+   ! iret = set_attributes(ncid,skint_id,units='celsius',long_name='skin sea surface temperature')
+   ! iret = set_attributes(ncid,x_taus_id,units='N/m2',long_name='x-wind stress')
+   ! iret = set_attributes(ncid,y_taus_id,units='N/m2',long_name='y-wind stress')
+   ! iret = set_attributes(ncid,swr_id,units='W/m2',long_name='short wave radiation')
+   ! iret = set_attributes(ncid,albedo_id,units='dimensionless',long_name='sea surface albedo')
+   ! iret = set_attributes(ncid,coszen_id,units='dimensionless',long_name='cosine of the zenith angle')
+   ! iret = set_attributes(ncid,heat_id,units='W/m2',long_name='surface heat flux')
+   ! iret = set_attributes(ncid,total_id,units='W/m2',long_name='total surface heat exchange')
+   ! iret = set_attributes(ncid,lwr_id,units='W/m2',long_name='long wave radiation')
+   ! iret = set_attributes(ncid,sens_id,units='W/m2',long_name='sensible heat flux')
+   ! iret = set_attributes(ncid,latent_id,units='W/m2',long_name='latent heat flux')
+
 !   iret = set_attributes(ncid,seviri_diff_id,units='celsius',long_name='sum of seviri differences')
 !   iret = set_attributes(ncid,seviri_sq_diff_id,units='celsius',long_name='sum of seviri squared differences')
 !   iret = set_attributes(ncid,seviri_obs_id,units='dimensionless',long_name='total number of seviri observations')
@@ -1707,22 +1737,7 @@
 !   iret = set_attributes(ncid,ostia_tmi_sq_diff_id,units='celsius',long_name='sum of ostia-tmi squared differences')
 !   iret = set_attributes(ncid,cloud_id,units='tenths',long_name='total fractional cloud cover')
 
-!   iret = set_attributes(ncid,sss_id,units='psu',long_name='sea surface salinity')
-   iret = set_attributes(ncid,x_taus_id,units='N/m2',long_name='x-wind stress')
-   iret = set_attributes(ncid,y_taus_id,units='N/m2',long_name='y-wind stress')
-   iret = set_attributes(ncid,swr_id,units='W/m2',long_name='short wave radiation')
-
-   ! WT 20171024
-   iret = set_attributes(ncid,albedo_id,units='dimensionless',long_name='sea surface albedo')
-   ! WT 20180319
-   iret = set_attributes(ncid,coszen_id,units='dimensionless',long_name='cosine of the zenith angle')
-   
-   iret = set_attributes(ncid,heat_id,units='W/m2',long_name='surface heat flux')
-   iret = set_attributes(ncid,total_id,units='W/m2',long_name='total surface heat exchange')
-   iret = set_attributes(ncid,lwr_id,units='W/m2',long_name='long wave radiation')
-   iret = set_attributes(ncid,sens_id,units='W/m2',long_name='sensible heat flux')
-   iret = set_attributes(ncid,latent_id,units='W/m2',long_name='latent heat flux')
-!   iret = set_attributes(ncid,int_sw_id,units='J/m2',long_name='integrated short wave radiation')
+   !   iret = set_attributes(ncid,int_sw_id,units='J/m2',long_name='integrated short wave radiation')
 !   iret = set_attributes(ncid,int_hf_id,units='J/m2',long_name='integrated surface heat flux')
 !   iret = set_attributes(ncid,int_total_id,units='J/m2',long_name='integrated total surface heat exchange')
 !   iret = set_attributes(ncid,int_cs_id,units='J/m2',long_name='integrated clear sky short wave radiation')
@@ -1764,7 +1779,7 @@
 
 !  global attributes
    iret = nf_put_att_text(ncid,NF_GLOBAL,'Title',LEN_TRIM(title),title)
-   history = 'Created by GOTM v. '//"3.0.0"
+   history = 'Created by GOTM-DA '//"v3g"
    iret = nf_put_att_text(ncid,NF_GLOBAL,'history',LEN_TRIM(history),history)
    iret = nf_put_att_text(ncid,NF_GLOBAL,'Conventions',6,'COARDS')
    call check_err(iret)
