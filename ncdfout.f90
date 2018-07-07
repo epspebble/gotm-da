@@ -1367,20 +1367,21 @@
 !EOP
 !
 ! !PRIVATE DATA MEMBERS
-!  dimension lengths
+   !  dimension lengths
    integer, parameter        :: lon_len=1
    integer, parameter        :: lat_len=1
    integer                   :: depth_len
    integer                   :: time_len=NF_UNLIMITED
-!  variable ids
+
+   !  variable ids
    integer, private          :: lon_id,lat_id,z_id,z1_id,time_id,zeta_id
-   !integer, private          :: border_id,swr_error_id,wind_error_id
-   ! integer, private          :: seviri_diff_id,seviri_sq_diff_id,seviri_obs_id
-   ! integer, private          :: amsre_diff_id,amsre_sq_diff_id,amsre_obs_id
-   ! integer, private          :: tmi_diff_id,tmi_sq_diff_id,tmi_obs_id
-   ! integer, private          :: ostia_diff_id,ostia_sq_diff_id
-   ! integer, private          :: ostia_seviri_diff_id,ostia_amsre_diff_id,ostia_tmi_diff_id
-   ! integer, private          :: ostia_seviri_sq_diff_id,ostia_amsre_sq_diff_id,ostia_tmi_sq_diff_id
+   
+   !WT 20180706 3D variables ids in an array, along with an array of names
+   integer, private, dimension(12) :: var_3d_id
+   character (len=65), dimension(12) :: var_3d_name = &
+        [character(len=65) :: 'sst','skint','x-taus','y-taus','swr','albedo','coszen','heat','total','lwr','sens','latent']
+   
+   !WT 20180706 Original ids, one by one.
    integer, private          :: sst_id,sss_id,skint_id,cloud_id
    integer, private          :: x_taus_id,y_taus_id
    integer, private          :: swr_id,albedo_id,coszen_id,heat_id,total_id,lwr_id,sens_id,latent_id
@@ -1399,10 +1400,20 @@
    integer, private          :: tked_id,tked_obs_id
    integer, private          :: prod_shear_id,prod_buoy_id
    integer, private          :: uu_id,vv_id,ww_id,tt_id,chi_id
+   !integer, private          :: border_id,swr_error_id,wind_error_id
+   ! integer, private          :: seviri_diff_id,seviri_sq_diff_id,seviri_obs_id
+   ! integer, private          :: amsre_diff_id,amsre_sq_diff_id,amsre_obs_id
+   ! integer, private          :: tmi_diff_id,tmi_sq_diff_id,tmi_obs_id
+   ! integer, private          :: ostia_diff_id,ostia_sq_diff_id
+   ! integer, private          :: ostia_seviri_diff_id,ostia_amsre_diff_id,ostia_tmi_diff_id
+   ! integer, private          :: ostia_seviri_sq_diff_id,ostia_amsre_sq_diff_id,ostia_tmi_sq_diff_id
+
+   !WT 20180706 Miscellaneous local variables?
    integer, private          :: ncdf_time_unit
    integer, private          :: set=1
    integer, private          :: start(4),edges(4)
    logical,save,private      :: GrADS=.false.
+
 !
 !-----------------------------------------------------------------------
 
@@ -1438,6 +1449,9 @@
    character(len=128)        :: ncdf_time_str,history,name
    real(4)                   :: r4
    double precision                  :: miss_val
+
+   !WT 20180706
+   integer :: i
 !
 !-------------------------------------------------------------------------
 !BOC
@@ -1491,10 +1505,6 @@
    dims(3) = time_dim
    !iret = nf_def_var(ncid,'zeta',NF_REAL,3,dims, zeta_id)
    !call check_err(iret)
-   iret = nf_def_var(ncid,'sst',NF_REAL,3,dims, sst_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'skint',NF_REAL,3,dims, skint_id)
-   call check_err(iret)
 !   iret = nf_def_var(ncid,'cloud',NF_REAL,3,dims, cloud_id)
 !   call check_err(iret)
 !   iret = nf_def_var(ncid,'swr_error',NF_REAL,3,dims, swr_error_id)
@@ -1536,34 +1546,40 @@
 !   iret = nf_def_var(ncid,'ostia_tmi_diff',NF_REAL,3,dims, ostia_tmi_diff_id)
 !   call check_err(iret)
 !   iret = nf_def_var(ncid,'ostia_tmi_sq_diff',NF_REAL,3,dims, ostia_tmi_sq_diff_id)
-
 !   call check_err(iret)
 !   iret = nf_def_var(ncid,'sss',NF_REAL,3,dims, sss_id)
 !   call check_err(iret)
-   iret = nf_def_var(ncid,'x-taus',NF_REAL,3,dims, x_taus_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'y-taus',NF_REAL,3,dims, y_taus_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'swr',NF_REAL,3,dims, swr_id)
-   call check_err(iret)
 
-   ! WT 20171024
-   iret = nf_def_var(ncid,'albedo',NF_REAL,3,dims, albedo_id)
-   call check_err(iret)
-   ! WT 20180319
-   iret = nf_def_var(ncid,'coszen',NF_REAL,3,dims, coszen_id)
-   call check_err(iret)
-   
-   iret = nf_def_var(ncid,'heat',NF_REAL,3,dims, heat_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'total',NF_REAL,3,dims, total_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'lwr',NF_REAL,3,dims, lwr_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'sens',NF_REAL,3,dims, sens_id)
-   call check_err(iret)
-   iret = nf_def_var(ncid,'latent',NF_REAL,3,dims, latent_id)
-   call check_err(iret)
+   !WT 20180706 The following replace the repetition from 'sst' till 'latent'
+   do i = 1, 12
+      iret = nf_def_var(ncid,var_3d_name(i),NF_REAL,3,dims,var_3d_id(i))
+      call check_err(iret)
+   end do
+
+   ! iret = nf_def_var(ncid,'sst',NF_REAL,3,dims, sst_id)
+   ! call check_err(iret)
+   ! iret = nf_def_var(ncid,'skint',NF_REAL,3,dims, skint_id)
+   ! call check_err(iret)      
+   ! iret = nf_def_var(ncid,'x-taus',NF_REAL,3,dims, x_taus_id)
+   ! call check_err(iret)
+   ! iret = nf_def_var(ncid,'y-taus',NF_REAL,3,dims, y_taus_id)
+   ! call check_err(iret)
+   ! iret = nf_def_var(ncid,'swr',NF_REAL,3,dims, swr_id)
+   ! call check_err(iret)
+   ! iret = nf_def_var(ncid,'albedo',NF_REAL,3,dims, albedo_id)
+   ! call check_err(iret)
+   ! iret = nf_def_var(ncid,'coszen',NF_REAL,3,dims, coszen_id)
+   ! call check_err(iret)
+   ! iret = nf_def_var(ncid,'heat',NF_REAL,3,dims, heat_id)
+   ! call check_err(iret)
+   ! iret = nf_def_var(ncid,'total',NF_REAL,3,dims, total_id)
+   ! call check_err(iret)
+   ! iret = nf_def_var(ncid,'lwr',NF_REAL,3,dims, lwr_id)
+   ! call check_err(iret)
+   ! iret = nf_def_var(ncid,'sens',NF_REAL,3,dims, sens_id)
+   ! call check_err(iret)
+   ! iret = nf_def_var(ncid,'latent',NF_REAL,3,dims, latent_id)
+   ! call check_err(iret)
 
 !   iret = nf_def_var(ncid,'int_sw',NF_REAL,3,dims, int_sw_id)
 !   call check_err(iret)
@@ -1594,12 +1610,12 @@
  !  call check_err(iret)
  !  iret = nf_def_var(ncid,'v_obs',NF_REAL,4,dims,v_obs_id)
  !  call check_err(iret)
-   iret = nf_def_var(ncid,'salt',NF_REAL,4,dims,salt_id)
-   call check_err(iret)
+ !  iret = nf_def_var(ncid,'salt',NF_REAL,4,dims,salt_id)
+ !  call check_err(iret)
  !  iret = nf_def_var(ncid,'salt_obs',NF_REAL,4,dims,salt_obs_id)
  !  call check_err(iret)
-   iret = nf_def_var(ncid,'temp',NF_REAL,4,dims,temp_id)
-   call check_err(iret)
+ !  iret = nf_def_var(ncid,'temp',NF_REAL,4,dims,temp_id)
+ !  call check_err(iret)
  !  iret = nf_def_var(ncid,'temp_obs',NF_REAL,4,dims,temp_obs_id)
  !  call check_err(iret)
  !  iret = nf_def_var(ncid,'SS',NF_REAL,4,dims,SS_id)
@@ -1654,7 +1670,6 @@
 !   iret = set_attributes(ncid,swr_error_id,units='no units')
 !   iret = set_attributes(ncid,wind_error_id,units='no units')
 !   iret = set_attributes(ncid,border_id,units='no units')
-
 
    select case (ncdf_time_unit)
       case(0)                           ! seconds
@@ -1720,9 +1735,9 @@
  !  iret = set_attributes(ncid,u_obs_id,units='m/s',long_name='obs. x-velocity')
  !  iret = set_attributes(ncid,v_id,units='m/s',long_name='y-velocity')
  !  iret = set_attributes(ncid,v_obs_id,units='m/s',long_name='obs. y-velocity')
-   iret = set_attributes(ncid,salt_id,units='ppt',long_name='salinity')
+ !  iret = set_attributes(ncid,salt_id,units='ppt',long_name='salinity')
  !  iret = set_attributes(ncid,salt_obs_id,units='ppt',long_name='obs. salinity')
-   iret = set_attributes(ncid,temp_id,units='celsius',long_name='temperature')
+  ! iret = set_attributes(ncid,temp_id,units='celsius',long_name='temperature')
   ! iret = set_attributes(ncid,temp_obs_id,units='celcius',long_name='obs. temperature')
   ! iret = set_attributes(ncid,SS_id,units='s-1',long_name='shear frequency')
   ! iret = set_attributes(ncid,NN_id,units='s-1',long_name='buoyancy frequency')
@@ -1847,10 +1862,52 @@
    end select
    iret = store_data(ncid,time_id,2,1,iscalar=time)
 
-!  Time varying data : x,y,t 
-!   iret = store_data(ncid,zeta_id,4,1,scalar=zeta)
-   iret = store_data(ncid,sst_id,4,1,scalar=sst)
-   iret = store_data(ncid,skint_id,4,1,scalar=skint)
+   !  Time varying data : x,y,t
+   !WT 20180706
+
+   do i = 1,12
+      select case (var_3d_name(i))
+      case('sst')
+         iret = store_data(ncid,var_3d_id(i),4,1,scalar=sst)
+      case('skint')
+         iret = store_data(ncid,var_3d_id(i),4,1,scalar=skint)
+      case('x-taus')
+         iret = store_data(ncid,var_3d_id(i),4,1,scalar=tx)
+      case('y-taus')
+         iret = store_data(ncid,var_3d_id(i),4,1,scalar=ty)
+      case('albedo')
+         iret = store_data(ncid,var_3d_id(i),4,1,scalar=albedo)
+      case('coszen')
+         iret = store_data(ncid,var_3d_id(i),4,1,scalar=coszen)
+      case('heat')
+         iret = store_data(ncid,var_3d_id(i),4,1,scalar=heat)
+      case('total')
+         iret = store_data(ncid,var_3d_id(i),4,1,scalar=heat+I_0)
+      case('swr')
+         iret = store_data(ncid,var_3d_id(i),4,1,scalar=I_0)
+      case('lwr')
+         iret = store_data(ncid,var_3d_id(i),4,1,scalar=-qb)
+      case('sens')
+         iret = store_data(ncid,var_3d_id(i),4,1,scalar=-qh)
+      case('latent')
+         iret = store_data(ncid,var_3d_id(i),4,1,scalar=-qe)
+      end select
+   end do
+   
+   ! iret = store_data(ncid,zeta_id,4,1,scalar=zeta)
+   ! iret = store_data(ncid,sst_id,4,1,scalar=sst)
+   ! iret = store_data(ncid,skint_id,4,1,scalar=skint)
+   ! iret = store_data(ncid,x_taus_id,4,1,scalar=tx)
+   ! iret = store_data(ncid,y_taus_id,4,1,scalar=ty)
+   ! iret = store_data(ncid,swr_id,4,1,scalar=I_0)
+   ! iret = store_data(ncid,albedo_id,4,1,scalar=albedo)
+   ! iret = store_data(ncid,coszen_id,4,1,scalar=coszen)   
+   ! iret = store_data(ncid,heat_id,4,1,scalar=heat)
+   ! iret = store_data(ncid,total_id,4,1,scalar=heat+I_0)
+   ! iret = store_data(ncid,lwr_id,4,1,scalar=-qb)
+   ! iret = store_data(ncid,sens_id,4,1,scalar=-qh)
+   ! iret = store_data(ncid,latent_id,4,1,scalar=-qe)
+
    !iret = store_data(ncid,swr_error_id,4,1,scalar=swr_error)
    !iret = store_data(ncid,wind_error_id,4,1,scalar=wind_error)
    !iret = store_data(ncid,border_id,4,1,scalar=border)
@@ -1873,19 +1930,6 @@
    !iret = store_data(ncid,ostia_seviri_sq_diff_id,4,1,scalar=ostia_seviri_sq_diff)
    !iret = store_data(ncid,cloud_id,4,1,scalar=cloud)
 !   iret = store_data(ncid,sss_id,4,1,scalar=sss)
-   iret = store_data(ncid,x_taus_id,4,1,scalar=tx)
-   iret = store_data(ncid,y_taus_id,4,1,scalar=ty)
-   iret = store_data(ncid,swr_id,4,1,scalar=I_0)
-   ! WT 20170724
-   iret = store_data(ncid,albedo_id,4,1,scalar=albedo)
-   ! WT 20180319
-   iret = store_data(ncid,coszen_id,4,1,scalar=coszen)
-   
-   iret = store_data(ncid,heat_id,4,1,scalar=heat)
-   iret = store_data(ncid,total_id,4,1,scalar=heat+I_0)
-   iret = store_data(ncid,lwr_id,4,1,scalar=-qb)
-   iret = store_data(ncid,sens_id,4,1,scalar=-qh)
-   iret = store_data(ncid,latent_id,4,1,scalar=-qe)
 !   iret = store_data(ncid,int_sw_id,4,1,scalar=int_sw)
 !   iret = store_data(ncid,int_hf_id,4,1,scalar=int_hf)
 !   iret = store_data(ncid,int_total_id,4,1,scalar=int_total)
@@ -1899,9 +1943,9 @@
  !  iret = store_data(ncid,u_obs_id,5,nlev,array=uprof)
  !  iret = store_data(ncid,v_id,5,nlev,array=v)
  !  iret = store_data(ncid,v_obs_id,5,nlev,array=vprof)
-   iret = store_data(ncid,salt_id,5,nlev,array=S)
+ !  iret = store_data(ncid,salt_id,5,nlev,array=S)
  !  iret = store_data(ncid,salt_obs_id,5,nlev,array=sprof)
-   iret = store_data(ncid,temp_id,5,nlev,array=T)
+ !  iret = store_data(ncid,temp_id,5,nlev,array=T)
  !  iret = store_data(ncid,temp_obs_id,5,nlev,array=tprof)
  !  iret = store_data(ncid,SS_id,5,nlev,array=SS)
  !  iret = store_data(ncid,NN_id,5,nlev,array=NN)

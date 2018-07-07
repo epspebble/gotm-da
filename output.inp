@@ -1,0 +1,14 @@
+ &output
+  sst=T,
+  skint=T,
+  tau_x=F,
+  tau_y=F,
+  albedo=T,
+  coszen=T,
+  heat=T,
+  total=F,
+  swr=T,
+  lwr=T,
+  sens=T,
+  latent=T
+ /
