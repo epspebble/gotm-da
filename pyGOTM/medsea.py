@@ -43,6 +43,32 @@ plots_folder = os.path.join(project_folder,'plots')
 data_folder = os.path.join(project_folder,'data',grid)
 grid_folder = os.path.join(project_folder,'grid',grid) 
 
+def set_folders(new_external_folder=None,
+                new_results_folder=None,
+                new_cache_folder=None,
+                new_plots_folder=None,
+                new_data_folder=None,
+                new_grid_folder=None):
+    if new_external_folder is not None:
+        global external_folder
+        external_folder = new_external_folder
+    if new_results_folder is not None:
+        global results_folder
+        results_folder = new_results_folder
+    if new_cache_folder is not None:
+        global cache_folder
+        cache_folder = new_cache_folder
+    if new_plots_folder is not None:
+        global plots_folder
+        plots_folder = new_plots_folder
+    if new_data_folder is not None:
+        global data_folder
+        data_folder = new_data_folder
+    if new_grid_folder is not None:
+        global grid_folder
+        grid_folder = new_grid_folder
+    return
+
 ## Global config for medsea simulations 
 # The following are not meant to be changed interactively, as functions in other modules in thisos.listdir(ms.base_folder)
 # package will not see the changes. 
@@ -126,23 +152,34 @@ csk = ''
 grd = '75m'
 run_key = asm + alb + csk + '-' + grd
 
-def set_run(asm=asm,alb=alb,csk=csk,grd=grd):
-    global run_key
-    run = asm + alb + csk + '-' + grd
-    if run in run_profiles.keys():
-        run_config = run_profiles[run]
-        if verbose:
-            print('Preset run profile: ' + run + ' selected:')
-            # Print run profile details.
-            if 'tabulate' not in sys.modules.keys():
-                for key in run_config:
-                    print('\t',key,':\t', run_config[key])
-            else:
-                print(tabulate([[name,val] for name, val in run_config.items()]))
+def set_run(new_run_key=run_key,asm=None,alb=None,csk=None,grd=None):
+    global run_keu
+    if asm is None:
+        assert alb is None
+        assert csk is None
+        assert grd is None
+        assert new_run_key is not None
+        run_key = new_run_key
     else:
-        print('WARNING: unknown run profile: ' + run)
+        assert alb is not None
+        assert csk is not None
+        assert grd is not None
+        assert new_run_key is None
+        new_run_key = asm + alb + csk + '-' + grd
+        if new_run_key in run_profiles.keys():
+            run_config = run_profiles[new_run_key]
+            if verbose:
+                print('Preset run profile: ' + new_run_key + ' selected:')
+                # Print run profile details.
+                if 'tabulate' not in sys.modules.keys():
+                    for key in run_config:
+                        print('\t',key,':\t', run_config[key])
+                else:
+                    print(tabulate([[name,val] for name, val in run_config.items()]))
+            else:
+                print('WARNING: unknown run profile: ' + new_run_key)
 
-    run_key = run
+        run_key = new_run_key
     return run_key
 
 # List of run_profiles done in the past.
@@ -286,6 +323,7 @@ def set_run(asm=asm,alb=alb,csk=csk,grd=grd):
 # Alias
 def setup(*args,**kwargs):
     return set_grid(*args,**kwargs)
+
 
 # Routines to set global values in this module. Can be used in interactive session to change config.
 def set_grid(new_grid=grid, #new_ASM=ASM,
@@ -510,7 +548,7 @@ import numpy as np
 if not(os.path.isfile(os.path.join(grid_folder,'grid_data.npy'))):
     subgrid_data = set_grid(return_grid_data=True)
     # Generate the cache
-    np.save(os.path.join(grid_folder,'grid_data.npy'),subgrid_data)
+    np.save(os.path.join(project_folder,'grid_{!s}_data.npy'.format(grid)),subgrid_data)
 else: 
     subgrid, rea_indices, grid_indices = np.load(os.path.join(grid_folder,'grid_data.npy'))
     grid_lats, grid_lons, medsea_flags, max_depth = subgrid
@@ -521,7 +559,7 @@ else:
 data_sources = dict(
     heat = 'medsea_ERA_INTERIM',
     met = 'medsea_ERA_INTERIM',
-    tprof = 'medsea_MFC_midnights',
+    tprof = 'medsea_MFC_midnight',
     sprof = 'medsea_MFC_sunrise',
     chlo = 'medsea_MODIS',
     iop = 'medsea_MODIS')
@@ -581,9 +619,9 @@ def get_data_sources(dat, year=None, month=None, mode='r'):
         assert isinstance(name,str)
 
         if name == 'heat' or name == 'met':
-            return 'ERA'
+            return 'ERA-INTERIM'
         elif name == 'tprof' or name == 'sprof':
-            return 'rea'
+            return 'MFC_midnight'
         elif name == 'chlo' or name == 'iop':
             return 'MODIS'
         else:
