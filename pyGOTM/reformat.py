@@ -207,10 +207,14 @@ def medsea_ERA_reformat(year, month=None):
     tic = time()
     elapsed = 0
     for dat_type in ['heat','met']:
-        dst_fn = 'medsea_ERA_{:s}_{:d}.nc'.format(dat_type, year)
+        if month is None:
+            dst_fn = 'medsea_ERA-INTERIM_{:s}_{:d}.nc'.format(dat_type, year)
+        else:
+            dst_fn = 'medsea_ERA-INTERIM_{:s}_{:d}{:02d}.nc'.format(dat_type, year, month)
         print('Writing {:s}...'.format(join(dst_folder,dst_fn)))
         # Create the dimensions
-        with Dataset(join(dst_folder,dst_fn),'w',format="NETCDF3_CLASSIC") as ds:
+        #with Dataset(join(dst_folder,dst_fn),'w',format="NETCDF3_CLASSIC") as ds:
+        with Dataset(join(dst_folder,dst_fn),'w',diskless=True,persist=True) as ds:
             ds.createDimension('time') # unlimited
             ds.createDimension('lat', size=len(dst_lats))
             ds.createDimension('lon', size=len(dst_lons))
@@ -237,19 +241,16 @@ def medsea_ERA_reformat(year, month=None):
             ds_time[:] = [hour_offset+3*i for i in range(yrdays*8)] # 8 records per day.
         toc = time()-tic
         elapsed += toc
-        print('Finished writing dimensions. Elapsed {:.2f}s'.format(toc))
     
-        # Append the data one variable after another.
-        for name in names[dat_type]:
+        with Dataset(join(dst_folder,dst_fn),'a',diskless=True,persist=True) as ds:
             tic = time()
-            src_fn = 'MEDSEA_ERA-INT_{:s}_y{:d}.nc'.format(name,year)
-            # Append data for one variable for one year.
-            with Dataset(join(dst_folder,dst_fn),'a') as ds:
-                var = ds.createVariable(name,'f8',dimensions=('time','lat','lon'))
+            for name in names[dat_type]:
+                var = ds.createVariable(name,'f4',dimensions=('time','lat','lon'))
                 # The lat_slice and lon_slice is computed in the first run, and shold
                 # stay the same after every function call if assumption that
                 # the lat/lon grid of the source dataset is unique and identical
                 # across nc files.
+                src_fn = 'MEDSEA_ERA-INT_{:s}_y{:d}.nc'.format(name,year)                
                 val = get_data(name,src_fn) 
                 if name == 't2m':
                     var[:] = val - 273.15 # Convert from degrees K to degrees C
@@ -259,7 +260,7 @@ def medsea_ERA_reformat(year, month=None):
                     var[:] = val
             toc = time()-tic
             elapsed += toc
-            print('Finished appending data for {:s}.'.format(name))
+            print('Finished writing data for {:s}.'.format(dat_type))
 
         print('Total time: {:.2f}s'.format(elapsed))
 
@@ -350,7 +351,7 @@ def medsea_ECMWF_reformat(year,month):
             src_fn = 'ECMWF_{:s}_y{:d}m{:02d}.nc'.format(name,year,month)
             # Append data for one variable for one year.
             with Dataset(join(dst_folder,dst_fn),'a') as ds:
-                var = ds.createVariable(name,'f8',dimensions=('time','lat','lon'))
+                var = ds.createVariable(name,'f4',dimensions=('time','lat','lon'))
                 val = get_data(name,src_fn)
                 if name == 't2m':
                     var[:] = val - 273.15 # Convert from degrees K to degrees C
@@ -455,7 +456,7 @@ def medsea_MFC_midnight_reformat(year,month=None):
             print('Finished reading. Elapsed {:.2f}s.'.format(time()-tic))
             
             tic = time()
-            var = ds.createVariable(dst_varname[name],'f8',dimensions=('time','depth','lat','lon'))            
+            var = ds.createVariable(dst_varname[name],'f4',dimensions=('time','depth','lat','lon'))            
             var[:] = data
         print('Finished appending data for {:s}. Elapsed {:.2f}s'.format(dat_type,time()-tic))
 
