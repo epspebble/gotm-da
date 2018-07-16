@@ -85,10 +85,16 @@ def setup(verbose=verbose,**overrides):
         project_folder = join(userhome,project_name) # notebooks, jobs, scripts, config templates
 
     # 2. GOTM program
+
+    # Make sure the version override is done before the following paths update are done.
+    if 'GOTM_version' in preset_overrides:
+        GOTM_version = preset_overrides['GOTM_version']
+        
     if 'GOTM_executable' in paths_overrides:
         GOTM_executable = paths_overrides['GOTM_executable']
     else:
-        GOTM_executable = 'gotm'+'-'+GOTM_version # Just the name.
+        GOTM_executable = 'gotm'+'-'+GOTM_version # This will change by 'GOTM_version' value in preset_overrides
+        
     if 'GOTM_executable_path' in paths_overrides:
         GOTM_executable_path = paths_overrides['GOTM_executable_path']
     else:
