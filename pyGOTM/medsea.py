@@ -350,18 +350,39 @@ def set_grid(new_grid=grid, #new_ASM=ASM,
             rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth)
             grid_indices = (M, N, sea_mn, sea_m, sea_n)
     """
-    from netCDF4 import Dataset
-    from matplotlib import cm
+
+    # Global folder names to be used in this function.
+    global grid_folder, data_folder, results_folder
 
     # Declaring global is necessary for modifying them interactively after importing this module.
     global run, grid, max_depth#, ASM
     global grid_lats, grid_lons, medsea_flags, max_depth
     global medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth
     global M, N, sea_mn, sea_m, sea_n
-    global grid_folder, data_folder, results_folder
 
     # For plotting heatmaps more conveniently
     global extent
+    
+    # Skip the whole function if a cache file is found.
+    import numpy as np
+    grid = new_grid
+    new_grid_folder = os.path.join(project_folder,'grid',new_grid)
+    set_folders(new_grid_folder = new_grid_folder)
+    grid_cache_fn = os.path.join(new_grid_folder,'grid_data.npy')
+    if os.path.isfile(grid_cache_fn):
+        subgrid, rea_indices, grid_indices = np.load(grid_cache_fn)
+        (grid_lats, grid_lons, medsea_flags, max_depth) = subgrid
+        (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth, loc_type) = rea_indices
+        (M, N, sea_mn, sea_m, sea_n) = grid_indices
+        if return_grid_data:        
+            return subgrid, rea_indices, grid_indices
+        else:
+            print('Using grid cache at {:s}...'.format(grid_cache_fn))
+            return
+
+    print('Grid cache not found, generating grid data...')
+    from netCDF4 import Dataset
+    from matplotlib import cm
 
     # Override the global variables using values passed from function call.
     grid = new_grid
@@ -540,22 +561,16 @@ def set_grid(new_grid=grid, #new_ASM=ASM,
     rea_indices = (medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth, loc_type)
     grid_indices = (M, N, sea_mn, sea_m, sea_n)
 
+    # If the function has not returned in the begining... Pack up and generate a cache file.
+    assert not os.path.isfile(grid_cache_fn)
+    np.save(grid_cache_fn, (subgrid, rea_indices, grid_indices))    
+    
     if return_grid_data:
         return subgrid, rea_indices, grid_indices
 
-#  Now run set_grid() only if a cache does not exsit.
-import numpy as np
-grid_cache_fn = os.path.join(grid_folder,'grid_data.npy')
-if not(os.path.isfile(grid_cache_fn)):
-    subgrid_data = set_grid(return_grid_data=True)
-    # Generate the cache
-    np.save(grid_cache_fn,subgrid_data)
-else: 
-    subgrid, rea_indices, grid_indices = np.load(grid_cache_fn)
-    grid_lats, grid_lons, medsea_flags, max_depth = subgrid
-    medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth, loc_type = rea_indices
-    M, N, sea_mn, sea_m, sea_n = grid_indices
-
+# Set default grid
+set_grid('1x')
+    
 # Print some settings upon loading of this 
 data_sources = dict(
     heat = 'medsea_ERA_INTERIM',
