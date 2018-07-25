@@ -545,12 +545,13 @@ def set_grid(new_grid=grid, #new_ASM=ASM,
 
 #  Now run set_grid() only if a cache does not exsit.
 import numpy as np
-if not(os.path.isfile(os.path.join(grid_folder,'grid_data.npy'))):
+grid_cache_fn = os.path.join(grid_folder,'grid_data.npy')
+if not(os.path.isfile(grid_cache_fn)):
     subgrid_data = set_grid(return_grid_data=True)
     # Generate the cache
-    np.save(os.path.join(project_folder,'grid_{!s}_data.npy'.format(grid)),subgrid_data)
+    np.save(grid_cache_fn,subgrid_data)
 else: 
-    subgrid, rea_indices, grid_indices = np.load(os.path.join(grid_folder,'grid_data.npy'))
+    subgrid, rea_indices, grid_indices = np.load(grid_cache_fn)
     grid_lats, grid_lons, medsea_flags, max_depth = subgrid
     medsea_rea_lat_ind, medsea_rea_lon_ind, medsea_rea_ndepth, loc_type = rea_indices
     M, N, sea_mn, sea_m, sea_n = grid_indices
