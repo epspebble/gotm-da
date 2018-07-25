@@ -307,7 +307,10 @@ def medsea_MODIS_reformat(year,num=46):
     assert 'medsea' not in sys.modules, "'import pyGOTM.medsea as medsea' first!'"
             
     # Writing to an nc file.
-    dst_fn = 'medsea_MODIS_{:s}_8D_{:d}.nc'.format(obs_type,year)
+    if obs_type == 'CHL':
+        dst_fn = 'medsea_MODIS_chlo_{:d}.nc'.format(year)
+    elif obs_type == 'IOP':
+        dst_fn = 'medsea_MODIS_iop_{:d}.nc'.format(year)
     print('Writing to {:s}...'.format(join(dst_folder,dst_fn)))
     with Dataset(join(dst_folder,dst_fn),'w',format='NETCDF3_CLASSIC') as ds: 
 

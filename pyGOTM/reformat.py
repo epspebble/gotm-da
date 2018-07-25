@@ -213,8 +213,7 @@ def medsea_ERA_reformat(year, month=None):
             dst_fn = 'medsea_ERA-INTERIM_{:s}_{:d}{:02d}.nc'.format(dat_type, year, month)
         print('Writing {:s}...'.format(join(dst_folder,dst_fn)))
         # Create the dimensions
-        #with Dataset(join(dst_folder,dst_fn),'w',format="NETCDF3_CLASSIC") as ds:
-        with Dataset(join(dst_folder,dst_fn),'w',diskless=True,persist=True) as ds:
+        with Dataset(join(dst_folder,dst_fn),'w',format="NETCDF3_CLASSIC",diskless=True,persist=True) as ds:
             ds.createDimension('time') # unlimited
             ds.createDimension('lat', size=len(dst_lats))
             ds.createDimension('lon', size=len(dst_lons))

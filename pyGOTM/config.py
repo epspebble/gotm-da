@@ -63,6 +63,7 @@ def setup(verbose=verbose,**overrides):
     
     # Global "paths" variables computed from the "input" global preset module variables.
     global project_folder, GOTM_executable, GOTM_executable_path, GOTM_nml_path, GOTM_nml
+    global project_name, GOTM_version, epoch 
 
     # Hardcoded defaults
     preset = ['project_name', 'GOTM_version', 'epoch']
