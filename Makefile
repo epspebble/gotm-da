@@ -33,7 +33,7 @@ else
 FC=gfortran
 FFLAGS=-fbackslash # To use '\n', '\r' etc...
 endif
-NETCDFLIB = libnetcdf.a # Build it and copy it to our working folder
+NETCDFLIB=libnetcdf.a # Build it and copy it to our working folder
 
 # The build options below are all irrelevant for usual PC, Westgrid and ComputeCanada servers.
 
