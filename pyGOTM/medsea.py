@@ -26,6 +26,24 @@ nlev = 122 # Number of levels in the truncated grid for up to 75m.
 grid = '1x' # TO BE DEPRECATED. Propose to use 'res' to denote the spatial resolution instead.
 region = 'medsea' # practically just a prefix of filenames for now, the code is strongly tied to this assumption
 
+# Code names of products, which are used by the pyGOTM.reformat scripts to generate folder structure using these names.
+atm_product = 'ERA-INTERIM'
+ocean_product = 'MFC-midnight'
+remote_sensing_product = 'MODIS'
+
+def set_sources(new_atm_product=None,
+                new_ocean_product=None,
+                new_remote_sensing_product=None):
+    if new_atm_product is not None:
+        global atm_product
+        atm_product = new_atm_product
+    if new_ocean_product is not None:
+        global ocean_product
+        ocean_product = new_ocean_product
+    if new_remote_sensing_product is not None:
+        global remote_sensing_product
+        remote_sensing_product = new_remote_sensing_product
+    
 
 # A switch.
 overwrite = True # True means running at the same grid point will overwrite files if already present (notably the *.inp etc...)
@@ -368,7 +386,6 @@ def set_grid(new_grid=grid, #new_ASM=ASM,
     grid = new_grid
     new_grid_folder = os.path.join(project_folder,'grid',new_grid)
     new_data_folder = os.path.join(project_folder,'data',new_grid)
-    
     set_folders(new_grid_folder = new_grid_folder, new_data_folder = new_data_folder)
     grid_cache_fn = os.path.join(new_grid_folder,'grid_data.npy')
     if os.path.isfile(grid_cache_fn):
@@ -379,7 +396,7 @@ def set_grid(new_grid=grid, #new_ASM=ASM,
         if return_grid_data:        
             return subgrid, rea_indices, grid_indices
         else:
-            print('Using grid cache at {:s}...'.format(grid_cache_fn))
+            #print('Using grid cache at {:s}...'.format(grid_cache_fn))
             return
 
     print('Grid cache not found, generating grid data...')
@@ -637,11 +654,11 @@ def get_data_sources(dat, year=None, month=None, mode='r'):
         assert isinstance(name,str)
 
         if name == 'heat' or name == 'met':
-            return 'ERA-INTERIM'
+            return atm_product
         elif name == 'tprof' or name == 'sprof':
-            return 'MFC_midnight'
+            return ocean_product
         elif name == 'chlo' or name == 'iop':
-            return 'MODIS'
+            return remote_sensing_product
         else:
             raise NotImplementedError('Data source unknown for ' + name)
         return None
@@ -842,7 +859,7 @@ def get_local_folder(*args, create=False):
     if not(os.path.isdir(local_folder)):
         if create:
             try:
-              print('The folder {:s} is not found, creating it.'.format(local_folder))
+              #print('The folder {:s} is not found, creating it.'.format(local_folder))
               os.mkdir(local_folder)
             except:
               raise
