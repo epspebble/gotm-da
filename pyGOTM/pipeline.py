@@ -34,29 +34,29 @@ def write_dat(indices,run_instance):
 
     # Create folders if necessary
     
-    #print('Creating folders if necessary...')
+    
     print('Generating input data files...')
     write_dat_begin = toc()
-    
+    #print('Creating folders if necessary...')
     for m,n in indices:
         #lat,lon = run_instance.get_lat_lon(m,n)
         dst_folder = run_instance.get_local_folder(m,n,create=True)
     #print('Elapsed {:.2f}s'.format(toc()-tic))
     
     # Read data for heat.dat
-    #tic = toc()
-    #print('Reading in data for heat.dat...')
+    tic = toc()
+    print('Reading in data for heat.dat...')
     with run_instance.get_data_sources('heat') as ds:
         time = num2date(ds['time'][:],ds['time'].units)
         lwrd = ds['lwrd'][:]
         swrd = ds['swrd'][:]
         swrd_cs = ds['swrd_cs'][:]
         cloud_factor = masked_outside(ds['cloud_factor'][:],0,2)
-    #print('Elapsed {:.2f}s'.format(toc()-tic))
+    print('Elapsed {:.2f}s'.format(toc()-tic))
     
     # Write data to heat.dat
-    #tic = toc()
-    #print('Writing heat.dat to the grid folders...')
+    tic = toc()
+    print('Writing heat.dat to the grid folders...')
     for m,n in indices:
         lat,lon = run_instance.get_lat_lon(m,n)
         dst_folder = run_instance.get_local_folder(m,n,)
@@ -70,12 +70,12 @@ def write_dat(indices,run_instance):
                 col[3] = lwrd[i,m,n]
                 line = ('{:s}'+' {:10.5g}'*3 + '\n').format(*col)
                 f.write(line)    
-    #print('Elapsed {:.2f}s'.format(toc()-tic))
+    print('Elapsed {:.2f}s'.format(toc()-tic))
     del lwrd, swrd, swrd_cs, cloud_factor
 
     # Read data for met.dat
-    #tic = toc()
-    #print('Reading in data for met.dat...')
+    tic = toc()
+    print('Reading in data for met.dat...')
     with run_instance.get_data_sources('met') as ds:
         time = num2date(ds['time'][:],ds['time'].units)
         u10m = ds['u10m'][:]
@@ -84,11 +84,11 @@ def write_dat(indices,run_instance):
         t2m = ds['t2m'][:]
         q2m = ds['q2m'][:]
         precip = ds['precip'][:]    
-    #print('Elapsed {:.2f}s'.format(toc()-tic))
+    print('Elapsed {:.2f}s'.format(toc()-tic))
 
     # Write data for met.dat
-    #tic = toc()
-    #print('Writing met.dat to the grid folders...')
+    tic = toc()
+    print('Writing met.dat to the grid folders...')
     for m,n in indices:
         #lat,lon = run_instance.get_lat_lon(m,n)
         dst_folder = run_instance.get_local_folder(m,n)
@@ -107,21 +107,21 @@ def write_dat(indices,run_instance):
                 col[8] = 0 # snow!?
                 line = ('{:s}'+' {:10.5g}'*8 + '\n').format(*col)
                 f.write(line)    
-    #print('Elapsed {:.2f}s'.format(toc()-tic))
+    print('Elapsed {:.2f}s'.format(toc()-tic))
     del time, u10m, v10m, sp, t2m, q2m, precip
 
     # Read data for tprof.dat
-    #tic = toc()
-    #print('Reading in data for tprof.dat...')    
+    tic = toc()
+    print('Reading in data for tprof.dat...')    
     with run_instance.get_data_sources('tprof') as ds: 
         depth = ds['depth'][:]
         dates = num2date(ds['time'][:],ds['time'].units)
         temp = masked_outside(ds['temp'][:],4,35)   
-    #print('Elapsed {:.2f}s'.format(toc()-tic))
+    print('Elapsed {:.2f}s'.format(toc()-tic))
 
     # Write data for tprof.dat
-    #tic = toc()
-    #print('Writing tprof.dat to the grid folders...')    
+    tic = toc()
+    print('Writing tprof.dat to the grid folders...')    
     for m,n in indices:
         #lat,lon = run_instance.get_lat_lon(m,n)
         dst_folder = run_instance.get_local_folder(m,n)
@@ -133,21 +133,21 @@ def write_dat(indices,run_instance):
                 for j in range(len(depth)):
                     line = ('{0:g} {1:g}\n').format(-depth[j],temp[i,j,m,n])
                     f.write(line)       
-    #print('Elapsed {:.2f}s'.format(toc()-tic))
+    print('Elapsed {:.2f}s'.format(toc()-tic))
     del depth, dates, temp
 
     # Read data for sprof.dat
-    #tic = toc()
-    #print('Reading in MFC_midnight data for sprof.dat...')    
+    tic = toc()
+    print('Reading in data for sprof.dat...')    
     with run_instance.get_data_sources('sprof') as ds: 
         depth = ds['depth'][:]
         dates = num2date(ds['time'][:],ds['time'].units)
         salt = masked_outside(ds['salt'][:],0,1000)    
-    #print('Elapsed {:.2f}s'.format(toc()-tic))
+    print('Elapsed {:.2f}s'.format(toc()-tic))
 
     # Write data for sprof.dat
-    #tic = toc()
-    #print('Writing sprof.dat to the grid folders...')       
+    tic = toc()
+    print('Writing sprof.dat to the grid folders...')       
     for m,n in indices:
         #lat,lon = run_instance.get_lat_lon(m,n)
         dst_folder = run_instance.get_local_folder(m,n)
@@ -159,20 +159,20 @@ def write_dat(indices,run_instance):
                 for j in range(len(depth)):
                     line = ('{0:g} {1:g}\n').format(-depth[j],salt[i,j,m,n])
                     f.write(line)
-    #print('Elapsed {:.2f}s'.format(toc()-tic))
+    print('Elapsed {:.2f}s'.format(toc()-tic))
     del depth, dates, salt
 
     # Read data for chlo.dat
-    #tic = toc()
-    #print('Reading in data for chlo.dat...')    
+    tic = toc()
+    print('Reading in data for chlo.dat...')    
     with run_instance.get_data_sources('chlo') as ds:
         time = num2date(ds['time'][:],ds['time'].units)
         chlo = masked_outside(ds['chlor_a'][:],0,10)
-    #print('Elapsed {:.2f}s'.format(toc()-tic))
+    print('Elapsed {:.2f}s'.format(toc()-tic))
 
     # Write data for chlo.dat    
-    #tic = toc()
-    #print('Writing chlo.dat to the grid folders...')       
+    tic = toc()
+    print('Writing chlo.dat to the grid folders...')       
     for m,n in indices:
         dst_folder = run_instance.get_local_folder(m,n)
         dst_fn = 'chlo.dat'
@@ -191,19 +191,20 @@ def write_dat(indices,run_instance):
                     print('WARNING: {:d} consecutive nan values while writing {:s}.'.format(count,join(dst_folder,dst_fn)))
 
     del chlo
-
+    print('Elapsed {:.2f}s'.format(toc()-tic))
+    
     # Read data for iop.dat
-    #tic = toc()
-    #print('Reading in data for iop.dat...')
+    tic = toc()
+    print('Reading in data for iop.dat...')
     with run_instance.get_data_sources('iop') as ds:
         time = num2date(ds['time'][:],ds['time'].units)
         a = ds['a_488_giop'][:]
         bb = ds['bb_488_giop'][:]
-    #print('Elapsed {:.2f}s'.format(toc()-tic))
+    print('Elapsed {:.2f}s'.format(toc()-tic))
 
     # Write data for iop.dat    
-    #tic = toc()
-    #print('Writing iop.dat to the grid folders...')
+    tic = toc()
+    print('Writing iop.dat to the grid folders...')
     for m,n in indices:
         dst_folder = run_instance.get_local_folder(m,n)
         dst_fn = 'iop.dat'
@@ -222,13 +223,18 @@ def write_dat(indices,run_instance):
                 print('WARNING: {:d} consecutive nan values while writing {:s}.'.format(count,join(dst_folder,dst_fn)))
     #print('Elapsed {:.2f}s'.format(toc()-tic))
     del a, bb
-    print('Elapsed {:.2f}s'.format(toc()-write_dat_begin))
+    print('Elapsed {:.2f}s'.format(toc()-tic))
+    print('Total write_dat time: {:.2f}s'.format(toc()-write_dat_begin))
     
-def create_header(fn,varnames,i0,i1,epoch='1981-01-01 00:00:00'):
+def create_header(fn,i0,i1,var3d,var4d=None,epoch='1981-01-01 00:00:00'):
     from netCDF4 import Dataset
     with Dataset(fn,'w',format='NETCDF3_CLASSIC') as ds:
         ds.createDimension('time')
         ds.createDimension('index', size = i1-i0)
+        if var4d is not None:
+            ds.createDimension('depth', size = 122)
+            ncdepth = ds.createVariable('depth','f4',dimensions=('depth',))
+        
         nctime = ds.createVariable('time','i4',dimensions=('time',))
         nctime.units = 'hours since ' + epoch
         ncindex = ds.createVariable('index','i2',dimensions=('index',))
@@ -238,9 +244,11 @@ def create_header(fn,varnames,i0,i1,epoch='1981-01-01 00:00:00'):
         nclon = ds.createVariable('lon','f4',dimensions=('index',))
         nclon.units = 'degree east'
 
-        for varname in varnames:
+        for varname in var3d:
             ds.createVariable(varname,'f4',dimensions=('time','index'))
-
+        for varname in var4d:
+            ds.createVariable(varname,'f4',dimensions=('time','index','depth'))
+            
 def batch_run(grid, run, ver, start, stop, wd, i0=None,i1=None, c=None, k=None, prepared_input=True, cached_write=False):
     """
     grid = '144x'
@@ -264,6 +272,9 @@ def batch_run(grid, run, ver, start, stop, wd, i0=None,i1=None, c=None, k=None, 
     init_start = time()
     print('Setting up batch GOTM-{:s} run for {:s} grid in {:s}'.format(ver,grid,wd))
     medsea = run_setup(grid, ver, wd)
+
+    assert medsea.grid == grid
+    assert medsea.GOTM_version == ver
     
     # Calculate the subset of grid points to work on.
     I = len(medsea.sea_mn)
@@ -306,9 +317,11 @@ def batch_run(grid, run, ver, start, stop, wd, i0=None,i1=None, c=None, k=None, 
         fn_batch = out_fn
         
     # Populate the batch results netCDF file header.    
-    varnames = ['sst','skint','x-taus','y-taus','albedo','coszen','heat','total','swr','lwr','sens','latent']
-    print('Creating nc file header to store results containing: \n{!s}'.format(varnames))
-    create_header(fn_batch,varnames,i0,i1,str(medsea.epoch))
+    var3d = ['sst','skint','x-taus','y-taus','albedo','coszen','heat','total','swr','lwr','sens','latent']
+    var4d = ['temp']
+    
+    print('Creating nc file header to store results containing: \n{!s}'.format(var3d))
+    create_header(fn_batch,i0,i1,var3d,var4d,str(medsea.epoch))
 
     print('Initialization finished. Elapsed {:.2f}s.'.format(time()-init_start))
     
@@ -325,12 +338,16 @@ def batch_run(grid, run, ver, start, stop, wd, i0=None,i1=None, c=None, k=None, 
             medsea.local_run(m,n,start,stop,run=run,cached=False)
             # Append data immediately.
             print('Appending data point #{:d}, index ({:d},{:d})...'.format(i,m,n))
-            with Dataset(fn_batch,'a') as ds_out:
+            append_start = time()
+            with Dataset(fn_batch,'a',disk_less=True) as ds_out:
                 with Dataset(fn_pt,'r') as ds_in:
                     ds_out['lat'][i-i0] = ds_in['lat'][0]
                     ds_out['lon'][i-i0] = ds_in['lon'][0]                
-                    for varname in varnames:
+                    for varname in var3d:
                         ds_out[varname][:,i-i0] = ds_in[varname][:,0,0]
+                    for varname in var4d:
+                        ds_out[varname][:,i-i0,:] = ds_in[varname][:,:,0,0]
+            print('Elapsed {:.2f}s.'.format(time()-append_start))
         except Exception as e:
             print(e)
                     
