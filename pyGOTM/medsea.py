@@ -367,7 +367,9 @@ def set_grid(new_grid=grid, #new_ASM=ASM,
     import numpy as np
     grid = new_grid
     new_grid_folder = os.path.join(project_folder,'grid',new_grid)
-    set_folders(new_grid_folder = new_grid_folder)
+    new_data_folder = os.path.join(project_folder,'data',new_grid)
+    
+    set_folders(new_grid_folder = new_grid_folder, new_data_folder = new_data_folder)
     grid_cache_fn = os.path.join(new_grid_folder,'grid_data.npy')
     if os.path.isfile(grid_cache_fn):
         subgrid, rea_indices, grid_indices = np.load(grid_cache_fn)
