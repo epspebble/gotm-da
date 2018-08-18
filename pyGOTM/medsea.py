@@ -28,7 +28,7 @@ region = 'medsea' # practically just a prefix of filenames for now, the code is 
 
 # Code names of products, which are used by the pyGOTM.reformat scripts to generate folder structure using these names.
 atm_product = 'ERA-INTERIM'
-ocean_product = 'MFC-midnight'
+ocean_product = 'MFC_midnight'
 remote_sensing_product = 'MODIS'
 
 def set_sources(new_atm_product=None,

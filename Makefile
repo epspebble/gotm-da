@@ -82,7 +82,6 @@ libutil.a(tridiagonal.o)		\
 libutil.a(eqstate.o)			\
 libobservations.a(observations.o)	\
 libmeanflow.a(meanflow.o)		\
-libairsea.a(airsea.o)			\
 libturbulence.a(turbulence.o)		\
 liboutput.a(asciiout.o)			\
 liboutput.a(ncdfout.o)			\
@@ -90,6 +89,9 @@ liboutput.a(output.o)			\
 libturbulence.a(sediment.o)		\
 libturbulence.a(seagrass.o)
 
+AIRSEA	= \
+libairsea.a(airsea.o)		\
+libairsea.a(short_wave_radiation.o)	\
 
 UTIL	= \
 libutil.a(advection.o)		\
