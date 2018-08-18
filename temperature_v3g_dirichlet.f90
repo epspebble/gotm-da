@@ -148,7 +148,8 @@ subroutine temperature(nlev,dt,cnpar,I_0,heat,advect,qdir_frac,qdiff_frac,cosr,n
   !  hard coding of parameters, to be included into namelist for gotm2.0 
   Bcup=1 !BC Neumann
   Tup=-heat/(rho_0*cp)!Heat flux (positive upward)
-  Bcdw=2 !BC Neumann
+  !Bcdw=1 !BC Neumann
+  Bcdw=2 !BC Dirichlet 
   Tdw=0.!No flux
   surf_flux=.false.                     
   bott_flux=.false.

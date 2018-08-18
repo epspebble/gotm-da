@@ -24,7 +24,7 @@ MODULE time
   public                              :: init_time, calendar_date
   public                              :: julian_day, update_time
   public                              :: write_time_string
-  public                              :: UTC_to_local, tz !WT 
+  public                              :: UTC_to_local, tz, fractional_year !WT 
   public                              :: time_diff
   !
   ! !PUBLIC DATA MEMBERS:
@@ -37,6 +37,7 @@ MODULE time
   integer,           public           :: dayofyear !WT
   integer,           public           :: timefmt
   integer,           public           :: MinN,MaxN
+
   !
   ! !REVISION HISTORY:
   !  Original author(s): Karsten Bolding & Hans Burchard
@@ -492,7 +493,39 @@ contains
 
   end subroutine UTC_to_local
 
-    end module time
+  function fractional_year(jul,secs)
+    ! DESCRIPTION
+    ! The time of year in radian (a fraction out of 2*pi).
+
+    implicit None
+    integer, intent(in) :: jul, secs
+    double precision :: fractional_year
+    double precision, parameter                :: pi=3.14159265358979323846
+    
+    ! Local variables
+    integer :: yrdays, jul0, yyyy, mm, dd, days
+    double precision :: hours
+
+    ! 1. Convert Julian day to yyyy-mm-dd.
+    call calendar_date(jul,yyyy,mm,dd)
+
+    ! 2. Find number of days since yyyy-01-01, and the fractional hour since midnight.
+    call julian_day(yyyy,1,1,jul0) ! jul0 = julian day number of the first day of year.
+
+    ! 3. The fractional solar year (\gamma) in solareqns.pdf, which begins noon on civil New Year Day.
+    if (mod(yyyy,4) .eq. 0) then
+       yrdays = 366
+    else
+       yrdays = 365
+    end if
+    
+    days = jul - jul0 ! = day_of_year-1 = 0 for the first day yyyy:01-01
+    hours = 1.*secs/3600. ! hours should be UTC decimal time
+    fractional_year = (2.*pi/yrdays)*(days+((hours-12)/24))  
+
+  end function fractional_year
+  
+end module time
 
 !-----------------------------------------------------------------------
 ! Copyright by the GOTM-team under the GNU Public License - www.gnu.org

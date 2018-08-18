@@ -453,7 +453,7 @@ double precision function trans(z,extinct_method)
            !trans = trans+para_A
         END DO
      END IF
-
+     
   case (13)
      K1 = (-0.057+0.482*sqrt(abp_coe)+4.221*bb)*(1+0.09*sin(acos(coszen)))
      K2 = (0.183+0.702*abp_coe-2.567*bb)*(1.465-0.667*coszen) 
@@ -462,149 +462,35 @@ double precision function trans(z,extinct_method)
      !IF (z.gt. 3.0) then  ! E_IR is absorbed within the layer of top 3m.
      !   trans = 0.424*exp(-K_vis*z)
      !ELSE
-        trans = 0.576*exp(-K_ir*z)+0.424*exp(-K_vis*z)
+     trans = 0.576*exp(-K_ir*z)+0.424*exp(-K_vis*z)
      !end if
+     
+  ! case (14)
+  !    !WT 20180815 Warning. Untested case implemented by Joyce.
+  !    ! Originally commenting B1, B1 in version 1, but commenting A1, A1 in version 2.
+        
+  !    ! A1 = 0.0268*log(chlo) + 0.5581                 !version 1: including albedo
+  !    ! A2 = -0.017*log(chlo) + 0.2246
+  !    ! B1 = -0.0184*chlo**2 + 0.1141*chlo+0.042
+  !    ! B2 = 0.5641*chlo**0.13
 
-  case (14)
-     A1 = 0.0268*log(chlo) + 0.5581                 !version for including albedo
-     A2 = -0.017*log(chlo) + 0.2246
-     !      B1 = -0.0184*chlo**2 + 0.1141*chlo+0.042
-     !      B2 = 0.5641*chlo**0.13
-
-
-     !     A1 = 0.571+0.025*log(0.149*chlo)               !version for not including albedo
-     !     A2 = 0.223+0.010*log(2.329*chlo)
-     B1 = 0.015+0.176*sqrt(0.462*chlo)
-     B2 = 0.688+0.060*log(0.125*chlo)
-     Tr = A1*exp(-B1*z) + A2*exp(-B2*z)
-     F_theta = 0.42*coszen-0.34
-     IF (cloud.gt. 0.1) then
-        G_CI = 0
-     ELSE 
-        G_CI = 1  
-     END IF
-     trans = Tr*(1+F_theta*G_CI)
+  !    A1 = 0.571+0.025*log(0.149*chlo)               !version 2: not including albedo
+  !    A2 = 0.223+0.010*log(2.329*chlo)
+  !    B1 = 0.015+0.176*sqrt(0.462*chlo)
+  !    B2 = 0.688+0.060*log(0.125*chlo)
+     
+  !    Tr = A1*exp(-B1*z) + A2*exp(-B2*z)
+  !    F_theta = 0.42*coszen-0.34
+  !    IF (cloud.gt. 0.1) then
+  !       G_CI = 0
+  !    ELSE 
+  !       G_CI = 1  
+  !    END IF
+  !    trans = Tr*(1+F_theta*G_CI)
+     
   end select
 
 end function trans
-
-!!! Copied and pasted from case (14)
-!!$     case (14)  !HX 16/06/2017
-!!$        A1 = 0.0268*log(chlo) + 0.5581                 !version for including albedo
-!!$        A2 = -0.017*log(chlo) + 0.2246
-!!$        !      B1 = -0.0184*chlo**2 + 0.1141*chlo+0.042
-!!$        !      B2 = 0.5641*chlo**0.13
-!!$
-!!$
-!!$        !     A1 = 0.571+0.025*log(0.149*chlo)               !version for not including albedo
-!!$        !     A2 = 0.223+0.010*log(2.329*chlo)
-!!$        B1 = 0.015+0.176*sqrt(0.462*chlo)
-!!$        B2 = 0.688+0.060*log(0.125*chlo)
-!!$        Tr = A1*exp(-B1*z) + A2*exp(-B2*z)
-!!$        F_theta = 0.42*coszen-0.34
-!!$        IF (cloud.gt. 0.1) then
-!!$           G_CI = 0
-!!$        ELSE 
-!!$           G_CI = 1  
-!!$        END IF
-!!$        trans = Tr*(1+F_theta*G_CI)
-!!$        rad(i)=I_0*trans/(rho_0*cp)  
-
-!!! Copied and pasted from case (13)
-!!$     case (13)   
-!!$        !   this calcualtion is defined for theta_a = acos(coszen) varies from 0-60 degrees; however, appplying adaption seems does not make much difference with 61277.dat  
-!!$        !    IF (coszen.ge.0.5) then
-!!$        !---------------------------
-!!$        !    IF (coszen.gt.0.9848) then 
-!!$        !        coszen = 0.9848
-!!$        !    End if 
-!!$        !    If (coszen.lt.0.5) then  
-!!$        !        coszen = 0.5
-!!$        !    end if 
-!!$        !---------------------------angle does not affect much    
-!!$        IF (I_0 .le. 0) then 
-!!$           rad(i) = 0
-!!$        ELSE 
-!!$           K1 = (-0.057+0.482*sqrt(abp_coe)+4.221*bb)*(1+0.09*sin(acos(coszen)))
-!!$           K2 = (0.183+0.702*abp_coe-2.567*bb)*(1.465-0.667*coszen) 
-!!$           K_vis = K1+K2/sqrt(1+z)
-!!$           K_ir = (0.560+2.304/(0.001+z)**0.65)*(1+0.002*acos(coszen)*180/(3.1415926))
-!!$           IF (z.gt. 3.0) then  ! E_IR is absorbed within the layer of top 3m.   
-!!$              trans = 0.424*exp(-K_vis*z)            
-!!$           ELSE
-!!$              trans = 0.576*exp(-K_ir*z)+0.424*exp(-K_vis*z)  
-!!$
-!!$           END IF
-!!$        END If
-!!$        !    ELSE
-!!$        !coszen = 0.5   
-!!$        !    K1 = -0.057+0.482*sqrt(abp_coe)+4.221*bb*(1+0.09*sin(acos(coszen)))
-!!$        !    K2 = (0.183+0.702*abp_coe-2.567*bb)*(1.465-0.667*coszen) 
-!!$        !    K_vis = K1+K2/(1+z)**0.5
-!!$        !    K_ir = (0.560+2.304/(0.001+z)**0.65)*(1+0.002*acos(coszen)*180/3.1415926)
-!!$
-!!$        !       IF (z.lt.-3) then
-!!$        !            trans = 0.424*exp(-K_vis*z)            
-!!$        !        ELSE
-!!$        !            trans = 0.576*exp(-K_ir*z)+0.424*exp(-K_vis*z)            
-!!$        !        END IF 
-!!$
-!!$        !    END IF
-!!$        !     print*, trans
-!!$        rad(i)=I_0*trans/(rho_0*cp)                    
-
-!!! Copied and pasted from case(12), outside of the select case block.
-!!$  !--------------------------------
-!!$  !WT Due to HX/SP, extra factor of Trans_1/(1-albedo) to remove the albedo factor I_0, and apply the implicit albedo in Ohlmann's formulas.
-!!$  !-------------------------------HX 
-!!$
-!!$  IF(cloud.gt. 0.1) then
-!!$     DO j=1,4
-!!$        para_A=C1(j)*chlo+C2(j)*cloud+C4(j)               
-!!$        Trans_1 = Trans_1+para_A                                    
-!!$     END DO
-!!$  ELSE
-!!$     DO j=9,12
-!!$        !                   IF (coszen.lt.2.49/(7.68*chlo+17.81)) then
-!!$        !                       coszen = 2.49/(7.68*chlo+17.81)
-!!$        !                   END IF
-!!$
-!!$        IF(coszen.lt. 0.2588) THEN
-!!$           coszen=0.2588   
-!!$        END IF
-!!$        para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
-!!$        Trans_1 = Trans_1+para_A
-!!$     END DO
-!!$  End If
-!!$  !---------------------------------HX
-!!$
-!!$  rad(nlev)=I_0*Trans_1/(rho_0*cp*(1-albedo))
-
-!!! Copied and pasted from case(12).
-!!$           trans=0.0
-!!$           IF(cloud.gt.0.1) then
-!!$              !revised SP 20/06/17 setting clear sky limit as 0.1 following Table 1 in Ohlmann&Siegel(2000)
-!!$              DO j=1,4
-!!$                 para_A=C1(j)*chlo+C2(j)*cloud+C4(j)
-!!$                 para_K=C1(j+4)*chlo+C2(j+4)*cloud+C4(j+4)
-!!$                 trans=trans+para_A*exp(-para_K*z)
-!!$              END DO
-!!$           ELSE
-!!$              DO j=9,12
-!!$                 !                   IF (coszen.lt. 2.49/(7.68*chlo+17.81)) then 
-!!$                 !                       coszen =2.49/(7.68*chlo+17.81)
-!!$                 IF(coszen.lt. 0.2588) THEN
-!!$                    coszen=0.2588   
-!!$                 END IF
-!!$                 para_A=C1(j)*chlo+(C3(j)/coszen)+C4(j)
-!!$                 para_K=C1(j+4)*chlo+(C3(j+4)/coszen)+C4(j+4)
-!!$                 trans=trans+para_A*exp(-para_K*z)
-!!$
-!!$              END DO
-!!$           END IF
-!!$           !WT Due to HX/SP, removes the extra albedo application outside of Ohlmann's formulation.
-!!$           rad(i)=(I_0/(1-albedo))*trans/(rho_0*cp)
-!!!
 
 !EOC
 !-----------------------------------------------------------------------
