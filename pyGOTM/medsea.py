@@ -114,7 +114,7 @@ ASM_level = {
     'ASM3': dict(assimilation_type=2, assim_window=3, extinct_method=12, extinct_file='chlo.dat'), # Ohlmann-Siegel (2000) chlorophyll-a based
     'ASM4': dict(assimilation_type=2, assim_window=3, extinct_method=15), # Paulson-Simpson 9-band with Jerlov type I modification due to Verevochkin (2005)
     'ASM5': dict(assimilation_type=2, assim_window=3, extinct_method=13, extinct_file='iop.dat'), # Lee et al. (2003) IOP-based
-    'ASM6': dict(assimilation_type=2, assim_window=3, extinct_method=16), # Paulson-Simpson 9-band with Jerlov type I modification due to Soloviev et al. (2005)
+    'ASM6': dict(assimilation_type=2, assim_window=3, extinct_method=16), # Paulson-Simpson 9-band with Jerlov type I modification due to Soloviev et al. (1996)
 
 }
 
