@@ -23,6 +23,26 @@ def run_setup(grid, ver, wd):
     return medsea
 
 def write_dat(indices,run_instance):
+    """    
+    Usage:
+    from pyGOTM import medsea # import a predefined run instance
+    
+    indices = medsea.sea_mn[0:100] # the predefined indices was stored as an attribute of the run instance, take only first 100 indices
+
+    write_dat(indices,medsea) # passing the indices and the run instance to the write_date method, which should be implemented as a method
+    of the run instance instead of a method of the pipeline... maybe
+
+    Current design issue (2018-08-22), in realistic usage, the input data files may not be static and could come from different sources.
+
+    For e.g. the chlo.dat file could come from either linear interpolations of 8-day average, 
+    or a daily average with some sort of interpolation or reconstruction.
+
+    Moreover, the same file might be used for more than one purpose: chlo.dat is used both as an input to the extinction (light absorption) 
+    parametrization, and to the albedo parametrization. Opening the same file twice is acceptable if compiled by ifort, but not by gfortran
+    as per Fortran standard.
+
+
+    """
     from netCDF4 import Dataset, MFDataset, num2date
     from os.path import join
     from numpy.ma import masked_outside, is_masked
