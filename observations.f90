@@ -69,7 +69,7 @@
    double precision, public          :: A=0.58,g1=0.35,g2=23.0
    double precision, public          :: chlo      !SP 20/02/06
    double precision, public          :: abp_coe,bb      !HX 11/05/2017 
-   double precision, public          :: Trans_1
+   !double precision, public          :: Trans_1 !WT 2018-08-22 
 
 !HK/SH
 !  Parameters for absorption of solar energy - Paulson and Simpson 1981
