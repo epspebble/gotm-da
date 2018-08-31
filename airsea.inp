@@ -8,8 +8,8 @@
         wind_h=           10,
         rh_h=             2,
         airt_h=           2,
-        solar=            1370.,
-        net_ir=           1370.,
+        solar=            1367., !WT Updated from https://plantpredict.com/algorithm/irradiance-radiation/#gti-dirint, agrees with wikipedia
+        net_ir=           1353., !WT Taken from airsea.inp initialization value
         swr_error=        0.0,
         wind_error=       0.0,
   const_qin=              1000.0,

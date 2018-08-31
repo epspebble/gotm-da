@@ -76,10 +76,13 @@ module airsea
   !  integrated short-wave radiation, heat flux and total heat flux:
   double precision, public                    :: int_sw=0.,int_hf=0.
   double precision, public                    :: int_total=0.,int_cs=0.
-  !
-!!!!! SH - 14/08/2003 - additional parameters for thermal skin etc
-  !
-  double precision, public	:: I_0_calc,coszen,cosr,qdir_frac,qdiff_frac
+  !  locations of the sun, and time of year etc.
+  double precision, public                    :: gamma, eqtime, tst, tst_offset
+  double precision, public                    :: decl, coszen, cosr, ha
+
+  !!!!! SH - 14/08/2003 - additional parameters for thermal skin etc
+  ! 
+  double precision, public	:: I_0_calc,qdir_frac,qdiff_frac
   double precision, public	:: deltaTo=0., sssto=0., deltaT=0.
   double precision, public	:: sssT=0., delta=0.,I_0_cs
   double precision, public	:: I_cool = 0.,albedo,qtot,sunbet
@@ -205,8 +208,13 @@ module airsea
   double precision                  :: alat,alon
 
 !!!!! SH 14/08/2003
+
+  !WT This may be assimilated from some data source depending of airt_method
   double precision, public	:: airt
-  double precision, public	:: solar
+
+  !WT These two values are also read directly from the 'airsea' namelist, so these
+  ! initialization values are normally overridden immediately
+  double precision, public	:: solar=1367 !WT Set the value found in short_wave_radiation
   double precision, public	:: net_ir=1353 !1350.
 
   !WT 2016-09-24 Debug
@@ -276,18 +284,18 @@ contains
          airt_method, airt_file, &
          albedo_method, albedo_file, & !WT
          coolskin_method !WT
-    
+
     namelist /coolskin/ iter_max,err_max !WT
     !
     !-----------------------------------------------------------------------
     !BOC
     write(0,*) '   ', 'init_air_sea'
 
-!WT 20171026
+    !WT 20171026
     open(namlst,file='coolskin.inp',action='read',status='old',err=901)
     read(namlst,nml=coolskin,err=902)
     close(namlst)
-    
+
 999 write(0,*) 'Finished temporary hack for coolskin control.'
 
     open(namlst,file='airsea.inp',action='read',status='old',err=90)
@@ -431,7 +439,7 @@ contains
 100 write(0,*) 'FATAL ERROR: ', 'I could not open ',trim(albedo_file)
     stop 'init_airsea'
 
-!WT 20171026
+    !WT 20171026
 901 write(0,*) 'WARNING: ', 'I could not open coolskin.inp.\n Resorting to default values.'
     iter_max = 30
     err_max = 0.001
@@ -441,7 +449,7 @@ contains
     err_max = 0.001
     goto 999
 
-    
+
   end subroutine init_air_sea
   !EOC
 
@@ -516,7 +524,7 @@ contains
        call read_heat_flux(jul,secs,swrd,adjustment,qb_down)
     case default
     end select
-    
+
     select case (swr_method)
     case (CONSTVAL)
        I_0=const_qin
@@ -530,7 +538,7 @@ contains
           print *, "The flux_method must equal ", FROMFILE, " as well."
           stop "RuntimeError"
        else
-          
+
           ! WT Calculate "clear-sky downward SWR according to Rosati (88)"
           ! Output saved as I_0_calc. It should not include albedo calculation here. Revision needed.
           call short_wave_radiation(jul,secs,alat,alon,I_0_calc)
@@ -541,12 +549,12 @@ contains
           ! WT Deduce a cloud value from the adjustment factor restricted to [0,1]
           !    We are effectively assuming the reduction of swrd in the atmosphere is due purely to 'cloud'
           cloud = 1 - min(1.,max(0.,adjustment))
-          
+
           ! WT Some other previous comments not by me.
           !Net shortwave radiation
           !  I_0=I_0_calc
           !     The heat fluxes
-          
+
           !              I_0=adjustment*(1.-albedo) ! adjustment comes from heat.dat 3rd column
 
           ! SP June 2016 - determine cloud fraction
@@ -754,24 +762,24 @@ contains
     double precision                  ::usrold,tsrold,qsrold,conusr,contsr,conqsr
     double precision                  ::hsb,hlb,qout,dels,qcol,alq,xlamx
     double precision                  ::f_c=0.
-! Formula coefficients for extinct_method = 12
-double precision                  :: C1(16) = &
-(/.026,-.009,-.015,-.003,.063,.278,3.91,16.64, &
-.033,-.01,-.019,-.006,.066,.396,7.68,51.27/)
-double precision                  :: C2(16) = &
-(/.112,.034,-.006,-.131,-.015,-.562,-12.91,-478.28, &
-.0,.0,.0,.0,.0,.0,.0,.0/)
-double precision                  :: C3(16) = &
-(/.0,.0,.0,.0,.0,.0,.0,.0, &
--.025,-.007,-.003,-.004,.006,-.027,-2.49,13.14/)
-double precision                  :: C4(16) = &
-(/.366,.207,.188,.169,.082,1.02,16.62,736.56, &
-.419,.231,.195,.154,.066,.886,17.81,665.19/)
+    ! Formula coefficients for extinct_method = 12
+    double precision                  :: C1(16) = &
+         (/.026,-.009,-.015,-.003,.063,.278,3.91,16.64, &
+         .033,-.01,-.019,-.006,.066,.396,7.68,51.27/)
+    double precision                  :: C2(16) = &
+         (/.112,.034,-.006,-.131,-.015,-.562,-12.91,-478.28, &
+         .0,.0,.0,.0,.0,.0,.0,.0/)
+    double precision                  :: C3(16) = &
+         (/.0,.0,.0,.0,.0,.0,.0,.0, &
+         -.025,-.007,-.003,-.004,.006,-.027,-2.49,13.14/)
+    double precision                  :: C4(16) = &
+         (/.366,.207,.188,.169,.082,1.02,16.62,736.56, &
+         .419,.231,.195,.154,.066,.886,17.81,665.19/)
 
-! Parameters for extinct_method 12
-double precision		:: para_A,para_K
-! Parameters for extinct_method 13
-double precision              :: K_ir,K_vis,K1,K2
+    ! Parameters for extinct_method 12
+    double precision		:: para_A,para_K
+    ! Parameters for extinct_method 13
+    double precision              :: K_ir,K_vis,K1,K2
 
     integer                           ::iter
 
@@ -991,7 +999,7 @@ double precision              :: K_ir,K_vis,K1,K2
        ! calculate the fraction of solar radiation absorbed in the skin layer
        ! this depends on extinction method
        select case (extinct_method)
-          
+
        case(9)
           !Eq. (16) from Fairall et al., 1996b, using the full Paulson & Simpson (1981) 9-band scheme
           do j=1,9
@@ -999,7 +1007,7 @@ double precision              :: K_ir,K_vis,K1,K2
           end do
           dels=rns*f_c
           f_c=0.
-          
+
        case(12)
 
 
@@ -1007,7 +1015,7 @@ double precision              :: K_ir,K_vis,K1,K2
           !if(coszen.lt. 0.2588) then
           !   coszen=0.2588
           !end if
-          
+
           !Eq. (7) in Ohlmann & Siegel (2000)
           if(cloud.gt.0.1) then
              do j=1,4
@@ -1035,14 +1043,14 @@ double precision              :: K_ir,K_vis,K1,K2
           !uses Eq. (11) in Lee et al., 2005
           K1 = (-0.057+0.482*sqrt(abp_coe)+4.221*bb)*(1+0.09*sin(acos(coszen)))
           K2 = (0.183+0.702*abp_coe-2.567*bb)*(1.465-0.667*coszen)
-          
+
           K_vis = K1+K2/sqrt(1+(tkt/2))
           K_ir = (0.560+2.304/(0.001+(tkt/2))**0.65)*(1+0.002*acos(coszen)*180/(3.1415926))
-          
+
           f_c = 1 - ( 0.576*exp(-K_ir*(tkt/2)) + 0.424*exp(-K_vis*(tkt/2)) ) ! crude numerical approx. of integral, i.e. 1-T(z=tkt/2)
           dels=rns*f_c
           f_c=0.
-          
+
        case(15)
           !Eq. (16) from Fairall et al., 1996b, using the full Paulson & Simpson (1981) 9-band scheme
           zdeta(1)=24.1;  ! Jerlov water type I
@@ -1066,7 +1074,7 @@ double precision              :: K_ir,K_vis,K1,K2
           end do
           dels=rns*f_c
           f_c=0.
-          
+
        case(16)
           !Eq. (16) from Fairall et al., 1996b, using the full Paulson & Simpson (1981) 9-band scheme
           zdeta(1)=1/0.066;  ! Jerlov water type I
@@ -1084,61 +1092,61 @@ double precision              :: K_ir,K_vis,K1,K2
           end do
           dels=rns*f_c
           f_c=0.0
-          
+
        case default
-          
+
           !Eq. (17) from Fairall et al., 1996b (an approximation of Paulson & Simpson (1981) 9-band scheme)
           !f_c = .137+11.*tkt-6.6e-5/tkt*(1.-dexp(-tkt/8.0e-4))
-          
+
           !Eq. (17) from Fairall et al., 1996b, first term is changed based on suggestion by Wick et al., 2005 (who used the Ohlmann & Siegel (2000) scheme)
           f_c = .067+11.*tkt-6.6e-5/tkt*(1.-dexp(-tkt/8.0e-4))
-          
+
           dels=rns*f_c
           f_c=0.
-          
+
        end select
-       
-!------ Coolskin parametrization options  ------------------------------------        
-        qcol=qout-dels
-        
-        if (qcol.le.0) then
-           !no cool-skin, we do not model a possible warm-skin
-           dter = 0
-        else
-           select case (coolskin_method) 
-           case (1)
-              !---------------------------------------- Artale et al (2002)    HX
-              !WT Split casing w.r.t to wind speed.
-              if (w.le.7.5) then
-                 xlamx = (sqrt(rho_air/rhow)*usr)*von*86400/((0.2*w+0.5)*rhow*10*cpw*visw)
-              end if
-              if (w.gt.7.5.and.w.lt.10) then
-                 xlamx = (sqrt(rho_air/rhow)*usr)*von*86400/((1.6*w-10)*rhow*10*cpw*visw)
-              end if
-              if (w.ge.10) then
-                 xlamx = (sqrt(rho_air/rhow)*usr)*von*86400/(6*rhow*10*cpw*visw)
-              end if
-              tkt=xlamx*visw/(sqrt(rho_air/rhow)*usr)
-              
-              !WT Seem to be common to Fairall et al (1996b) and Artale et al (2002).
-              dter=qcol*tkt/tcw                                 ! Cool skin (Eq. 13 in Fairall et al. (1996b))
-              !------------------------end Artale et al (2002)------------
 
-!---------------------------------------------------PS81  !HX
-!        xlamx = 6.5
-!        tkt=xlamx*visw/(sqrt(rho_air/rhow)*usr)
-!-----------------------end PS81-------------------------
+       !------ Coolskin parametrization options  ------------------------------------        
+       qcol=qout-dels
 
-!---------------------------------------------------W85   !HX
-!        if (u10.le.7) then
-!           xlamx = 2+(5/7)*u10
-!        else
-!           xlamx = 7.
-!        end if
-!        tkt=xlamx*visw/(sqrt(rho_air/rhow)*usr)
-!----------------------end W85--------------------------
+       if (qcol.le.0) then
+          !no cool-skin, we do not model a possible warm-skin
+          dter = 0
+       else
+          select case (coolskin_method) 
+          case (1)
+             !---------------------------------------- Artale et al (2002)    HX
+             !WT Split casing w.r.t to wind speed.
+             if (w.le.7.5) then
+                xlamx = (sqrt(rho_air/rhow)*usr)*von*86400/((0.2*w+0.5)*rhow*10*cpw*visw)
+             end if
+             if (w.gt.7.5.and.w.lt.10) then
+                xlamx = (sqrt(rho_air/rhow)*usr)*von*86400/((1.6*w-10)*rhow*10*cpw*visw)
+             end if
+             if (w.ge.10) then
+                xlamx = (sqrt(rho_air/rhow)*usr)*von*86400/(6*rhow*10*cpw*visw)
+             end if
+             tkt=xlamx*visw/(sqrt(rho_air/rhow)*usr)
 
-           case default
+             !WT Seem to be common to Fairall et al (1996b) and Artale et al (2002).
+             dter=qcol*tkt/tcw                                 ! Cool skin (Eq. 13 in Fairall et al. (1996b))
+             !------------------------end Artale et al (2002)------------
+
+             !---------------------------------------------------PS81  !HX
+             !        xlamx = 6.5
+             !        tkt=xlamx*visw/(sqrt(rho_air/rhow)*usr)
+             !-----------------------end PS81-------------------------
+
+             !---------------------------------------------------W85   !HX
+             !        if (u10.le.7) then
+             !           xlamx = 2+(5/7)*u10
+             !        else
+             !           xlamx = 7.
+             !        end if
+             !        tkt=xlamx*visw/(sqrt(rho_air/rhow)*usr)
+             !----------------------end W85--------------------------
+
+          case default
              !---------------------------------------- Fairall et al (1996b)
              alq=Al*qcol+be*hlb*cpw/xlv                      !Eq. 8 in Fairall et al. (1996b)
              if(alq.gt.0.) then                              !originally (qcol.gt.0)
@@ -1150,17 +1158,17 @@ double precision              :: K_ir,K_vis,K1,K2
              end if
              dter=qcol*tkt/tcw                                 ! Cool skin (Eq. 13 in Fairall et al. (1996b))
              !------------------------end Fairall et al (1996b)------------
-            
-         end select
 
-         end if
-         
+          end select
+
+       end if
+
        dqer=wetc*dter
 
 
        !WT Following should be immediately after computations of conusr, contsr, conqsr
        ! for readability up to the second 'continue' statement (jump out point)
-       
+
        !(sxj) check for convergence and leave loop if met
        IF((iter==iter_max).AND.(max(abs(conusr),abs(contsr),abs(conqsr)).gt.err_max)) THEN
           PRINT*,'convergence error: consur, constr, conqsr = ', conusr, contsr, conqsr

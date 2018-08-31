@@ -21,6 +21,9 @@ ifneq (,$(wildcard $(TMP)))
 TMP = .
 endif
 
+# Prevent the object archives to be created in deterministic mode.
+ARFLAGS=rU
+
 # Use a locally built netcdf-3.6.2 static library. 
 # Prefer Intel Fortran over GNU Fortran compiler (if available)
 
@@ -77,84 +80,88 @@ NETCDFLIB=libnetcdf.a # Build it and copy it to our working folder
 #FFLAGS = -I$(NETCDFINCDIR)
 
 MODULES	= \
-libutil.a(time.o)			\
-libutil.a(tridiagonal.o)		\
-libutil.a(eqstate.o)			\
-libobservations.a(observations.o)	\
-libmeanflow.a(meanflow.o)		\
-libturbulence.a(turbulence.o)		\
-liboutput.a(asciiout.o)			\
-liboutput.a(ncdfout.o)			\
-liboutput.a(output.o)			\
-libturbulence.a(sediment.o)		\
-libturbulence.a(seagrass.o)
+libutil.a(util/time.o)			\
+libutil.a(util/tridiagonal.o)		\
+libutil.a(util/eqstate.o)			\
+libobservations.a(observations/observations.o)	\
+libmeanflow.a(meanflow/meanflow.o)		\
+libturbulence.a(turbulence/turbulence.o)		\
+liboutput.a(output/asciiout.o)			\
+liboutput.a(output/ncdfout.o)			\
+liboutput.a(output/output.o)			\
+libturbulence.a(turbulence/sediment.o)		\
+libturbulence.a(turbulence/seagrass.o)
+
+#WT Other than the key module defining source code above,
+# The rest of the code under each library is to be grouped
+# into subdirectories.
 
 AIRSEA	= \
-libairsea.a(airsea.o)		\
-libairsea.a(short_wave_radiation.o)	\
+libairsea.a(airsea/airsea.o)		\
+libairsea.a(airsea/short_wave_radiation.o)	\
 
 UTIL	= \
-libutil.a(advection.o)		\
-libutil.a(w_split_it_adv.o)	\
-libutil.a(gridinterpol.o)	\
-libutil.a(yevol.o)
+libutil.a(util/advection.o)		\
+libutil.a(util/w_split_it_adv.o)	\
+libutil.a(util/gridinterpol.o)	\
+libutil.a(util/yevol.o)
 
 MEANFLOW	= \
-libmeanflow.a(updategrid.o)		\
-libmeanflow.a(adaptivegrid.o)		\
-libmeanflow.a(coriolis.o)		\
-libmeanflow.a(uequation.o)		\
-libmeanflow.a(vequation.o)		\
-libmeanflow.a(extpressure.o)		\
-libmeanflow.a(intpressure.o)		\
-libmeanflow.a(friction.o)		\
-libmeanflow.a(temperature.o)		\
-libmeanflow.a(salinity.o)		\
-libmeanflow.a(stratification.o)		\
-libmeanflow.a(buoyancy.o)		\
-libmeanflow.a(convectiveadjustment.o)	\
-libmeanflow.a(production.o)
+libmeanflow.a(meanflow/updategrid.o)		\
+libmeanflow.a(meanflow/adaptivegrid.o)		\
+libmeanflow.a(meanflow/coriolis.o)		\
+libmeanflow.a(meanflow/uequation.o)		\
+libmeanflow.a(meanflow/vequation.o)		\
+libmeanflow.a(meanflow/extpressure.o)		\
+libmeanflow.a(meanflow/intpressure.o)		\
+libmeanflow.a(meanflow/friction.o)		\
+libmeanflow.a(meanflow/temperature.o)		\
+libmeanflow.a(meanflow/salinity.o)		\
+libmeanflow.a(meanflow/stratification.o)		\
+libmeanflow.a(meanflow/buoyancy.o)		\
+libmeanflow.a(meanflow/convectiveadjustment.o)	\
+libmeanflow.a(meanflow/production.o)
 
 TURBULENCE   = \
-libturbulence.a(tkeeq.o)		\
-libturbulence.a(q2over2eq.o)		\
-libturbulence.a(lengthscaleeq.o)	\
-libturbulence.a(dissipationeq.o)	\
-libturbulence.a(genericeq.o)		\
-libturbulence.a(tkealgebraic.o)		\
-libturbulence.a(algebraiclength.o)	\
-libturbulence.a(ispralength.o)		\
-libturbulence.a(potentialml.o)		\
-libturbulence.a(cmue_bb.o)		\
-libturbulence.a(cmue_bbqe.o)		\
-libturbulence.a(cmue_ca.o)		\
-libturbulence.a(cmue_caqe.o)		\
-libturbulence.a(cmue_cb.o)		\
-libturbulence.a(cmue_cbqe.o)		\
-libturbulence.a(cmue_kc.o)		\
-libturbulence.a(cmue_kcqe.o)		\
-libturbulence.a(cmue_my.o)		\
-libturbulence.a(cmue_gpqe.o)		\
-libturbulence.a(cmue_ma.o)		\
-libturbulence.a(cmue_sg.o)		\
-libturbulence.a(cmue_rf.o)		\
-libturbulence.a(fk_craig.o)		\
-libturbulence.a(turbulence_adv.o)	\
-libturbulence.a(gotm.o)
+libturbulence.a(turbulence/tkeeq.o)		\
+libturbulence.a(turbulence/q2over2eq.o)		\
+libturbulence.a(turbulence/lengthscaleeq.o)	\
+libturbulence.a(turbulence/dissipationeq.o)	\
+libturbulence.a(turbulence/genericeq.o)		\
+libturbulence.a(turbulence/tkealgebraic.o)		\
+libturbulence.a(turbulence/algebraiclength.o)	\
+libturbulence.a(turbulence/ispralength.o)		\
+libturbulence.a(turbulence/potentialml.o)		\
+libturbulence.a(turbulence/cmue_bb.o)		\
+libturbulence.a(turbulence/cmue_bbqe.o)		\
+libturbulence.a(turbulence/cmue_ca.o)		\
+libturbulence.a(turbulence/cmue_caqe.o)		\
+libturbulence.a(turbulence/cmue_cb.o)		\
+libturbulence.a(turbulence/cmue_cbqe.o)		\
+libturbulence.a(turbulence/cmue_kc.o)		\
+libturbulence.a(turbulence/cmue_kcqe.o)		\
+libturbulence.a(turbulence/cmue_my.o)		\
+libturbulence.a(turbulence/cmue_gpqe.o)		\
+libturbulence.a(turbulence/cmue_ma.o)		\
+libturbulence.a(turbulence/cmue_sg.o)		\
+libturbulence.a(turbulence/cmue_rf.o)		\
+libturbulence.a(turbulence/fk_craig.o)		\
+libturbulence.a(turbulence/turbulence_adv.o)	\
+libturbulence.a(gotm.o) #WT Curious. A particular module depends on main loop gotm.f90!?
 #libturbulence.a(gotm_lib_version.o)
 
 OBSERVATIONS   = \
-libobservations.a(analytical_profile.o)	\
-libobservations.a(get_eps_profile.o)	\
-libobservations.a(get_ext_pressure.o)	\
-libobservations.a(get_int_pressure.o)	\
-libobservations.a(get_s_profile.o)	\
-libobservations.a(get_t_profile.o)	\
-libobservations.a(get_vel_profile.o)	\
-libobservations.a(get_w_adv.o)	\
-libobservations.a(get_zeta.o)	\
-libobservations.a(read_extinction.o)	\
-#libobservations.a(read_chlo.o)	\
+libobservations.a(observations/analytical_profile.o)	\
+libobservations.a(observations/get_eps_profile.o)	\
+libobservations.a(observations/get_ext_pressure.o)	\
+libobservations.a(observations/get_int_pressure.o)	\
+libobservations.a(observations/get_s_profile.o)	\
+libobservations.a(observations/get_t_profile.o)	\
+libobservations.a(observations/get_vel_profile.o)	\
+libobservations.a(observations/get_w_adv.o)	\
+libobservations.a(observations/get_zeta.o)	\
+libobservations.a(observations/read_extinction.o)	\
+#libobservations.a(observations/read_chlo.o)	\
 
 
 LIBS	=	libairsea.a		\
@@ -172,6 +179,7 @@ gotm: $(NETCDFLIB) $(MODULES) $(LIBS) main.o
 
 backup: gotm
 	tar -czvf .backup/gotm-src-$(TODAY).tar.gz *.f90 Makefile
+
 backup-all: gotm
 	tar -czvf .backup/gotm-$(TODAY).tar.gz *
 
