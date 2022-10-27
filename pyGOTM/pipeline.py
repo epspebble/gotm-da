@@ -320,7 +320,29 @@ def batch_run(grid, run, ver, start, stop, wd, i0=None,i1=None, c=None, k=None, 
         gunzip_start = time()
         print('Extracting content to {:s}...'.format(wd))
         with tarfile.open(fn_tar,'r:gz') as tar:
-            tar.extractall(path=wd)
+            
+            import os
+            
+            def is_within_directory(directory, target):
+                
+                abs_directory = os.path.abspath(directory)
+                abs_target = os.path.abspath(target)
+            
+                prefix = os.path.commonprefix([abs_directory, abs_target])
+                
+                return prefix == abs_directory
+            
+            def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+            
+                for member in tar.getmembers():
+                    member_path = os.path.join(path, member.name)
+                    if not is_within_directory(path, member_path):
+                        raise Exception("Attempted Path Traversal in Tar File")
+            
+                tar.extractall(path, members, numeric_owner=numeric_owner) 
+                
+            
+            safe_extract(tar, path=wd)
         print('Elapsed {:.2f}s.'.format(time()-gunzip_start))
     else:
         print('Creating folder structure for {:d} grid points...'.format(i1-i0))
